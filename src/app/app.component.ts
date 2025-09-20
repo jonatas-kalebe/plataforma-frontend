@@ -8,7 +8,7 @@ import { HttpClient } from '@angular/common/http';
   imports: [CommonModule],
   template: `
     <div style="text-align: center; margin-top: 5rem; font-family: sans-serif;">
-      <h1 style="font-size: 3rem; color: #333;">[Nome da Sua Empresa]</h1>
+      <h1 style="font-size: 3rem; color: #333;">Athenity</h1>
       <p style="font-size: 1.2rem; color: #666;">A revolução na validação de talentos.</p>
 
       <div style="margin-top: 3rem; padding: 2rem; border: 1px solid #ccc; border-radius: 8px; max-width: 600px; margin-left: auto; margin-right: auto; background-color: #f9f9f9;">
