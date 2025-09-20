@@ -37,7 +37,8 @@ export class AppComponent implements OnInit {
   apiMessage: string = 'Conectando...';
 
   ngOnInit() {
-    this.http.get<{ status: string }>('/api/health').subscribe({
+    const apiUrl = 'https://plataforma-api-kwf8.onrender.com/api/health';
+    this.http.get<{ status: string }>(apiUrl).subscribe({
       next: (response) => {
         this.apiStatus = 'online';
         this.apiMessage = `Status: Conectado! Mensagem da API: "${response.status}"`;
