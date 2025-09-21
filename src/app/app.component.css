@@ -1,0 +1,12 @@
+.main-content {
+  animation: fade-in-main 0.8s ease-in;
+}
+
+@keyframes fade-in-main {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
