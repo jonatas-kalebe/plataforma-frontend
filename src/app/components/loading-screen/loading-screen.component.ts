@@ -16,10 +16,8 @@ import { finalize } from 'rxjs/operators';
 export class LoadingScreenComponent implements OnInit {
   isFadingOut = false;
   @Output() loadingFinished = new EventEmitter<void>();
-
   svgContent: SafeHtml | null = null;
 
-  // IDs dos grupos que esperamos encontrar no SVG
   private readonly svgGroupIds = [
     'owl-outline', 'owl-head-details', 'owl-left-eye', 'owl-right-eye',
     'owl-left-pupil', 'owl-body-circuitry-left', 'owl-body-circuitry-right',
@@ -28,7 +26,7 @@ export class LoadingScreenComponent implements OnInit {
 
   private readonly sanitizer = inject(DomSanitizer);
   private readonly http = inject(HttpClient);
-  private readonly cdr = inject(ChangeDetectorRef); // Para notificar o Angular sobre as mudanças
+  private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnInit(): void {
     this.http.get('assets/logo/Logo_lines.svg', { responseType: 'text' })
@@ -36,42 +34,28 @@ export class LoadingScreenComponent implements OnInit {
         finalize(() => {
           setTimeout(() => {
             this.isFadingOut = true;
-            this.cdr.markForCheck(); // Notifica a mudança
+            this.cdr.markForCheck();
             setTimeout(() => this.loadingFinished.emit(), 800);
-          }, 7000);
+          }, 3600);
         })
       )
       .subscribe({
         next: (svgData) => {
           this.processSvg(svgData);
-          this.cdr.markForCheck(); // Notifica a mudança
+          this.cdr.markForCheck();
         },
-        error: (err) => {
-          console.error('Falha crítica ao carregar ou processar o arquivo SVG:', err);
-        }
+        error: (err) => {}
       });
   }
 
-  /**
-   * CORRIGIDO: Esta função agora é mais segura.
-   * Ela apenas converte IDs para classes e adiciona classes às elipses,
-   * sem remover atributos estruturais essenciais como 'transform'.
-   */
   private processSvg(svgData: string): void {
     let modifiedSvg = svgData;
-
-    // 1. Converte IDs de grupos para classes para seleção via CSS.
     this.svgGroupIds.forEach(id => {
       const idRegex = new RegExp(`id="${id}"`, 'g');
       modifiedSvg = modifiedSvg.replace(idRegex, `class="${id}"`);
     });
-
-    // 2. Adiciona classes sequenciais às elipses soltas que não têm ID.
     let ellipseCounter = 1;
-    modifiedSvg = modifiedSvg.replace(/<ellipse/g, () => {
-      return `<ellipse class="ellipse-${ellipseCounter++}"`;
-    });
-
+    modifiedSvg = modifiedSvg.replace(/<ellipse/g, () => `<ellipse class="ellipse-${ellipseCounter++}"`);
     this.svgContent = this.sanitizer.bypassSecurityTrustHtml(modifiedSvg);
   }
 }

@@ -26,130 +26,76 @@
 }
 
 .svg-container {
-  /* Usamos vw para que o logo escale com a largura da tela */
   width: 25vw;
-
   min-width: 80px;
   max-width: 200px;
 }
 
-/* --- CORREÇÃO: Aplicando estilos diretamente ao SVG --- */
 .svg-container svg {
-  /* Força o SVG a ocupar 100% do seu container pai (.svg-container) */
   width: 100%;
-  height: auto; /* Mantém a proporção correta */
-  display: block; /* Remove espaços extras abaixo da imagem */
+  height: auto;
+  display: block;
 }
 
+@keyframes draw-stroke { to { stroke-dashoffset: 0; } }
+@keyframes fade-in-element { to { opacity: 1; } }
+@keyframes fade-in-text { to { opacity: 1; } }
 
-/* --- ANIMAÇÕES E ORQUESTRAÇÃO (Seu código, com pequenas melhorias) --- */
-
-@keyframes draw-stroke {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-@keyframes fade-in-element {
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes fade-in-text {
-  to {
-    opacity: 1;
-  }
-}
-
-/* --- ESTILOS GLOBAIS PARA O SVG ANIMADO --- */
 .svg-container path,
 .svg-container ellipse {
-  /* Estilos base para todos os traços */
-  stroke: #A1A1AA !important; /* Cinza claro como cor padrão */
+  stroke: #A1A1AA !important;
   stroke-width: 2 !important;
-  fill: none !important; /* Garante que nada seja preenchido */
+  fill: none !important;
   stroke-linecap: round !important;
   stroke-linejoin: round !important;
-
-  /* Animação base */
   stroke-dasharray: 2500;
   stroke-dashoffset: 2500;
-  animation: draw-stroke 2.5s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  animation: draw-stroke 1.2s cubic-bezier(0.65, 0, 0.35, 1) forwards;
 }
 
-/* --- ORQUESTRAÇÃO DA ANIMAÇÃO (ATRASOS) --- */
-
-.svg-container .owl-outline path {
-  animation-delay: 0s;
-}
-
-.svg-container .owl-head-details path {
-  animation-delay: 1.2s;
-}
+.svg-container .owl-outline path { animation-delay: 0s; }
+.svg-container .owl-head-details path { animation-delay: 0.4s; }
 
 .svg-container .ellipse-3,
 .svg-container .ellipse-4 {
   opacity: 0;
-  animation: fade-in-element 0.5s ease-out forwards, draw-stroke 2.5s cubic-bezier(0.65, 0, 0.35, 1) forwards;
-  animation-delay: 1.8s;
+  animation: fade-in-element 0.3s ease-out forwards, draw-stroke 1.2s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  animation-delay: 0.6s;
 }
 
 .svg-container .owl-left-eye path,
-.svg-container .owl-right-eye path {
-  animation-delay: 2s;
-}
+.svg-container .owl-right-eye path { animation-delay: 0.8s; }
 
-/* Sobrescreve a cor do traço para os olhos */
 .svg-container .owl-right-eye path[d*="Z"],
-.svg-container .owl-left-pupil path[d*="Z"] {
-  stroke: #dbc043 !important;
-}
+.svg-container .owl-left-pupil path[d*="Z"] { stroke: #dbc043 !important; }
 
-.svg-container .owl-left-pupil path {
-  animation-delay: 2.5s;
-}
+.svg-container .owl-left-pupil path { animation-delay: 1s; }
 
 .svg-container .owl-chest-details path,
-.svg-container .owl-leg-details path {
-  animation-delay: 3s;
-}
+.svg-container .owl-leg-details path { animation-delay: 1.2s; }
 
 .svg-container .owl-body-circuitry-left path,
-.svg-container .owl-body-circuitry-right path {
-  animation-delay: 3.5s;
-}
+.svg-container .owl-body-circuitry-right path { animation-delay: 1.4s; }
 
 .svg-container .ellipse-1,
 .svg-container .ellipse-2 {
   opacity: 0;
-  animation: fade-in-element 0.5s ease-out forwards, draw-stroke 2.5s cubic-bezier(0.65, 0, 0.35, 1) forwards;
-  animation-delay: 4s;
+  animation: fade-in-element 0.3s ease-out forwards, draw-stroke 1.2s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  animation-delay: 1.6s;
 }
 
 .svg-container .owl-lower-body-circuitry path,
-.svg-container .owl-lower-body-circuitry ellipse {
-  animation-delay: 4.2s;
-}
+.svg-container .owl-lower-body-circuitry ellipse { animation-delay: 1.8s; }
 
-/* Animação do texto de status */
 .status-text {
   color: #9CA3AF;
   font-family: 'Source Code Pro', monospace;
   opacity: 0;
-  animation: fade-in-text 1s ease-out forwards;
-  animation-delay: 5s;
+  animation: fade-in-text 0.6s ease-out forwards;
+  animation-delay: 2.4s;
 }
 
-/* --- MEDIA QUERY: Ajustes para telas maiores (ex: tablets e desktops) --- */
 @media (min-width: 768px) {
-  .svg-container {
-    /* Podemos permitir que o logo fique um pouco maior em telas grandes */
-    max-width: 180px;
-  }
-
-  .status-text {
-    /* Aumentamos um pouco o texto também */
-    font-size: 1.1rem;
-  }
+  .svg-container { max-width: 180px; }
+  .status-text { font-size: 1.1rem; }
 }
