@@ -3,7 +3,8 @@
   (loadingFinished)="onLoadingFinished()">
 </app-loading-screen>
 
-<div *ngIf="!isAppLoading" class="app-container" [ngClass]="{ 'fade-in': !isAppLoading }">
+<div *ngIf="!isAppLoading" class="app-container" [class.fade-in]="!isAppLoading">
+
   <header class="app-header">
   </header>
 
@@ -11,7 +12,7 @@
   <router-outlet></router-outlet>
     </main>
 
-  <footer class="app-footer">
+  <footer class="app-footer text-center p-4 text-sm text-athenity-text-body/60">
     <p>&copy; 2025 Athenity. Todos os direitos reservados.</p>
   </footer>
   </div>

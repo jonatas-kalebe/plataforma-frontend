@@ -6,7 +6,6 @@
 .app-container {
   min-height: 100vh;
   display: grid;
-  gap: 1rem;
   grid-template-rows: auto 1fr auto;
   grid-template-areas:
     "header"
@@ -25,10 +24,4 @@
 @keyframes fade-in-main {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-@media (min-width: 768px) {
-  .app-container {
-    padding: 0 2rem;
-  }
 }

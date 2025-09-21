@@ -36,7 +36,7 @@
 
 .svg-container path,
 .svg-container ellipse {
-  stroke: #A1A1AA !important;
+  stroke: #8892B0 !important;
   stroke-width: 2 !important;
   fill: none !important;
   stroke-linecap: round !important;
@@ -60,7 +60,7 @@
 .svg-container .owl-right-eye path { animation-delay: 0.8s; }
 
 .svg-container .owl-right-eye path[d*="Z"],
-.svg-container .owl-left-pupil path[d*="Z"] { stroke: #dbc043 !important; }
+.svg-container .owl-left-pupil path[d*="Z"] { stroke: #FFD700 !important; }
 
 .svg-container .owl-left-pupil path { animation-delay: 1s; }
 
@@ -81,8 +81,8 @@
 .svg-container .owl-lower-body-circuitry ellipse { animation-delay: 1.8s; }
 
 .status-text {
-  color: #9CA3AF;
-  font-family: 'Source Code Pro', monospace;
+  color: #8892B0;
+  font-family: 'Fira Code', monospace;
   opacity: 0;
   animation: fade-in-text 0.6s ease-out forwards;
   animation-delay: 2.4s;
