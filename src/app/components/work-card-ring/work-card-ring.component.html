@@ -1,38 +1,8 @@
-<div class="mt-14 perspective">
+<div class="ring-wrap">
   <div #ring class="ring">
-    <div class="card">
-      <div class="thumb"></div>
-      <div class="meta">
-        <h5>Projeto A</h5>
-        <span>Experiência Imersiva</span>
-      </div>
-    </div>
-    <div class="card">
-      <div class="thumb"></div>
-      <div class="meta">
-        <h5>Projeto B</h5>
-        <span>Plataforma Inteligente</span>
-      </div>
-    </div>
-    <div class="card">
-      <div class="thumb"></div>
-      <div class="meta">
-        <h5>Projeto C</h5>
-        <span>Data-Driven</span>
-      </div>
-    </div>
-    <div class="card">
-      <div class="thumb"></div>
-      <div class="meta">
-        <h5>Projeto D</h5>
-        <span>E-commerce Moderno</span>
-      </div>
-    </div>
-    <div class="card">
-      <div class="thumb"></div>
-      <div class="meta">
-        <h5>Projeto E</h5>
-        <span>Sistema de Gestão</span>
+    <div class="work-card" *ngFor="let item of items; index as idx" [style.--i]="idx">
+      <div class="work-card-inner">
+        {{ item.title }}
       </div>
     </div>
   </div>

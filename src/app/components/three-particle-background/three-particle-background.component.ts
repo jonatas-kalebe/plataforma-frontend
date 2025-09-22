@@ -1,3 +1,4 @@
+// src/app/pages/landing/three-particle-background.component.ts
 import { Component, ElementRef, AfterViewInit, OnDestroy, NgZone, HostListener } from '@angular/core';
 import * as THREE from 'three';
 
@@ -5,23 +6,21 @@ import * as THREE from 'three';
   selector: 'app-three-particle-background',
   standalone: true,
   template: '',
-  styles: [':host { display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }']
+  styles: [':host{display:block;position:absolute;top:0;left:0;width:100%;height:100%;z-index:-1}']
 })
 export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestroy {
   private scene!: THREE.Scene;
   private camera!: THREE.PerspectiveCamera;
   private renderer!: THREE.WebGLRenderer;
   private particles!: THREE.Points;
-  private mouse = new THREE.Vector2(-100, -100); // Iniciar fora da tela
-  private raycaster = new THREE.Raycaster();
-  private originalPositions!: Float32Array;
+  private mouse = new THREE.Vector2(-100, -100);
+  private original!: Float32Array;
+  private raf = 0;
 
-  private animationFrameId!: number;
-
-  constructor(private el: ElementRef, private ngZone: NgZone) {}
+  constructor(private el: ElementRef, private zone: NgZone) {}
 
   ngAfterViewInit(): void {
-    this.ngZone.runOutsideAngular(() => {
+    this.zone.runOutsideAngular(() => {
       this.initThree();
       this.createParticles();
       this.animate();
@@ -29,35 +28,33 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   }
 
   ngOnDestroy(): void {
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-    }
-    window.removeEventListener('resize', this.onWindowResize);
-    // Limpeza de recursos do Three.js
-    if(this.renderer) this.renderer.dispose();
-    if(this.particles.geometry) this.particles.geometry.dispose();
-    if((this.particles.material as THREE.Material)) (this.particles.material as THREE.Material).dispose();
+    if (this.raf) cancelAnimationFrame(this.raf);
+    window.removeEventListener('resize', this.onResize);
+    if (this.renderer) this.renderer.dispose();
+    if (this.particles?.geometry) this.particles.geometry.dispose();
+    if (this.particles?.material) (this.particles.material as THREE.Material).dispose();
   }
 
-  @HostListener('window:resize', ['$event'])
-  onWindowResize = (): void => {
-    this.camera.aspect = this.el.nativeElement.clientWidth / this.el.nativeElement.clientHeight;
+  @HostListener('window:resize')
+  onResize = () => {
+    const host = this.el.nativeElement;
+    this.camera.aspect = host.clientWidth / host.clientHeight;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(this.el.nativeElement.clientWidth, this.el.nativeElement.clientHeight);
-  }
+    this.renderer.setSize(host.clientWidth, host.clientHeight);
+  };
 
   @HostListener('document:mousemove', ['$event'])
-  onMouseMove(event: MouseEvent): void {
-    this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  onMouseMove(e: MouseEvent) {
+    const host = this.el.nativeElement.getBoundingClientRect();
+    this.mouse.x = ((e.clientX - host.left) / host.width) * 2 - 1;
+    this.mouse.y = -((e.clientY - host.top) / host.height) * 2 + 1;
   }
 
-  private initThree(): void {
+  private initThree() {
     const host = this.el.nativeElement;
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(75, host.clientWidth / host.clientHeight, 0.1, 1000);
-    this.camera.position.z = 5;
-
+    this.camera = new THREE.PerspectiveCamera(60, host.clientWidth / host.clientHeight, 0.1, 1000);
+    this.camera.position.z = 8;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setSize(host.clientWidth, host.clientHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -65,80 +62,55 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     host.appendChild(this.renderer.domElement);
   }
 
-  private createParticles(): void {
-    const particleCount = 5000;
-    const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
-
-    const colorCircuitGreen = new THREE.Color(0x64FFDA);
-    const colorDarkBlue = new THREE.Color(0x0A192F);
-
-    for (let i = 0; i < particleCount; i++) {
+  private createParticles() {
+    const count = 7000;
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const g = new THREE.Color(0x64ffda);
+    const b = new THREE.Color(0x0a192f);
+    for (let i = 0; i < count; i++) {
       const i3 = i * 3;
-      positions[i3] = (Math.random() - 0.5) * 20;
-      positions[i3 + 1] = (Math.random() - 0.5) * 20;
-      positions[i3 + 2] = (Math.random() - 0.5) * 10;
-
-      const mixedColor = Math.random() > 0.7 ? colorCircuitGreen.clone() : colorDarkBlue.clone().lerp(colorCircuitGreen, Math.random() * 0.3);
-      colors[i3] = mixedColor.r;
-      colors[i3 + 1] = mixedColor.g;
-      colors[i3 + 2] = mixedColor.b;
+      positions[i3] = (Math.random() - 0.5) * 24;
+      positions[i3 + 1] = (Math.random() - 0.5) * 14;
+      positions[i3 + 2] = (Math.random() - 0.5) * 8;
+      const c = Math.random() > 0.7 ? g.clone() : b.clone().lerp(g, Math.random() * 0.35);
+      colors[i3] = c.r;
+      colors[i3 + 1] = c.g;
+      colors[i3 + 2] = c.b;
     }
-
-    this.originalPositions = new Float32Array(positions);
-
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-    const material = new THREE.PointsMaterial({
-      size: 0.03,
-      vertexColors: true,
-      blending: THREE.AdditiveBlending,
-      transparent: true,
-      opacity: 0.8
-    });
-
-    this.particles = new THREE.Points(geometry, material);
+    this.original = new Float32Array(positions);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const mat = new THREE.PointsMaterial({ size: 0.035, vertexColors: true, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending });
+    this.particles = new THREE.Points(geo, mat);
     this.scene.add(this.particles);
   }
 
-  private animate = (): void => {
-    this.animationFrameId = requestAnimationFrame(this.animate);
-
-    const positions = this.particles.geometry.getAttribute('position');
-    const elapsedTime = Date.now() * 0.0001;
-
-    for (let i = 0; i < positions.count; i++) {
+  private animate = () => {
+    this.raf = requestAnimationFrame(this.animate);
+    const pos = this.particles.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const arr = pos.array as Float32Array;
+    const t = performance.now() * 0.00015;
+    for (let i = 0; i < pos.count; i++) {
       const i3 = i * 3;
-      const x = this.originalPositions[i3];
-      const y = this.originalPositions[i3 + 1];
-
-      // Movimento sutil pulsante
-      positions.setX(i, x + Math.cos(elapsedTime + x) * 0.1);
-      positions.setY(i, y + Math.sin(elapsedTime + y) * 0.1);
+      const ox = this.original[i3];
+      const oy = this.original[i3 + 1];
+      arr[i3] = ox + Math.cos(t + ox) * 0.08;
+      arr[i3 + 1] = oy + Math.sin(t + oy) * 0.08;
     }
-
-    // Efeito de ondulação com o mouse
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-    const intersects = this.raycaster.intersectObject(this.particles); // This won't work directly on particles, so we do it manually
-
-    const particlePositions = (this.particles.geometry.getAttribute('position') as THREE.BufferAttribute).array;
-    for(let i = 0; i < positions.count; i++) {
+    const mx = this.mouse.x * 10;
+    const my = this.mouse.y * 6;
+    for (let i = 0; i < pos.count; i++) {
       const i3 = i * 3;
-      const particleVector = new THREE.Vector3(particlePositions[i3], particlePositions[i3+1], particlePositions[i3+2]);
-      const mouseVector = new THREE.Vector3(this.mouse.x * 10, this.mouse.y * 10, 0); // Project mouse onto a plane
-
-      const dist = particleVector.distanceTo(mouseVector);
-      if(dist < 2) {
-        const force = (2 - dist) * 0.05;
-        particlePositions[i3] += force * (particlePositions[i3] - mouseVector.x);
-        particlePositions[i3+1] += force * (particlePositions[i3+1] - mouseVector.y);
-      }
+      const dx = arr[i3] - mx;
+      const dy = arr[i3 + 1] - my;
+      const d2 = dx * dx + dy * dy + 0.5;
+      const f = 12 / d2;
+      arr[i3] += (dx / Math.sqrt(d2)) * f * 0.02;
+      arr[i3 + 1] += (dy / Math.sqrt(d2)) * f * 0.02;
     }
-
-
-    positions.needsUpdate = true;
+    pos.needsUpdate = true;
     this.renderer.render(this.scene, this.camera);
-  }
+  };
 }

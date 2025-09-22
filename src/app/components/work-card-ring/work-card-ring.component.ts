@@ -1,4 +1,3 @@
-// src/app/work-card-ring/work-card-ring.component.ts
 import { Component, ElementRef, NgZone, ViewChild, AfterViewInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import gsap from 'gsap';
@@ -15,6 +14,8 @@ gsap.registerPlugin(ScrollTrigger);
 })
 export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
   @ViewChild('ring', { static: true }) ring!: ElementRef<HTMLDivElement>;
+
+  items = Array.from({ length: 8 }).map((_, i) => ({ i, title: `Projeto ${i + 1}` }));
 
   private isDragging = false;
   private startX = 0;
@@ -35,13 +36,10 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.removeDragEvents();
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-    }
+    if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
   }
 
   private initAnimation(): void {
-    // Animação de entrada dos cards
     gsap.from(this.ring.nativeElement, {
       scrollTrigger: {
         trigger: this.ring.nativeElement,
@@ -86,12 +84,9 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
     if (!this.isDragging) return;
     const currentX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const deltaX = currentX - this.startX;
-
-    // Sensibilidade do arraste
     const sensitivity = 0.25;
     this.targetYRotate += deltaX * sensitivity;
     this.velocity = deltaX * sensitivity;
-
     this.startX = currentX;
   };
 
@@ -102,20 +97,13 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
 
   private smoothRotate = (): void => {
     if (!this.isDragging) {
-      // Aplica inércia (desaceleração)
       this.velocity *= 0.95;
-      if (Math.abs(this.velocity) < 0.01) {
-        this.velocity = 0;
-      }
+      if (Math.abs(this.velocity) < 0.01) this.velocity = 0;
       this.targetYRotate += this.velocity;
     }
-
-    // Interpolação linear para suavizar o movimento
     const lerpFactor = 0.1;
     this.currentYRotate += (this.targetYRotate - this.currentYRotate) * lerpFactor;
-
     this.ring.nativeElement.style.transform = `rotateY(${this.currentYRotate}deg)`;
-
     this.animationFrameId = requestAnimationFrame(this.smoothRotate);
   };
 }

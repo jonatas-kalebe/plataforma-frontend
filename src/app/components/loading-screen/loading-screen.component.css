@@ -13,33 +13,28 @@
   flex-direction: column;
   align-items: center;
   gap: 1.5rem;
-  /* Remove o box-shadow inicial para que a animação GSAP o controle */
 }
 
 .svg-container {
   width: clamp(100px, 15vw, 150px);
 }
 
-/* Estilos para o SVG, aplicados dinamicamente */
-:host ::ng-deep .svg-container svg {
+.svg-container svg {
   width: 100%;
   height: auto;
   display: block;
   overflow: visible;
 }
 
-:host ::ng-deep .svg-container path,
-:host ::ng-deep .svg-container ellipse {
+.svg-container path,
+.svg-container ellipse {
   stroke: #8892B0;
   stroke-width: 2;
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.svg-container .owl-right-eye path[d*="Z"],
 
-/* Estilo para os olhos, como no original */
-:host ::ng-deep .svg-container .owl-right-eye path,
-:host ::ng-deep .svg-container .owl-left-pupil path,
-:host ::ng-deep .svg-container .owl-left-eye path {
-  stroke: #FFD700 !important;
-}
+.svg-container .owl-left-pupil path[d*="Z"] { stroke: #FFD700 !important; }
+
