@@ -1,0 +1,39 @@
+/* Adiciona estilos para o carrossel 3D */
+:host {
+  display: block;
+  background-color: #0A192F; /* athenity-blue-deep */
+  color: #8892B0; /* athenity-text-body */
+}
+
+.swiper-container {
+  width: 100%;
+  padding-top: 50px;
+  padding-bottom: 50px;
+}
+
+.swiper-slide {
+  background-position: center;
+  background-size: cover;
+  width: 320px;
+  height: 400px;
+  filter: blur(2px) grayscale(80%);
+  transition: filter 0.5s ease;
+}
+
+.swiper-slide-active {
+  filter: blur(0) grayscale(0%);
+}
+
+.project-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background-color: #112240; /* athenity-blue-card */
+  border-radius: 1rem;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #CCD6F6; /* athenity-text-title */
+  border: 1px solid #64FFDA; /* athenity-green-circuit */
+}

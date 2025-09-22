@@ -150,14 +150,28 @@ export class LoadingScreenComponent implements OnInit, AfterViewInit, OnDestroy 
     }
     if (overlay) {
       gsap.killTweensOf(overlay);
-      gsap.set(overlay, {opacity: 0, pointerEvents: 'none'});
+      gsap.to(overlay, {
+        opacity: 0,
+        duration: 0.5,
+        ease: 'power2.in',
+        onComplete: () => {
+          this.finish();
+        }
+      });
+    } else {
+      this.finish();
     }
-    this.finish();
   }
 
   private finish(): void {
     if (this.isDone) return;
     this.isDone = true;
+
+    const overlay = this.hostRef.nativeElement.querySelector('.loading-overlay') as HTMLElement;
+    if (overlay) {
+        overlay.style.pointerEvents = 'none';
+    }
+
     this.hostRef.nativeElement.removeEventListener('click', this.onSkip);
     this.zone.run(() => this.loadingFinished.emit());
   }

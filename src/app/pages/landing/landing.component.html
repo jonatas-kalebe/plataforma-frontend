@@ -1,40 +1,89 @@
-<section class="hero-section flex flex-col items-center justify-center text-center min-h-[80vh] p-4">
-  <div class="max-w-4xl">
-    <h1 id="hero-title" class="text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter">
-      Transformamos Código em <span class="text-athenity-gold">Impacto</span>.
-    </h1>
-    <p id="hero-subtitle" class="mt-6 text-lg md:text-xl max-w-2xl mx-auto">
-      Somos a Athenity. Criamos software sob medida que impulsiona o crescimento, otimiza processos e entrega resultados excepcionais.
-    </p>
+<section id="hero-section" class="relative w-full h-screen flex flex-col justify-center items-center text-center text-athenity-text-title p-4 overflow-hidden">
+  <app-three-particle-background></app-three-particle-background>
+
+  <div class="relative z-10">
+    <h1 id="hero-title" class="font-heading font-black text-5xl md:text-7xl lg:text-8xl tracking-tighter uppercase">Nós Arquitetamos <br class="md:hidden"> Inteligência.</h1>
+    <p id="hero-subtitle" class="font-sans mt-6 text-lg md:text-xl max-w-2xl mx-auto text-athenity-text-body">Da concepção à execução, criamos experiências digitais que definem o futuro.</p>
     <div id="hero-cta" class="mt-12">
-      <a href="mailto:contato@athenity.com" class="bg-athenity-gold hover:opacity-90 text-athenity-blue-deep font-bold py-4 px-8 rounded-lg text-lg transition-transform transform hover:scale-105 shadow-lg shadow-athenity-gold/20">
-        Vamos Iniciar um Projeto
+      <a href="#work" class="bg-athenity-gold hover:opacity-90 text-athenity-blue-deep font-bold py-4 px-8 rounded-lg text-lg transition-transform transform hover:scale-105 shadow-lg shadow-athenity-gold/20">
+        Explore Nosso Trabalho
       </a>
     </div>
   </div>
-</section>
-
-<section class="services-section container mx-auto py-20 px-4">
-  <div class="text-center mb-12">
-    <h2 class="text-4xl">Nossa Especialidade</h2>
-    <p class="mt-2">Soluções digitais que resolvem desafios reais.</p>
-  </div>
-
-  <div class="flex flex-wrap justify-center gap-8">
-
-    <div class="service-card bg-athenity-blue-card p-8 rounded-xl w-full md:w-1/3 max-w-sm">
-      <h3 class="text-2xl text-athenity-green-circuit">Desenvolvimento Web e Mobile</h3>
-      <p class="mt-4">
-        Criamos aplicações robustas e escaláveis, de portais complexos a apps mobile intuitivos, com foco total na experiência do usuário.
-      </p>
-    </div>
-
-    <div class="service-card bg-athenity-blue-card p-8 rounded-xl w-full md:w-1/3 max-w-sm">
-      <h3 class="text-2xl text-athenity-green-circuit">Modernização de Sistemas</h3>
-      <p class="mt-4">
-        Transformamos sistemas legados em plataformas modernas, ágeis e seguras, garantindo a continuidade e a evolução do seu negócio.
-      </p>
-    </div>
-
+  <div class="absolute bottom-8 text-athenity-text-body animate-bounce">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+    </svg>
   </div>
 </section>
+
+<div id="scroll-content" class="bg-athenity-blue-deep relative z-10">
+
+  <section id="philosophy-section" class="container mx-auto py-24 md:py-32 px-6 flex items-center min-h-[80vh]">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+      <div class="text-left">
+        <h2 class="text-4xl md:text-5xl font-heading font-bold text-athenity-text-title mb-6 section-title">Da Complexidade <br> à Clareza.</h2>
+        <p class="text-lg text-athenity-text-body section-body">
+          Nossa filosofia é simples: transformar desafios de negócios complexos em soluções de software elegantes, intuitivas e eficientes. Mergulhamos fundo no seu domínio para arquitetar sistemas que não apenas funcionam, mas que prosperam em escala.
+        </p>
+      </div>
+      <div class="flex justify-center items-center h-64 md:h-96">
+        <svg id="clarity-animation" width="250" height="250" viewBox="0 0 100 100">
+          <path id="tangled-path" fill="none" stroke="#64FFDA" stroke-width="1"
+                d="M10 50 Q 20 10, 30 50 T 50 50 Q 60 20, 70 50 T 90 50 Q 80 90, 70 50 T 50 50 Q 40 80, 30 50 T 10 50" />
+          <path id="clear-path" fill="none" stroke="#64FFDA" stroke-width="1" d="M10 50 H 90" style="opacity: 0;" />
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section id="services-section" class="container mx-auto py-24 md:py-32 px-6 text-center">
+    <h2 class="text-4xl md:text-5xl font-heading font-bold text-athenity-text-title mb-16 section-title">Nosso Arsenal.</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div class="service-card bg-athenity-blue-card p-8 rounded-xl border border-transparent hover:border-athenity-green-circuit hover:-translate-y-2 transition-transform duration-300">
+        <h3 class="text-2xl font-heading text-athenity-green-circuit mb-4">Aplicações Customizadas</h3>
+        <p class="text-athenity-text-body">
+          Desenvolvemos software sob medida, perfeitamente alinhado às suas necessidades, para automação, eficiência e crescimento.
+        </p>
+      </div>
+      <div class="service-card bg-athenity-blue-card p-8 rounded-xl border border-transparent hover:border-athenity-green-circuit hover:-translate-y-2 transition-transform duration-300">
+        <h3 class="text-2xl font-heading text-athenity-green-circuit mb-4">IA & Machine Learning</h3>
+        <p class="text-athenity-text-body">
+          Integramos inteligência aos seus processos, descobrindo insights e criando sistemas que aprendem e evoluem.
+        </p>
+      </div>
+      <div class="service-card bg-athenity-blue-card p-8 rounded-xl border border-transparent hover:border-athenity-green-circuit hover:-translate-y-2 transition-transform duration-300">
+        <h3 class="text-2xl font-heading text-athenity-green-circuit mb-4">Arquitetura em Nuvem</h3>
+        <p class="text-athenity-text-body">
+          Projetamos e implementamos infraestruturas cloud-native robustas, escaláveis e seguras para o futuro do seu negócio.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="work-section" class="py-24 md:py-32 overflow-hidden">
+    <div class="container mx-auto text-center px-6">
+      <h2 class="text-4xl md:text-5xl font-heading font-bold text-athenity-text-title mb-16 section-title">Prova de Conceito.</h2>
+    </div>
+    <div class="swiper-container">
+      <div class="swiper-wrapper">
+        <div class="swiper-slide"><div class="project-card">Projeto Alpha</div></div>
+        <div class="swiper-slide"><div class="project-card">Projeto Beta</div></div>
+        <div class="swiper-slide"><div class="project-card">Projeto Gamma</div></div>
+        <div class="swiper-slide"><div class="project-card">Projeto Delta</div></div>
+        <div class="swiper-slide"><div class="project-card">Projeto Epsilon</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="cta-section" class="container mx-auto py-24 md:py-32 px-6 text-center">
+    <h2 class="text-4xl md:text-6xl font-heading font-bold text-athenity-text-title mb-8 section-title">Vamos Construir o Futuro.</h2>
+    <p class="text-lg text-athenity-text-body max-w-xl mx-auto mb-12 section-body">Tem uma ideia desafiadora? Nós temos a expertise para torná-la realidade.</p>
+    <div class="section-cta">
+      <a href="mailto:contato@athenity.com" class="bg-athenity-gold hover:opacity-90 text-athenity-blue-deep font-bold py-4 px-10 rounded-lg text-xl transition-transform transform hover:scale-105 shadow-lg shadow-athenity-gold/20">
+        Entre em Contato
+      </a>
+    </div>
+  </section>
+
+</div>

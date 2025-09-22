@@ -11,7 +11,6 @@ import { LoadingScreenComponent } from './components/loading-screen/loading-scre
   styleUrls: ['./app.component.css']
 })
 export class AppComponent {
-  // A única responsabilidade deste componente é controlar se o loading já terminou
   isAppLoading = true;
 
   onLoadingFinished() {
