@@ -1,18 +1,16 @@
-<app-loading-screen
-  *ngIf="isAppLoading"
-  (loadingFinished)="onLoadingFinished()">
-</app-loading-screen>
+<header class="fixed top-0 left-0 right-0 z-40">
+  <div class="max-w-7xl h-[88px] mx-auto px-6 flex items-center justify-between relative">
+    <div id="nav-logo-slot" class="absolute top-1/2 -translate-y-1/2 left-6">
+    </div>
 
-<div *ngIf="!isAppLoading" class="app-container" [class.fade-in]="!isAppLoading">
-
-  <header class="app-header">
-  </header>
-
-  <main class="app-main">
-  <router-outlet></router-outlet>
-    </main>
-
-  <footer class="app-footer text-center p-4 text-sm text-athenity-text-body/60">
-    <p>&copy; 2025 Athenity. Todos os direitos reservados.</p>
-  </footer>
+    <nav>
+      <a class="bg-athenity-gold text-athenity-blue-deep px-4 py-2 rounded-lg font-bold text-sm" href="#cta">Contato</a>
+    </nav>
   </div>
+</header>
+
+<app-loading-screen *ngIf="showOverlay()" (loadingFinished)="onOverlayDone()"></app-loading-screen>
+
+<main class="relative">
+  <router-outlet></router-outlet>
+</main>

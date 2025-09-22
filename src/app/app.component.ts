@@ -1,7 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { LoadingScreenComponent } from './components/loading-screen/loading-screen.component';
+import {LoadingScreenComponent} from './components/loading-screen/loading-screen.component';
+
 
 @Component({
   selector: 'app-root',
@@ -11,9 +12,9 @@ import { LoadingScreenComponent } from './components/loading-screen/loading-scre
   styleUrls: ['./app.component.css']
 })
 export class AppComponent {
-  isAppLoading = true;
+  showOverlay = signal(true);
 
-  onLoadingFinished() {
-    this.isAppLoading = false;
+  onOverlayDone(): void {
+    this.showOverlay.set(false);
   }
 }

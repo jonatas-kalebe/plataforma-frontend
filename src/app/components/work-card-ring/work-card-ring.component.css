@@ -1,0 +1,73 @@
+/* src/app/work-card-ring/work-card-ring.component.css */
+.perspective {
+  perspective: 1200px;
+}
+
+.ring {
+  position: relative;
+  transform-style: preserve-3d;
+  height: 360px;
+  width: 300px; /* Largura de um card */
+  margin: 0 auto;
+  cursor: grab;
+}
+
+.ring:active {
+  cursor: grabbing;
+}
+
+.ring .card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 300px;
+  height: 360px;
+  background: rgba(17, 34, 64, 0.9);
+  border: 1px solid rgba(100, 255, 218, 0.25);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  backface-visibility: hidden; /* Melhora performance */
+  transition: transform 0.3s ease-out; /* Suaviza hover */
+}
+
+.ring .card:hover {
+  transform: var(--transform) scale(1.05) !important;
+  border-color: rgba(100, 255, 218, 0.7);
+}
+
+
+/* Distribuição dinâmica dos cards em um círculo */
+/* Ajuste o número de cards aqui e no HTML */
+:host {
+  --card-count: 5;
+  --angle: calc(360deg / var(--card-count));
+  --radius: 420px; /* Distância do centro */
+}
+
+.ring .card:nth-child(1) { --transform: rotateY(calc(var(--angle) * 0)) translateZ(var(--radius)); transform: var(--transform); }
+.ring .card:nth-child(2) { --transform: rotateY(calc(var(--angle) * 1)) translateZ(var(--radius)); transform: var(--transform); }
+.ring .card:nth-child(3) { --transform: rotateY(calc(var(--angle) * 2)) translateZ(var(--radius)); transform: var(--transform); }
+.ring .card:nth-child(4) { --transform: rotateY(calc(var(--angle) * 3)) translateZ(var(--radius)); transform: var(--transform); }
+.ring .card:nth-child(5) { --transform: rotateY(calc(var(--angle) * 4)) translateZ(var(--radius)); transform: var(--transform); }
+
+
+.card .thumb {
+  height: 62%;
+  background: radial-gradient(circle at 30% 30%, rgba(100, 255, 218, 0.25), transparent),
+  linear-gradient(180deg, rgba(10, 25, 47, 0.6), rgba(10, 25, 47, 0.2));
+}
+
+.card .meta {
+  padding: 18px 20px;
+}
+
+.card .meta h5 {
+  font-weight: 800;
+  color: #ccd6f6;
+}
+
+.card .meta span {
+  font-size: 0.9rem;
+  color: #8892b0;
+}
