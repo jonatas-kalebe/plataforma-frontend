@@ -260,8 +260,14 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     }
     this.parallaxCurrent.lerp(this.parallaxTarget, 0.08);
 
-    this.camera.position.x = -this.parallaxCurrent.x * 3;
-    this.camera.position.y = this.parallaxCurrent.y * 5;
+    if(this.isMobile) {
+      this.camera.position.x = -this.parallaxCurrent.x * 12;
+      this.camera.position.y = this.parallaxCurrent.y * 15;
+    }
+    else {
+      this.camera.position.x = -this.parallaxCurrent.x * 3;
+      this.camera.position.y = this.parallaxCurrent.y * 5;
+    }
     this.camera.lookAt(0, 0, 0);
     this.camera.updateMatrixWorld();
 
@@ -270,7 +276,12 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.mouseVelocity = THREE.MathUtils.lerp(this.mouseVelocity, rawVelocity, 0.08);
     this.lastMousePosition.copy(this.smoothedMouse);
 
-    this.particles.rotation.y += 0.0003;
+    if(!this.prefersReducedMotion) {
+      if(this.isMobile)
+        this.particles.rotation.y += 0.0005;
+      else this.particles.rotation.y += 0.0003;
+    }
+
 
     this.accumulator += dt;
     let sub = 0;
