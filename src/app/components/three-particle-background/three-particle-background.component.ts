@@ -40,12 +40,13 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   private parallaxTarget = new THREE.Vector2(0, 0);
   private parallaxCurrent = new THREE.Vector2(0, 0);
-  private gyroParallaxTarget = new THREE.Vector2(0, 0);
   private gyroEnabled = false;
   private isTouching = false;
 
-  // PROPRIEDADES PARA A NOVA LÓGICA DE GIROSCÓPIO HEURÍSTICA
+  // CORREÇÃO: Propriedades para a lógica de giroscópio acumulativo ("infinito")
   private initialOrientation: { beta: number | null, gamma: number | null, alpha: number | null } = { beta: null, gamma: null, alpha: null };
+  private gyroVelocity = new THREE.Vector2(0, 0); // Armazena a velocidade de rotação atual
+  private gyroAccumulatedPosition = new THREE.Vector2(0, 0); // Posição acumulada da câmera
   private screenOrientation = 0;
 
   private animationFrameId = 0;
@@ -58,7 +59,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   private isMobile = false;
   private readonly mobileParticleCount = 120;
   private readonly desktopParticleCount = 120;
-  private readonly gyroIntensity = 5.0; // Intensidade para a nova lógica
+  private readonly gyroIntensity = 1.0; // Ajustado para a nova lógica de velocidade
 
   constructor(private el: ElementRef, private ngZone: NgZone) {
   }
@@ -94,7 +95,6 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     if (this.particles?.material) (this.particles.material as THREE.Material).dispose();
   }
 
-  // ... (onWindowResize, onMouseMove, onClick, etc. não mudaram)
   @HostListener('window:resize')
   onWindowResize = () => {
     const host = this.el.nativeElement;
@@ -135,10 +135,10 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   onTouchEnd() {
     this.shockwaves.push({pos: this.mouse.clone(), startTime: performance.now(), maxStrength: 1.0});
     this.isTouching = false;
+    // Em mobile, quando o toque termina, o mouse é "removido" da tela
     this.mouse.set(-100, -100);
   }
 
-  // ... (initThree, createParticles, etc. não mudaram)
   private initThree(): void {
     const host = this.el.nativeElement;
     this.isMobile = ('ontouchstart' in window) || (navigator as any).maxTouchPoints > 0;
@@ -191,8 +191,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   private createParticleTexture(): THREE.Texture {
     const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
+    canvas.width = 64; canvas.height = 64;
     const context = canvas.getContext('2d')!;
     const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 32);
     gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
@@ -221,56 +220,49 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   private onScreenOrientationChange = () => {
     this.screenOrientation = (window.orientation || 0) as number;
-    // Força a recalibração do ponto inicial
     this.initialOrientation = { beta: null, gamma: null, alpha: null };
   };
 
   /**
-   * CORREÇÃO: Nova lógica de giroscópio que interpreta a "torção" (alpha)
-   * e a mescla com a inclinação (gamma) para um controle horizontal mais intuitivo.
+   * CORREÇÃO: Lógica de giroscópio refeita para calcular a VELOCIDADE da câmera
+   * em vez da posição, permitindo o movimento "infinito".
    */
   private handleOrientation = (e: DeviceOrientationEvent) => {
     const beta = e.beta ?? 0;
     const gamma = e.gamma ?? 0;
     const alpha = e.alpha ?? 0;
 
-    // Captura a orientação inicial como ponto de referência.
     if (this.initialOrientation.beta === null) {
       this.initialOrientation = { beta, gamma, alpha };
       return;
     }
 
-    // Calcula a variação (delta) desde a posição inicial.
     let deltaBeta = beta - this.initialOrientation.beta;
-    let deltaGamma = gamma - (this.initialOrientation.gamma||0);
-    let deltaAlpha = alpha - (this.initialOrientation.alpha||0);
+    let deltaGamma = gamma - (this.initialOrientation.gamma || 0);
+    let deltaAlpha = alpha - (this.initialOrientation.alpha || 0);
 
-    // Normaliza o deltaAlpha (que vai de 0 a 360) para evitar saltos.
     if (deltaAlpha > 180) deltaAlpha -= 360;
     if (deltaAlpha < -180) deltaAlpha += 360;
 
-    // Fator de "verticalidade": 0 = deitado, 1 = em pé.
-    const uprightness = Math.sin(THREE.MathUtils.degToRad(Math.abs(beta)));
+    const deadZone = 2.0; // Graus de inclinação para ignorar (evita drift)
+    if (Math.abs(deltaBeta) < deadZone) deltaBeta = 0;
+    if (Math.abs(deltaGamma) < deadZone) deltaGamma = 0;
+    if (Math.abs(deltaAlpha) < deadZone) deltaAlpha = 0;
 
-    // Interpola o controle horizontal:
-    // Se deitado (uprightness=0), usa gamma.
-    // Se em pé (uprightness=1), usa alpha.
+    const uprightness = Math.sin(THREE.MathUtils.degToRad(Math.abs(beta)));
     const horizontalInput = THREE.MathUtils.lerp(deltaGamma, -deltaAlpha, uprightness);
 
-    // Mapeia os inputs para o parallax. O divisor (ex: 45) ajusta a sensibilidade.
-    let nx = (horizontalInput / 45) * this.gyroIntensity;
-    let ny = (deltaBeta / 45) * this.gyroIntensity;
+    // Converte a inclinação (em graus) para uma unidade de velocidade.
+    // O divisor controla a sensibilidade.
+    let vx = horizontalInput / 45;
+    let vy = deltaBeta / 45;
 
-    // Em modo paisagem, inverte os eixos.
     if (Math.abs(this.screenOrientation) === 90) {
-      [nx, ny] = [ny, -nx];
+      [vx, vy] = [vy, -vx];
     }
 
-    // Limita o valor final entre -1 e 1.
-    this.gyroParallaxTarget.set(
-      THREE.MathUtils.clamp(nx, -1, 1),
-      THREE.MathUtils.clamp(ny, -1, 1)
-    );
+    // Define a velocidade atual, que será usada no loop de animação.
+    this.gyroVelocity.set(vx, vy);
   };
 
   private animate = () => {
@@ -280,19 +272,35 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.lastTime = now;
 
     const useGyro = this.gyroEnabled && !this.isTouching;
+
     if (useGyro) {
-      this.parallaxTarget.lerp(this.gyroParallaxTarget, 0.1);
+      // LÓGICA DE GIROSCÓPIO INFINITO: Acumula a posição com base na velocidade.
+      this.gyroAccumulatedPosition.x += this.gyroVelocity.x * this.gyroIntensity * dt;
+      this.gyroAccumulatedPosition.y += this.gyroVelocity.y * this.gyroIntensity * dt;
+      this.parallaxTarget.copy(this.gyroAccumulatedPosition);
+    } else {
+      // LÓGICA PADRÃO (DESKTOP/TOUCH): O alvo é definido pelo mouse/toque.
+      // Se não for desktop e nem estiver tocando, a cena volta ao centro.
+      if (this.isMobile && !this.isTouching) {
+        this.parallaxTarget.lerp(new THREE.Vector2(0, 0), 0.05);
+      }
+      // Sincroniza a posição acumulada para uma transição suave de volta para o giroscópio.
+      this.gyroAccumulatedPosition.copy(this.parallaxTarget);
     }
+
     this.parallaxCurrent.lerp(this.parallaxTarget, 0.08);
 
+    // A intensidade do movimento da câmera agora é diferente para cada plataforma.
     if(this.isMobile) {
+      // Movimento mais pronunciado para o giroscópio
       this.camera.position.x = -this.parallaxCurrent.x * 12;
       this.camera.position.y = this.parallaxCurrent.y * 15;
-    }
-    else {
+    } else {
+      // Movimento sutil original para o mouse no desktop
       this.camera.position.x = -this.parallaxCurrent.x * 3;
       this.camera.position.y = this.parallaxCurrent.y * 5;
     }
+
     this.camera.lookAt(0, 0, 0);
     this.camera.updateMatrixWorld();
 
