@@ -53,7 +53,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   private readonly KEY_STRIDE = 2048;
 
   private isMobile = false;
-  private mobileParticleCount = 151;
+  private mobileParticleCount = 150;
   private desktopParticleCount = 1500;
   private gyroIntensity = 4.0;
 
