@@ -240,7 +240,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     if (deltaBeta > 180) { deltaBeta -= 360; }
     if (deltaBeta < -180) { deltaBeta += 360; }
 
-    const nx = THREE.MathUtils.clamp((deltaGamma / 30) * this.gyroIntensity, -1, 1);
+
+    const nx = THREE.MathUtils.clamp((deltaGamma / 20) * this.gyroIntensity, -1, 1);
     const ny = THREE.MathUtils.clamp((deltaBeta / 30) * this.gyroIntensity, -1, 1);
 
     this.gyroParallaxTarget.set(nx, ny);
