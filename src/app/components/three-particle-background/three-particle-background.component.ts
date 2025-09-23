@@ -44,10 +44,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   private gyroEnabled = false;
   private isTouching = false;
 
-  // NOVAS PROPRIEDADES PARA A LÓGICA AVANÇADA DE GIROSCÓPIO
-  private deviceQuaternion = new THREE.Quaternion();
-  private baseQuaternion = new THREE.Quaternion();
-  private isFirstGyroMove = true;
+  // PROPRIEDADES PARA A NOVA LÓGICA DE GIROSCÓPIO HEURÍSTICA
+  private initialOrientation: { beta: number | null, gamma: number | null, alpha: number | null } = { beta: null, gamma: null, alpha: null };
   private screenOrientation = 0;
 
   private animationFrameId = 0;
@@ -60,8 +58,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   private isMobile = false;
   private readonly mobileParticleCount = 60;
   private readonly desktopParticleCount = 120;
-  // A intensidade agora funciona como um multiplicador de ganho geral. 4.0 é um bom ponto de partida.
-  private readonly gyroIntensity = 4.0;
+  private readonly gyroIntensity = 5.0; // Intensidade para a nova lógica
 
   constructor(private el: ElementRef, private ngZone: NgZone) {
   }
@@ -79,9 +76,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
       if (!this.prefersReducedMotion) {
         window.addEventListener('click', this.tryEnableGyro, {once: true, passive: true});
-        // Listener para recalibrar o giroscópio se a tela girar (ex: de retrato para paisagem)
         window.addEventListener('orientationchange', this.onScreenOrientationChange, { passive: true });
-        this.onScreenOrientationChange(); // Define o valor inicial
+        this.onScreenOrientationChange();
         this.animate();
       }
     });
@@ -98,7 +94,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     if (this.particles?.material) (this.particles.material as THREE.Material).dispose();
   }
 
-  // ... (onWindowResize, onMouseMove, onClick, onTouch... não foram alterados)
+  // ... (onWindowResize, onMouseMove, onClick, etc. não mudaram)
   @HostListener('window:resize')
   onWindowResize = () => {
     const host = this.el.nativeElement;
@@ -142,7 +138,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.mouse.set(-100, -100);
   }
 
-  // ... (initThree, createParticles, createParticleTexture não foram alterados)
+  // ... (initThree, createParticles, etc. não mudaram)
   private initThree(): void {
     const host = this.el.nativeElement;
     this.isMobile = ('ontouchstart' in window) || (navigator as any).maxTouchPoints > 0;
@@ -223,55 +219,58 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.gyroEnabled = true;
   };
 
-  /**
-   * NOVO: Recalibra o ponto "zero" do giroscópio quando a orientação da tela muda.
-   */
   private onScreenOrientationChange = () => {
     this.screenOrientation = (window.orientation || 0) as number;
-    this.isFirstGyroMove = true; // Força a recalibração no próximo movimento
+    // Força a recalibração do ponto inicial
+    this.initialOrientation = { beta: null, gamma: null, alpha: null };
   };
 
   /**
-   * CORREÇÃO COMPLETA: Lógica refeita para usar Quaternions, garantindo
-   * um movimento relativo e intuitivo, independente da orientação do dispositivo.
+   * CORREÇÃO: Nova lógica de giroscópio que interpreta a "torção" (alpha)
+   * e a mescla com a inclinação (gamma) para um controle horizontal mais intuitivo.
    */
   private handleOrientation = (e: DeviceOrientationEvent) => {
-    // Converte os ângulos do evento de graus para radianos
-    const alpha = THREE.MathUtils.degToRad(e.alpha ?? 0); // Eixo Z (Bússola/Giro)
-    const beta = THREE.MathUtils.degToRad(e.beta ?? 0);  // Eixo X (Frente/Trás)
-    const gamma = THREE.MathUtils.degToRad(e.gamma ?? 0); // Eixo Y (Esquerda/Direita)
+    const beta = e.beta ?? 0;
+    const gamma = e.gamma ?? 0;
+    const alpha = e.alpha ?? 0;
 
-    // Cria um objeto Euler na ordem correta ('YXZ') para dispositivos móveis
-    const euler = new THREE.Euler(beta, alpha, -gamma, 'YXZ');
-    this.deviceQuaternion.setFromEuler(euler);
-
-    // Ajusta a rotação baseando-se na orientação da tela (retrato vs. paisagem)
-    const screenAngle = THREE.MathUtils.degToRad(this.screenOrientation);
-    const screenAdjustment = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -screenAngle);
-    this.deviceQuaternion.multiply(screenAdjustment);
-
-    // No primeiro movimento, captura a orientação inicial para usá-la como o "ponto zero"
-    if (this.isFirstGyroMove) {
-      this.baseQuaternion.copy(this.deviceQuaternion).invert();
-      this.isFirstGyroMove = false;
+    // Captura a orientação inicial como ponto de referência.
+    if (this.initialOrientation.beta === null) {
+      this.initialOrientation = { beta, gamma, alpha };
+      return;
     }
 
-    // Calcula a rotação RELATIVA à posição inicial
-    const relativeQuaternion = this.deviceQuaternion.clone().premultiply(this.baseQuaternion);
+    // Calcula a variação (delta) desde a posição inicial.
+    let deltaBeta = beta - this.initialOrientation.beta;
+    let deltaGamma = gamma - (this.initialOrientation.gamma||0);
+    let deltaAlpha = alpha - (this.initialOrientation.alpha||0);
 
-    // Pega um vetor que aponta para "frente" e o rotaciona
-    const lookVector = new THREE.Vector3(0, 0, 1);
-    lookVector.applyQuaternion(relativeQuaternion);
+    // Normaliza o deltaAlpha (que vai de 0 a 360) para evitar saltos.
+    if (deltaAlpha > 180) deltaAlpha -= 360;
+    if (deltaAlpha < -180) deltaAlpha += 360;
 
-    // Usa os eixos X e Y do vetor rotacionado como nosso alvo de parallax
-    let nx = lookVector.x * this.gyroIntensity;
-    let ny = -lookVector.y * this.gyroIntensity; // Invertido para corresponder à tela
+    // Fator de "verticalidade": 0 = deitado, 1 = em pé.
+    const uprightness = Math.sin(THREE.MathUtils.degToRad(Math.abs(beta)));
 
-    // Limita os valores para garantir que não saiam do controle
-    nx = THREE.MathUtils.clamp(nx, -1, 1);
-    ny = THREE.MathUtils.clamp(ny, -1, 1);
+    // Interpola o controle horizontal:
+    // Se deitado (uprightness=0), usa gamma.
+    // Se em pé (uprightness=1), usa alpha.
+    const horizontalInput = THREE.MathUtils.lerp(deltaGamma, -deltaAlpha, uprightness);
 
-    this.gyroParallaxTarget.set(nx, ny);
+    // Mapeia os inputs para o parallax. O divisor (ex: 45) ajusta a sensibilidade.
+    let nx = (horizontalInput / 45) * this.gyroIntensity;
+    let ny = (deltaBeta / 45) * this.gyroIntensity;
+
+    // Em modo paisagem, inverte os eixos.
+    if (Math.abs(this.screenOrientation) === 90) {
+      [nx, ny] = [ny, -nx];
+    }
+
+    // Limita o valor final entre -1 e 1.
+    this.gyroParallaxTarget.set(
+      THREE.MathUtils.clamp(nx, -1, 1),
+      THREE.MathUtils.clamp(ny, -1, 1)
+    );
   };
 
   private animate = () => {
@@ -286,8 +285,14 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     }
     this.parallaxCurrent.lerp(this.parallaxTarget, 0.08);
 
-    this.camera.position.x = -this.parallaxCurrent.x * 12;
-    this.camera.position.y = this.parallaxCurrent.y * 15;
+    if(this.isMobile) {
+      this.camera.position.x = -this.parallaxCurrent.x * 12;
+      this.camera.position.y = this.parallaxCurrent.y * 15;
+    }
+    else {
+      this.camera.position.x = -this.parallaxCurrent.x * 3;
+      this.camera.position.y = this.parallaxCurrent.y * 5;
+    }
     this.camera.lookAt(0, 0, 0);
     this.camera.updateMatrixWorld();
 
@@ -311,7 +316,6 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.renderer.render(this.scene, this.camera);
   };
 
-  // ... (stepPhysics não foi alterado)
   private stepPhysics(dt: number, timeNow: number) {
     const positions = this.particles.geometry.getAttribute('position').array as Float32Array;
     const v = this.particleVelocities;
