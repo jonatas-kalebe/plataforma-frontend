@@ -47,10 +47,10 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   private animationFrameId = 0;
   private lastTime = 0;
   private accumulator = 0;
-  private readonly dtFixed = 1 / 60; // Timestep fixo para a física
-  private lodStep = 1; // Fator de Level of Detail (LOD)
+  private readonly dtFixed = 1 / 60;
+  private lodStep = 1;
   private lodPhase = 0;
-  private readonly KEY_STRIDE = 2048; // Usado para a chave numérica do grid
+  private readonly KEY_STRIDE = 2048;
   private isMobile = false;
 
   constructor(private el: ElementRef, private ngZone: NgZone) {}
@@ -60,9 +60,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       this.initThree();
       this.createParticles();
       this.lastTime = performance.now();
-      // Em dispositivos móveis, a permissão para o giroscópio deve ser pedida após uma interação do usuário
-      window.addEventListener('touchstart', this.tryEnableGyro, { once: true, passive: true });
-      window.addEventListener('click', this.tryEnableGyro, { once: true, passive: true });
+      window.addEventListener('touchstart', this.tryEnableGyro, { passive: true });
+      window.addEventListener('click', this.tryEnableGyro, { passive: true });
       this.animate();
     });
   }
@@ -70,7 +69,9 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   ngOnDestroy(): void {
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     window.removeEventListener('resize', this.onWindowResize);
-    window.removeEventListener('deviceorientation', this.handleOrientation as any);
+    window.removeEventListener('touchstart', this.tryEnableGyro as any);
+    window.removeEventListener('click', this.tryEnableGyro as any);
+    if (this.gyroEnabled) window.removeEventListener('deviceorientation', this.handleOrientation as any);
     if (this.renderer) this.renderer.dispose();
     if (this.particles?.geometry) this.particles.geometry.dispose();
     if (this.particles?.material) (this.particles.material as THREE.Material).dispose();
@@ -105,7 +106,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     posAttr.setUsage(THREE.StreamDrawUsage);
     geometry.setAttribute('position', posAttr);
     const material = new THREE.PointsMaterial({
-      size: this.isMobile ? 1.1 : 0.9,
+      size: 0.9,
       map: this.createParticleTexture(),
       transparent: true,
       opacity: 0.8,
@@ -132,31 +133,6 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     return new THREE.CanvasTexture(canvas);
   }
 
-  // --- LÓGICA DO GIROSCÓPIO ---
-  private tryEnableGyro = () => {
-    if (this.gyroEnabled || typeof (DeviceOrientationEvent as any).requestPermission !== 'function') {
-      // Se não precisa de permissão (ex: Android), tenta adicionar o listener diretamente.
-      window.addEventListener('deviceorientation', this.handleOrientation);
-      return;
-    }
-    (DeviceOrientationEvent as any).requestPermission().then((permissionState: string) => {
-      if (permissionState === 'granted') {
-        window.addEventListener('deviceorientation', this.handleOrientation);
-      }
-    });
-  }
-
-  private handleOrientation = (event: DeviceOrientationEvent) => {
-    if (!this.gyroEnabled) this.gyroEnabled = true;
-    const beta = event.beta ?? 0;  // Inclinação frente-trás (-180 a 180)
-    const gamma = event.gamma ?? 0; // Inclinação esquerda-direita (-90 a 90)
-
-    // Normaliza e limita os valores para o efeito parallax
-    this.gyroParallaxTarget.x = Math.max(-1, Math.min(1, gamma / 45));
-    this.gyroParallaxTarget.y = Math.max(-1, Math.min(1, beta / 90));
-  }
-
-  // --- LISTENERS DE EVENTOS ---
   @HostListener('window:resize')
   onWindowResize = () => {
     const host = this.el.nativeElement;
@@ -167,7 +143,6 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   @HostListener('document:mousemove', ['$event'])
   onMouseMove(event: MouseEvent) {
-    if (this.isTouching) return; // Ignora mouse se estiver tocando
     const rect = this.el.nativeElement.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -177,73 +152,95 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   }
 
   @HostListener('document:touchstart', ['$event'])
-  onTouchStart(event: TouchEvent) {
-    if (event.touches.length > 0) {
-      this.isTouching = true;
-      this.touchStartTime = performance.now();
-      const touch = event.touches[0];
-      const rect = this.el.nativeElement.getBoundingClientRect();
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
-      this.mouse.x = (x / rect.width) * 2 - 1;
-      this.mouse.y = -(y / rect.height) * 2 + 1;
-      this.touchStartPos.copy(this.mouse);
-      this.parallaxTarget.set(this.mouse.x, this.mouse.y);
-    }
+  onTouchStart(ev: TouchEvent) {
+    if (ev.touches.length === 0) return;
+    const t = ev.touches[0];
+    const rect = this.el.nativeElement.getBoundingClientRect();
+    const x = t.clientX - rect.left;
+    const y = t.clientY - rect.top;
+    this.mouse.x = (x / rect.width) * 2 - 1;
+    this.mouse.y = -(y / rect.height) * 2 + 1;
+    this.parallaxTarget.set(this.mouse.x, this.mouse.y);
+    this.lastMousePosition.copy(this.mouse);
+    this.isTouching = true;
+    this.touchStartTime = performance.now();
+    this.touchStartPos.set(this.mouse.x, this.mouse.y);
   }
 
   @HostListener('document:touchmove', ['$event'])
-  onTouchMove(event: TouchEvent) {
-    if (event.touches.length > 0) {
-      const touch = event.touches[0];
-      const rect = this.el.nativeElement.getBoundingClientRect();
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
-      this.mouse.x = (x / rect.width) * 2 - 1;
-      this.mouse.y = -(y / rect.height) * 2 + 1;
-      this.parallaxTarget.set(this.mouse.x, this.mouse.y);
-    }
+  onTouchMove(ev: TouchEvent) {
+    if (ev.touches.length === 0) return;
+    const t = ev.touches[0];
+    const rect = this.el.nativeElement.getBoundingClientRect();
+    const x = t.clientX - rect.left;
+    const y = t.clientY - rect.top;
+    this.mouse.x = (x / rect.width) * 2 - 1;
+    this.mouse.y = -(y / rect.height) * 2 + 1;
+    this.parallaxTarget.set(this.mouse.x, this.mouse.y);
   }
 
   @HostListener('document:touchend', ['$event'])
-  onTouchEnd(event: TouchEvent) {
+  onTouchEnd(ev: TouchEvent) {
+    const dt = performance.now() - this.touchStartTime;
+    const dx = this.mouse.x - this.touchStartPos.x;
+    const dy = this.mouse.y - this.touchStartPos.y;
+    const moved = Math.hypot(dx, dy);
+    if (dt < 220 && moved < 0.05) this.tapImpulse = Math.min(this.tapImpulse + 0.7, 1);
     this.isTouching = false;
-    const touchDuration = performance.now() - this.touchStartTime;
-    const touchDistance = this.mouse.distanceTo(this.touchStartPos);
-
-    // Se o toque foi rápido e moveu pouco, considera um "tap"
-    if (touchDuration < 200 && touchDistance < 0.05) {
-      this.tapImpulse = 1.0; // Atribui um impulso
-    }
+    this.mouse.set(-100, -100);
   }
 
-  // --- LOOP PRINCIPAL DE ANIMAÇÃO E FÍSICA ---
+  @HostListener('document:touchcancel', ['$event'])
+  onTouchCancel() {
+    this.isTouching = false;
+    this.mouse.set(-100, -100);
+  }
+
+  private tryEnableGyro = async () => {
+    const DOE: any = (window as any).DeviceOrientationEvent;
+    if (!DOE) return;
+    if (typeof DOE.requestPermission === 'function') {
+      try {
+        const state = await DOE.requestPermission();
+        if (state !== 'granted') return;
+      } catch { return; }
+    }
+    if (!this.gyroEnabled) {
+      window.addEventListener('deviceorientation', this.handleOrientation as any, { passive: true });
+      this.gyroEnabled = true;
+      window.removeEventListener('touchstart', this.tryEnableGyro as any);
+      window.removeEventListener('click', this.tryEnableGyro as any);
+    }
+  };
+
+  private handleOrientation = (e: DeviceOrientationEvent) => {
+    const g = (e.gamma ?? 0);
+    const b = (e.beta ?? 0);
+    const nx = Math.max(-1, Math.min(1, g / 45));
+    const ny = Math.max(-1, Math.min(1, b / 45));
+    this.gyroParallaxTarget.set(nx * 0.9, -ny * 0.9);
+  };
+
   private animate = () => {
     this.animationFrameId = requestAnimationFrame(this.animate);
     const now = performance.now();
     const dt = (now - this.lastTime) / 1000;
     this.lastTime = now;
-
-    // Combina o parallax do mouse/toque com o do giroscópio
-    const totalParallaxX = this.parallaxTarget.x + this.gyroParallaxTarget.x;
-    const totalParallaxY = this.parallaxTarget.y + this.gyroParallaxTarget.y;
-    this.parallaxCurrent.lerp(new THREE.Vector2(totalParallaxX, totalParallaxY), 0.05);
-
+    const useGyro = this.gyroEnabled && !this.isTouching;
+    if (useGyro) this.parallaxTarget.copy(this.gyroParallaxTarget);
+    this.parallaxCurrent.lerp(this.parallaxTarget, 0.06);
     this.camera.position.x = -this.parallaxCurrent.x * 5;
     this.camera.position.y = -this.parallaxCurrent.y * 5;
     this.camera.lookAt(0, 0, 0);
     this.camera.updateMatrixWorld();
-    this.smoothedMouse.lerp(this.mouse, 0.1);
+    this.smoothedMouse.lerp(this.mouse, 0.12);
     const rawVelocity = this.smoothedMouse.distanceTo(this.lastMousePosition);
-    this.mouseVelocity += (rawVelocity - this.mouseVelocity) * 0.05;
+    this.mouseVelocity += (rawVelocity - this.mouseVelocity) * 0.08;
     this.lastMousePosition.copy(this.smoothedMouse);
+    this.tapImpulse *= 0.9;
     this.particles.rotation.y += 0.0003;
-
-    // Lógica de LOD para pular updates em frames lentos
     this.lodStep = dt > 1 / 55 ? 2 : 1;
     this.lodPhase ^= 1;
-
-    // Loop de física com timestep fixo para estabilidade
     this.accumulator += dt;
     let sub = 0;
     while (this.accumulator >= this.dtFixed && sub < 3) {
@@ -251,28 +248,22 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       this.accumulator -= this.dtFixed;
       sub++;
     }
-
     this.renderer.render(this.scene, this.camera);
-    this.tapImpulse *= 0.85; // Decaimento do impulso do "tap"
   };
 
   private stepPhysics(dt: number) {
     const positions = this.particles.geometry.getAttribute('position').array as Float32Array;
     const v = this.particleVelocities;
-
-    // Transforma o raio do mouse para o espaço local das partículas (considerando a rotação)
     this.raycaster.setFromCamera(this.smoothedMouse, this.camera);
     this.rayOrigin.copy(this.raycaster.ray.origin);
     this.rayDir.copy(this.raycaster.ray.direction).normalize();
     this.rayOriginLocal.copy(this.rayOrigin).applyAxisAngle(new THREE.Vector3(0, 1, 0), -this.particles.rotation.y);
     this.rayDirLocal.copy(this.rayDir).applyAxisAngle(new THREE.Vector3(0, 1, 0), -this.particles.rotation.y).normalize();
-
-    // Parâmetros da Física
     const MAX_SENSIBLE_VELOCITY = 0.04;
     const MAX_RADIUS = 25;
-    const MAX_FORCE = this.isMobile ? 0.6 : 0.4;
+    const MAX_FORCE = 0.4;
     const normalizedVelocity = Math.min(this.mouseVelocity / MAX_SENSIBLE_VELOCITY, 1.0);
-    const effectStrength = normalizedVelocity + this.tapImpulse; // Adiciona o impulso do tap
+    const effectStrength = Math.min(normalizedVelocity + this.tapImpulse, 1.0);
     const dynamicInteractionRadius = effectStrength * MAX_RADIUS;
     const dynamicForceFactor = effectStrength * MAX_FORCE;
     const repulsionRadius = 4.0;
@@ -280,14 +271,14 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     const returnSpeed = 0.0003;
     const friction = 0.96;
     const radius2 = dynamicInteractionRadius * dynamicInteractionRadius;
-
-    // Otimização com Grid Espacial
     for (const arr of this.grid.values()) arr.length = 0;
     const invCell = 1 / this.cellSize;
     for (let i = 0; i < positions.length; i += 3) {
       const px = positions[i];
       const py = positions[i + 1];
-      const key = Math.floor(px * invCell) * this.KEY_STRIDE + Math.floor(py * invCell);
+      const cellX = Math.floor(px * invCell);
+      const cellY = Math.floor(py * invCell);
+      const key = cellX * this.KEY_STRIDE + cellY;
       let arr = this.grid.get(key);
       if (!arr) {
         arr = [];
@@ -295,64 +286,68 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       }
       arr.push(i);
     }
-
-    // Loop principal da física (com aritmética escalar para performance)
+    const rep2 = repulsionRadius * repulsionRadius;
     const count = positions.length;
     for (let i = 0, idx = 0; i < count; i += 3, idx++) {
-      const px = positions[i], py = positions[i + 1], pz = positions[i + 2];
-      let vx = v[i], vy = v[i + 1], vz = v[i + 2];
-
-      // Interação com o Mouse
-      if (dynamicInteractionRadius > 0.1 && (this.lodStep === 1 || ((idx + this.lodPhase) % this.lodStep === 0))) {
-        const wx = px - this.rayOriginLocal.x, wy = py - this.rayOriginLocal.y, wz = pz - this.rayOriginLocal.z;
-        const proj = wx * this.rayDirLocal.x + wy * this.rayDirLocal.y + wz * this.rayDirLocal.z;
-        const cx = this.rayOriginLocal.x + this.rayDirLocal.x * proj;
-        const cy = this.rayOriginLocal.y + this.rayDirLocal.y * proj;
-        const cz = this.rayOriginLocal.z + this.rayDirLocal.z * proj;
-        const dxr = px - cx, dyr = py - cy, dzr = pz - cz;
-        const d2 = dxr * dxr + dyr * dyr + dzr * dzr;
-        if (d2 < radius2) {
-          const d = Math.sqrt(d2) + 1e-6;
-          const falloff = Math.pow(1 - d / (dynamicInteractionRadius + 1e-6), 2);
-          const f = falloff * dynamicForceFactor;
-          vx += (dxr / d) * f;
-          vy += (dyr / d) * f;
-          vz += (dzr / d) * f;
-        }
+      const px = positions[i];
+      const py = positions[i + 1];
+      const pz = positions[i + 2];
+      let vx = v[i];
+      let vy = v[i + 1];
+      let vz = v[i + 2];
+      const wx = px - this.rayOriginLocal.x;
+      const wy = py - this.rayOriginLocal.y;
+      const wz = pz - this.rayOriginLocal.z;
+      const proj = wx * this.rayDirLocal.x + wy * this.rayDirLocal.y + wz * this.rayDirLocal.z;
+      const cx = this.rayOriginLocal.x + this.rayDirLocal.x * proj;
+      const cy = this.rayOriginLocal.y + this.rayDirLocal.y * proj;
+      const cz = this.rayOriginLocal.z + this.rayDirLocal.z * proj;
+      const dxr = px - cx;
+      const dyr = py - cy;
+      const dzr = pz - cz;
+      const d2 = dxr * dxr + dyr * dyr + dzr * dzr;
+      if (dynamicInteractionRadius > 0.1 && d2 < radius2) {
+        const d = Math.sqrt(d2) + 1e-6;
+        const falloff = Math.pow(1 - d / (dynamicInteractionRadius + 1e-6), 2);
+        const f = falloff * dynamicForceFactor;
+        vx += (dxr / d) * f;
+        vy += (dyr / d) * f;
+        vz += (dzr / d) * f;
       }
-
-      // Repulsão entre Partículas
-      const cellX = Math.floor(px * invCell), cellY = Math.floor(py * invCell);
+      const cellX = Math.floor(px * invCell);
+      const cellY = Math.floor(py * invCell);
       for (let nx = -1; nx <= 1; nx++) {
         for (let ny = -1; ny <= 1; ny++) {
-          const arr = this.grid.get((cellX + nx) * this.KEY_STRIDE + (cellY + ny));
+          const nkey = (cellX + nx) * this.KEY_STRIDE + (cellY + ny);
+          const arr = this.grid.get(nkey);
           if (!arr) continue;
           for (let k = 0; k < arr.length; k++) {
             const j = arr[k];
             if (j === i) continue;
-            const ox = positions[j], oy = positions[j + 1];
-            const dxp = px - ox, dyp = py - oy;
+            const ox = positions[j];
+            const oy = positions[j + 1];
+            const dxp = px - ox;
+            const dyp = py - oy;
             const d2p = dxp * dxp + dyp * dyp;
-            if (d2p > 0 && d2p < repulsionRadius * repulsionRadius) {
+            if (d2p > 0 && d2p < rep2) {
               const d = Math.sqrt(d2p) + 1e-6;
-              const f = ((repulsionRadius - d) / repulsionRadius) * repulsionStrength;
+              const force = (repulsionRadius - d) / repulsionRadius;
+              const f = force * repulsionStrength;
               vx += (dxp / d) * f;
               vy += (dyp / d) * f;
             }
           }
         }
       }
-
-      // Força de Retorno e Fricção
-      const ox = this.originalPositions[i], oy = this.originalPositions[i + 1], oz = this.originalPositions[i + 2];
+      const ox = this.originalPositions[i];
+      const oy = this.originalPositions[i + 1];
+      const oz = this.originalPositions[i + 2];
       vx += (ox - px) * returnSpeed;
       vy += (oy - py) * returnSpeed;
       vz += (oz - pz) * returnSpeed;
       vx *= friction;
       vy *= friction;
       vz *= friction;
-
-      // Atualiza Posições e Velocidades
       positions[i] = px + vx;
       positions[i + 1] = py + vy;
       positions[i + 2] = pz + vz;
