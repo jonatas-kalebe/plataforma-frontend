@@ -44,8 +44,11 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   private gyroEnabled = false;
   private isTouching = false;
 
-  // CORREÇÃO: Propriedade para guardar a orientação inicial do giroscópio.
-  private initialOrientation: { beta: number | null, gamma: number | null } = { beta: null, gamma: null };
+  // NOVAS PROPRIEDADES PARA A LÓGICA AVANÇADA DE GIROSCÓPIO
+  private deviceQuaternion = new THREE.Quaternion();
+  private baseQuaternion = new THREE.Quaternion();
+  private isFirstGyroMove = true;
+  private screenOrientation = 0;
 
   private animationFrameId = 0;
   private lastTime = 0;
@@ -57,7 +60,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   private isMobile = false;
   private readonly mobileParticleCount = 60;
   private readonly desktopParticleCount = 120;
-  private readonly gyroIntensity = 4000.0;
+  // A intensidade agora funciona como um multiplicador de ganho geral. 4.0 é um bom ponto de partida.
+  private readonly gyroIntensity = 4.0;
 
   constructor(private el: ElementRef, private ngZone: NgZone) {
   }
@@ -75,8 +79,9 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
       if (!this.prefersReducedMotion) {
         window.addEventListener('click', this.tryEnableGyro, {once: true, passive: true});
-        // CORREÇÃO: Adiciona um listener para resetar o giroscópio se a tela girar.
-        window.addEventListener('orientationchange', this.resetGyro, { passive: true });
+        // Listener para recalibrar o giroscópio se a tela girar (ex: de retrato para paisagem)
+        window.addEventListener('orientationchange', this.onScreenOrientationChange, { passive: true });
+        this.onScreenOrientationChange(); // Define o valor inicial
         this.animate();
       }
     });
@@ -86,14 +91,14 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     window.removeEventListener('resize', this.onWindowResize);
     window.removeEventListener('click', this.tryEnableGyro as any);
-    // CORREÇÃO: Remove os listeners adicionados.
-    window.removeEventListener('orientationchange', this.resetGyro);
+    window.removeEventListener('orientationchange', this.onScreenOrientationChange);
     if (this.gyroEnabled) window.removeEventListener('deviceorientation', this.handleOrientation);
     if (this.renderer) this.renderer.dispose();
     if (this.particles?.geometry) this.particles.geometry.dispose();
     if (this.particles?.material) (this.particles.material as THREE.Material).dispose();
   }
 
+  // ... (onWindowResize, onMouseMove, onClick, onTouch... não foram alterados)
   @HostListener('window:resize')
   onWindowResize = () => {
     const host = this.el.nativeElement;
@@ -137,6 +142,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.mouse.set(-100, -100);
   }
 
+  // ... (initThree, createParticles, createParticleTexture não foram alterados)
   private initThree(): void {
     const host = this.el.nativeElement;
     this.isMobile = ('ontouchstart' in window) || (navigator as any).maxTouchPoints > 0;
@@ -217,36 +223,56 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.gyroEnabled = true;
   };
 
-  // CORREÇÃO: Função para resetar a referência do giroscópio.
-  private resetGyro = () => {
-    this.initialOrientation.beta = null;
-    this.initialOrientation.gamma = null;
-  }
+  /**
+   * NOVO: Recalibra o ponto "zero" do giroscópio quando a orientação da tela muda.
+   */
+  private onScreenOrientationChange = () => {
+    this.screenOrientation = (window.orientation || 0) as number;
+    this.isFirstGyroMove = true; // Força a recalibração no próximo movimento
+  };
 
-  // CORREÇÃO: Lógica do giroscópio refeita para ser relativa e intuitiva.
+  /**
+   * CORREÇÃO COMPLETA: Lógica refeita para usar Quaternions, garantindo
+   * um movimento relativo e intuitivo, independente da orientação do dispositivo.
+   */
   private handleOrientation = (e: DeviceOrientationEvent) => {
-    if (this.initialOrientation.beta === null || this.initialOrientation.gamma === null) {
-      this.initialOrientation.beta = e.beta ?? 0;
-      this.initialOrientation.gamma = e.gamma ?? 0;
-      return;
+    // Converte os ângulos do evento de graus para radianos
+    const alpha = THREE.MathUtils.degToRad(e.alpha ?? 0); // Eixo Z (Bússola/Giro)
+    const beta = THREE.MathUtils.degToRad(e.beta ?? 0);  // Eixo X (Frente/Trás)
+    const gamma = THREE.MathUtils.degToRad(e.gamma ?? 0); // Eixo Y (Esquerda/Direita)
+
+    // Cria um objeto Euler na ordem correta ('YXZ') para dispositivos móveis
+    const euler = new THREE.Euler(beta, alpha, -gamma, 'YXZ');
+    this.deviceQuaternion.setFromEuler(euler);
+
+    // Ajusta a rotação baseando-se na orientação da tela (retrato vs. paisagem)
+    const screenAngle = THREE.MathUtils.degToRad(this.screenOrientation);
+    const screenAdjustment = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -screenAngle);
+    this.deviceQuaternion.multiply(screenAdjustment);
+
+    // No primeiro movimento, captura a orientação inicial para usá-la como o "ponto zero"
+    if (this.isFirstGyroMove) {
+      this.baseQuaternion.copy(this.deviceQuaternion).invert();
+      this.isFirstGyroMove = false;
     }
 
-    const gamma = e.gamma ?? this.initialOrientation.gamma;
-    const beta = e.beta ?? this.initialOrientation.beta;
+    // Calcula a rotação RELATIVA à posição inicial
+    const relativeQuaternion = this.deviceQuaternion.clone().premultiply(this.baseQuaternion);
 
-    let deltaGamma = gamma - this.initialOrientation.gamma!;
-    let deltaBeta = beta - this.initialOrientation.beta!;
+    // Pega um vetor que aponta para "frente" e o rotaciona
+    const lookVector = new THREE.Vector3(0, 0, 1);
+    lookVector.applyQuaternion(relativeQuaternion);
 
-    if (deltaBeta > 180) { deltaBeta -= 360; }
-    if (deltaBeta < -180) { deltaBeta += 360; }
+    // Usa os eixos X e Y do vetor rotacionado como nosso alvo de parallax
+    let nx = lookVector.x * this.gyroIntensity;
+    let ny = -lookVector.y * this.gyroIntensity; // Invertido para corresponder à tela
 
-
-    const nx = THREE.MathUtils.clamp((deltaGamma / 1) * this.gyroIntensity, -1, 1);
-    const ny = THREE.MathUtils.clamp((deltaBeta / 30) * this.gyroIntensity, -1, 1);
+    // Limita os valores para garantir que não saiam do controle
+    nx = THREE.MathUtils.clamp(nx, -1, 1);
+    ny = THREE.MathUtils.clamp(ny, -1, 1);
 
     this.gyroParallaxTarget.set(nx, ny);
   };
-
 
   private animate = () => {
     this.animationFrameId = requestAnimationFrame(this.animate);
@@ -260,14 +286,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     }
     this.parallaxCurrent.lerp(this.parallaxTarget, 0.08);
 
-    if(this.isMobile) {
-      this.camera.position.x = -this.parallaxCurrent.x * 12;
-      this.camera.position.y = this.parallaxCurrent.y * 15;
-    }
-    else {
-      this.camera.position.x = -this.parallaxCurrent.x * 3;
-      this.camera.position.y = this.parallaxCurrent.y * 5;
-    }
+    this.camera.position.x = -this.parallaxCurrent.x * 12;
+    this.camera.position.y = this.parallaxCurrent.y * 15;
     this.camera.lookAt(0, 0, 0);
     this.camera.updateMatrixWorld();
 
@@ -276,12 +296,9 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.mouseVelocity = THREE.MathUtils.lerp(this.mouseVelocity, rawVelocity, 0.08);
     this.lastMousePosition.copy(this.smoothedMouse);
 
-    if(!this.prefersReducedMotion) {
-      if(this.isMobile)
-        this.particles.rotation.y += 0.0005;
-      else this.particles.rotation.y += 0.0003;
+    if (!this.prefersReducedMotion) {
+      this.particles.rotation.y += 0.0003;
     }
-
 
     this.accumulator += dt;
     let sub = 0;
@@ -294,6 +311,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.renderer.render(this.scene, this.camera);
   };
 
+  // ... (stepPhysics não foi alterado)
   private stepPhysics(dt: number, timeNow: number) {
     const positions = this.particles.geometry.getAttribute('position').array as Float32Array;
     const v = this.particleVelocities;
