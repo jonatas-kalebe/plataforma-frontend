@@ -1,10 +1,6 @@
 import {AfterViewInit, Component, ElementRef, HostListener, NgZone, OnDestroy} from '@angular/core';
 import * as THREE from 'three';
 
-/**
- * Interface para definir a estrutura da "onda de choque" de um clique/toque,
- * alinhado com o estudo para fornecer feedback recompensador.
- */
 interface Shockwave {
   pos: THREE.Vector2;
   startTime: number;
@@ -47,6 +43,10 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   private gyroParallaxTarget = new THREE.Vector2(0, 0);
   private gyroEnabled = false;
   private isTouching = false;
+
+  // CORREÇÃO: Propriedade para guardar a orientação inicial do giroscópio.
+  private initialOrientation: { beta: number | null, gamma: number | null } = { beta: null, gamma: null };
+
   private animationFrameId = 0;
   private lastTime = 0;
   private accumulator = 0;
@@ -56,7 +56,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   private isMobile = false;
   private readonly mobileParticleCount = 60;
-  private readonly desktopParticleCount = 80;
+  private readonly desktopParticleCount = 120;
   private readonly gyroIntensity = 4.0;
 
   constructor(private el: ElementRef, private ngZone: NgZone) {
@@ -75,6 +75,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
       if (!this.prefersReducedMotion) {
         window.addEventListener('click', this.tryEnableGyro, {once: true, passive: true});
+        // CORREÇÃO: Adiciona um listener para resetar o giroscópio se a tela girar.
+        window.addEventListener('orientationchange', this.resetGyro, { passive: true });
         this.animate();
       }
     });
@@ -84,6 +86,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     window.removeEventListener('resize', this.onWindowResize);
     window.removeEventListener('click', this.tryEnableGyro as any);
+    // CORREÇÃO: Remove os listeners adicionados.
+    window.removeEventListener('orientationchange', this.resetGyro);
     if (this.gyroEnabled) window.removeEventListener('deviceorientation', this.handleOrientation);
     if (this.renderer) this.renderer.dispose();
     if (this.particles?.geometry) this.particles.geometry.dispose();
@@ -199,7 +203,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   }
 
   private tryEnableGyro = async () => {
-    if (!this.isMobile) return;
+    if (!this.isMobile || this.gyroEnabled) return;
     const DOE = (window as any).DeviceOrientationEvent;
     if (DOE && typeof DOE.requestPermission === 'function') {
       try {
@@ -209,18 +213,35 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
         return;
       }
     }
-    if (!this.gyroEnabled) {
-      window.addEventListener('deviceorientation', this.handleOrientation, {passive: true});
-      this.gyroEnabled = true;
-    }
+    window.addEventListener('deviceorientation', this.handleOrientation, {passive: true});
+    this.gyroEnabled = true;
   };
 
-  private handleOrientation = (e: DeviceOrientationEvent) => {
-    const gamma = e.gamma ?? 0;
-    const beta = e.beta ?? 0;
+  // CORREÇÃO: Função para resetar a referência do giroscópio.
+  private resetGyro = () => {
+    this.initialOrientation.beta = null;
+    this.initialOrientation.gamma = null;
+  }
 
-    const nx = Math.max(-1, Math.min(1, (gamma / 30) * this.gyroIntensity));
-    const ny = Math.max(-1, Math.min(1, (beta / 30) * this.gyroIntensity));
+  // CORREÇÃO: Lógica do giroscópio refeita para ser relativa e intuitiva.
+  private handleOrientation = (e: DeviceOrientationEvent) => {
+    if (this.initialOrientation.beta === null || this.initialOrientation.gamma === null) {
+      this.initialOrientation.beta = e.beta ?? 0;
+      this.initialOrientation.gamma = e.gamma ?? 0;
+      return;
+    }
+
+    const gamma = e.gamma ?? this.initialOrientation.gamma;
+    const beta = e.beta ?? this.initialOrientation.beta;
+
+    let deltaGamma = gamma - this.initialOrientation.gamma!;
+    let deltaBeta = beta - this.initialOrientation.beta!;
+
+    if (deltaBeta > 180) { deltaBeta -= 360; }
+    if (deltaBeta < -180) { deltaBeta += 360; }
+
+    const nx = THREE.MathUtils.clamp((deltaGamma / 30) * this.gyroIntensity, -1, 1);
+    const ny = THREE.MathUtils.clamp((deltaBeta / 30) * this.gyroIntensity, -1, 1);
 
     this.gyroParallaxTarget.set(nx, ny);
   };
