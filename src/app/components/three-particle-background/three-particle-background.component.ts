@@ -31,51 +31,45 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   private particles!: THREE.Points;
   private originalPositions!: Float32Array;
   private particleVelocities!: Float32Array;
-
   private mouse = new THREE.Vector2(-100, -100);
   private smoothedMouse = new THREE.Vector2(-100, -100);
   private lastMousePosition = new THREE.Vector2(-100, -100);
   private mouseVelocity = 0;
   private shockwaves: Shockwave[] = [];
-
   private parallaxTarget = new THREE.Vector2(0, 0);
   private parallaxCurrent = new THREE.Vector2(0, 0);
   private gyroParallaxTarget = new THREE.Vector2(0, 0);
   private gyroEnabled = false;
   private isTouching = false;
-
-  // PROPRIEDADES PARA A NOVA LÓGICA DE GIROSCÓPIO HEURÍSTICA
-  private initialOrientation: { beta: number | null, gamma: number | null, alpha: number | null } = { beta: null, gamma: null, alpha: null };
   private screenOrientation = 0;
-
+  private lastOrientation: { alpha: number | null; beta: number | null; gamma: number | null } = { alpha: null, beta: null, gamma: null };
+  private accumYaw = 0;
+  private accumPitch = 0;
+  private baseSpinX = 0;
+  private baseSpinY = 0;
   private animationFrameId = 0;
   private lastTime = 0;
   private accumulator = 0;
   private readonly dtFixed = 1 / 60;
   private tempVector3D = new THREE.Vector3();
   private prefersReducedMotion = false;
-
   private isMobile = false;
   private readonly mobileParticleCount = 120;
   private readonly desktopParticleCount = 120;
-  private readonly gyroIntensity = 5.0; // Intensidade para a nova lógica
+  private readonly gyroPositionGain = 0.02;
+  private readonly gyroSpinGain = 0.012;
 
-  constructor(private el: ElementRef, private ngZone: NgZone) {
-  }
+  constructor(private el: ElementRef, private ngZone: NgZone) {}
 
   ngAfterViewInit(): void {
     this.ngZone.runOutsideAngular(() => {
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-      if (mediaQuery.matches) {
-        this.prefersReducedMotion = true;
-      }
-
+      if (mediaQuery.matches) this.prefersReducedMotion = true;
       this.initThree();
       this.createParticles();
       this.lastTime = performance.now();
-
       if (!this.prefersReducedMotion) {
-        window.addEventListener('click', this.tryEnableGyro, {once: true, passive: true});
+        window.addEventListener('click', this.tryEnableGyro, { once: true, passive: true });
         window.addEventListener('orientationchange', this.onScreenOrientationChange, { passive: true });
         this.onScreenOrientationChange();
         this.animate();
@@ -94,16 +88,13 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     if (this.particles?.material) (this.particles.material as THREE.Material).dispose();
   }
 
-  // ... (onWindowResize, onMouseMove, onClick, etc. não mudaram)
   @HostListener('window:resize')
   onWindowResize = () => {
     const host = this.el.nativeElement;
     this.camera.aspect = host.clientWidth / host.clientHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(host.clientWidth, host.clientHeight);
-    if (this.prefersReducedMotion) {
-      this.renderer.render(this.scene, this.camera);
-    }
+    if (this.prefersReducedMotion) this.renderer.render(this.scene, this.camera);
   };
 
   @HostListener('document:mousemove', ['$event'])
@@ -114,10 +105,10 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.parallaxTarget.set(this.mouse.x, this.mouse.y);
   }
 
-  @HostListener('document:click', ['$event'])
+  @HostListener('document:click')
   onClick() {
     if (this.isTouching) return;
-    this.shockwaves.push({pos: this.mouse.clone(), startTime: performance.now(), maxStrength: 0.6});
+    this.shockwaves.push({ pos: this.mouse.clone(), startTime: performance.now(), maxStrength: 0.6 });
   }
 
   @HostListener('document:touchstart', ['$event'])
@@ -133,19 +124,18 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   @HostListener('document:touchend')
   onTouchEnd() {
-    this.shockwaves.push({pos: this.mouse.clone(), startTime: performance.now(), maxStrength: 1.0});
+    this.shockwaves.push({ pos: this.mouse.clone(), startTime: performance.now(), maxStrength: 1.0 });
     this.isTouching = false;
     this.mouse.set(-100, -100);
   }
 
-  // ... (initThree, createParticles, etc. não mudaram)
   private initThree(): void {
     const host = this.el.nativeElement;
     this.isMobile = ('ontouchstart' in window) || (navigator as any).maxTouchPoints > 0;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(75, host.clientWidth / host.clientHeight, 0.1, 200);
     this.camera.position.z = 60;
-    this.renderer = new THREE.WebGLRenderer({antialias: true, alpha: true, powerPreference: 'high-performance'});
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     this.renderer.setSize(host.clientWidth, host.clientHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.isMobile ? 1.5 : 1.75));
     this.renderer.setClearColor(0x000000, 0);
@@ -157,19 +147,16 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     this.particleVelocities = new Float32Array(particleCount * 3);
-
     for (let i = 0; i < particleCount; i++) {
       const i3 = i * 3;
       positions[i3] = (Math.random() - 0.5) * 150;
       positions[i3 + 1] = (Math.random() - 0.5) * 100;
       positions[i3 + 2] = (Math.random() - 0.5) * 150;
     }
-
     this.originalPositions = new Float32Array(positions);
     const posAttr = new THREE.BufferAttribute(positions, 3);
     posAttr.setUsage(THREE.StreamDrawUsage);
     geometry.setAttribute('position', posAttr);
-
     const material = new THREE.PointsMaterial({
       size: 1.2,
       map: this.createParticleTexture(),
@@ -179,14 +166,10 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       depthWrite: false,
       color: 0x2d5b8c
     });
-
     this.particles = new THREE.Points(geometry, material);
     this.particles.frustumCulled = false;
     this.scene.add(this.particles);
-
-    if (this.prefersReducedMotion) {
-      this.renderer.render(this.scene, this.camera);
-    }
+    if (this.prefersReducedMotion) this.renderer.render(this.scene, this.camera);
   }
 
   private createParticleTexture(): THREE.Texture {
@@ -211,66 +194,46 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       try {
         const state = await DOE.requestPermission();
         if (state !== 'granted') return;
-      } catch {
-        return;
-      }
+      } catch { return; }
     }
-    window.addEventListener('deviceorientation', this.handleOrientation, {passive: true});
+    window.addEventListener('deviceorientation', this.handleOrientation, { passive: true });
     this.gyroEnabled = true;
   };
 
   private onScreenOrientationChange = () => {
-    this.screenOrientation = (window.orientation || 0) as number;
-    // Força a recalibração do ponto inicial
-    this.initialOrientation = { beta: null, gamma: null, alpha: null };
+    const anyScr: any = window.screen as any;
+    this.screenOrientation = (anyScr?.orientation?.angle ?? (window as any).orientation ?? 0) as number;
+    this.lastOrientation = { alpha: null, beta: null, gamma: null };
   };
 
-  /**
-   * CORREÇÃO: Nova lógica de giroscópio que interpreta a "torção" (alpha)
-   * e a mescla com a inclinação (gamma) para um controle horizontal mais intuitivo.
-   */
+  private shortestAngleDiff(a: number, b: number) {
+    let d = a - b;
+    while (d > 180) d -= 360;
+    while (d < -180) d += 360;
+    return d;
+  }
+
   private handleOrientation = (e: DeviceOrientationEvent) => {
+    const alpha = e.alpha ?? 0;
     const beta = e.beta ?? 0;
     const gamma = e.gamma ?? 0;
-    const alpha = e.alpha ?? 0;
-
-    // Captura a orientação inicial como ponto de referência.
-    if (this.initialOrientation.beta === null) {
-      this.initialOrientation = { beta, gamma, alpha };
+    if (this.lastOrientation.alpha === null) {
+      this.lastOrientation = { alpha, beta, gamma };
       return;
     }
-
-    // Calcula a variação (delta) desde a posição inicial.
-    let deltaBeta = beta - this.initialOrientation.beta;
-    let deltaGamma = gamma - (this.initialOrientation.gamma||0);
-    let deltaAlpha = alpha - (this.initialOrientation.alpha||0);
-
-    // Normaliza o deltaAlpha (que vai de 0 a 360) para evitar saltos.
-    if (deltaAlpha > 180) deltaAlpha -= 360;
-    if (deltaAlpha < -180) deltaAlpha += 360;
-
-    // Fator de "verticalidade": 0 = deitado, 1 = em pé.
+    let dAlpha = this.shortestAngleDiff(alpha, this.lastOrientation.alpha!);
+    let dBeta = this.shortestAngleDiff(beta, this.lastOrientation.beta!);
+    let dGamma = this.shortestAngleDiff(gamma, this.lastOrientation.gamma!);
+    this.lastOrientation = { alpha, beta, gamma };
     const uprightness = Math.sin(THREE.MathUtils.degToRad(Math.abs(beta)));
-
-    // Interpola o controle horizontal:
-    // Se deitado (uprightness=0), usa gamma.
-    // Se em pé (uprightness=1), usa alpha.
-    const horizontalInput = THREE.MathUtils.lerp(deltaGamma, -deltaAlpha, uprightness);
-
-    // Mapeia os inputs para o parallax. O divisor (ex: 45) ajusta a sensibilidade.
-    let nx = (horizontalInput / 45) * this.gyroIntensity;
-    let ny = (deltaBeta / 45) * this.gyroIntensity;
-
-    // Em modo paisagem, inverte os eixos.
-    if (Math.abs(this.screenOrientation) === 90) {
-      [nx, ny] = [ny, -nx];
-    }
-
-    // Limita o valor final entre -1 e 1.
-    this.gyroParallaxTarget.set(
-      THREE.MathUtils.clamp(nx, -1, 1),
-      THREE.MathUtils.clamp(ny, -1, 1)
-    );
+    let yawDelta = THREE.MathUtils.lerp(dGamma, -dAlpha, uprightness);
+    let pitchDelta = dBeta;
+    if (Math.abs(this.screenOrientation) === 90) [yawDelta, pitchDelta] = [pitchDelta, -yawDelta];
+    this.accumYaw += yawDelta;
+    this.accumPitch += pitchDelta;
+    const tx = this.accumYaw * this.gyroPositionGain;
+    const ty = this.accumPitch * this.gyroPositionGain;
+    this.gyroParallaxTarget.set(THREE.MathUtils.clamp(tx, -2.5, 2.5), THREE.MathUtils.clamp(ty, -2.5, 2.5));
   };
 
   private animate = () => {
@@ -278,33 +241,28 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     const now = performance.now();
     const dt = (now - this.lastTime) / 1000;
     this.lastTime = now;
-
     const useGyro = this.gyroEnabled && !this.isTouching;
-    if (useGyro) {
-      this.parallaxTarget.lerp(this.gyroParallaxTarget, 0.1);
-    }
+    if (useGyro) this.parallaxTarget.lerp(this.gyroParallaxTarget, 0.12);
     this.parallaxCurrent.lerp(this.parallaxTarget, 0.08);
-
-    if(this.isMobile) {
+    if (this.isMobile) {
       this.camera.position.x = -this.parallaxCurrent.x * 12;
       this.camera.position.y = this.parallaxCurrent.y * 15;
-    }
-    else {
+    } else {
       this.camera.position.x = -this.parallaxCurrent.x * 3;
       this.camera.position.y = this.parallaxCurrent.y * 5;
     }
     this.camera.lookAt(0, 0, 0);
     this.camera.updateMatrixWorld();
-
     this.smoothedMouse.lerp(this.mouse, 0.12);
     const rawVelocity = this.smoothedMouse.distanceTo(this.lastMousePosition);
     this.mouseVelocity = THREE.MathUtils.lerp(this.mouseVelocity, rawVelocity, 0.08);
     this.lastMousePosition.copy(this.smoothedMouse);
-
     if (!this.prefersReducedMotion) {
-      this.particles.rotation.y += 0.0003;
+      this.baseSpinY += 0.0003;
+      this.particles.rotation.y = this.baseSpinY + this.accumYaw * this.gyroSpinGain;
+      this.baseSpinX += 0.00005;
+      this.particles.rotation.x = this.baseSpinX + this.accumPitch * this.gyroSpinGain * 0.5;
     }
-
     this.accumulator += dt;
     let sub = 0;
     while (this.accumulator >= this.dtFixed && sub < 3) {
@@ -312,35 +270,28 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       this.accumulator -= this.dtFixed;
       sub++;
     }
-
     this.renderer.render(this.scene, this.camera);
   };
 
   private stepPhysics(dt: number, timeNow: number) {
     const positions = this.particles.geometry.getAttribute('position').array as Float32Array;
     const v = this.particleVelocities;
-
     const MAX_SENSIBLE_VELOCITY = 0.04;
     const MAX_RADIUS = 15;
     const MAX_FORCE = 0.6;
     const friction = 0.96;
     const returnSpeed = 0.0005;
-
     const normalizedVelocity = Math.min(this.mouseVelocity / MAX_SENSIBLE_VELOCITY, 1.0);
     const easedVelocity = 1 - Math.pow(1 - normalizedVelocity, 3);
     const dynamicInteractionRadius = easedVelocity * MAX_RADIUS;
     const dynamicForceFactor = easedVelocity * MAX_FORCE;
-
     this.shockwaves = this.shockwaves.filter(sw => (timeNow - sw.startTime) < 500);
     for (let i = 0; i < positions.length; i += 3) {
       this.tempVector3D.set(positions[i], positions[i + 1], positions[i + 2]);
       this.tempVector3D.project(this.camera);
-
       if (this.tempVector3D.z > 1) continue;
-
       let totalForceX = 0;
       let totalForceY = 0;
-
       const distToMouse = Math.hypot(this.tempVector3D.x - this.smoothedMouse.x, this.tempVector3D.y - this.smoothedMouse.y);
       if (dynamicInteractionRadius > 0.01 && distToMouse < dynamicInteractionRadius) {
         const falloff = Math.pow(1 - distToMouse / dynamicInteractionRadius, 2);
@@ -349,31 +300,25 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
         totalForceX += (this.tempVector3D.x - this.smoothedMouse.x) / normDist * force;
         totalForceY += (this.tempVector3D.y - this.smoothedMouse.y) / normDist * force;
       }
-
       for (const sw of this.shockwaves) {
         const age = (timeNow - sw.startTime) / 500;
         const swRadius = age * 0.4;
         const swStrength = sw.maxStrength * (1 - age);
         const distToSw = Math.hypot(this.tempVector3D.x - sw.pos.x, this.tempVector3D.y - sw.pos.y);
-
         if (swStrength > 0 && distToSw < swRadius && distToSw > swRadius - 0.15) {
           const normDist = distToSw || 1;
           totalForceX += (this.tempVector3D.x - sw.pos.x) / normDist * swStrength;
           totalForceY += (this.tempVector3D.y - sw.pos.y) / normDist * swStrength;
         }
       }
-
       v[i] += totalForceX * 0.05;
       v[i + 1] += totalForceY * 0.05;
-
-      v[i] += (this.originalPositions[i] - positions[i]) * returnSpeed;
-      v[i + 1] += (this.originalPositions[i + 1] - positions[i + 1]) * returnSpeed;
-      v[i + 2] += (this.originalPositions[i + 2] - positions[i + 2]) * returnSpeed;
-
+      v[i] += (this.originalPositions[i] - positions[i]) * 0.0005;
+      v[i + 1] += (this.originalPositions[i + 1] - positions[i + 1]) * 0.0005;
+      v[i + 2] += (this.originalPositions[i + 2] - positions[i + 2]) * 0.0005;
       v[i] *= friction;
       v[i + 1] *= friction;
       v[i + 2] *= friction;
-
       positions[i] += v[i];
       positions[i + 1] += v[i + 1];
       positions[i + 2] += v[i + 2];
