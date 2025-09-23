@@ -54,7 +54,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   private isMobile = false;
   private mobileParticleCount = 25;
-  private desktopParticleCount = 80;
+  private desktopParticleCount = 81;
   private gyroIntensity = 4.0;
 
   constructor(private el: ElementRef, private ngZone: NgZone) {}
