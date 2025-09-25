@@ -52,7 +52,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run build:ssr:frontend && npm run serve:ssr:frontend',
     url: 'http://localhost:4000',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     stdout: 'pipe',
     stderr: 'pipe',
     timeout: 120000

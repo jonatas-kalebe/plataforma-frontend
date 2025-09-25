@@ -18,6 +18,13 @@ export interface ScrollMetrics {
   sections: ScrollSection[];
 }
 
+export interface ScrollState {
+  globalProgress: number;
+  velocity: number;
+  activeSection: number;
+  direction: 'up' | 'down' | 'none';
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -28,6 +35,8 @@ export class ScrollOrchestrationService {
   private isInitialized = false;
   private scrollTriggers: ScrollTrigger[] = [];
   private prefersReducedMotion = false;
+  private lastScrollY = 0;
+  private scrollDirection: 'up' | 'down' | 'none' = 'none';
   
   private metricsSubject = new BehaviorSubject<ScrollMetrics>({
     globalProgress: 0,
@@ -36,7 +45,15 @@ export class ScrollOrchestrationService {
     sections: []
   });
 
+  private scrollStateSubject = new BehaviorSubject<ScrollState>({
+    globalProgress: 0,
+    velocity: 0,
+    activeSection: 0,
+    direction: 'none'
+  });
+
   public readonly metrics$: Observable<ScrollMetrics> = this.metricsSubject.asObservable();
+  public readonly scrollState$: Observable<ScrollState> = this.scrollStateSubject.asObservable();
 
   constructor() {
     if (isPlatformBrowser(this.platformId)) {
@@ -51,6 +68,7 @@ export class ScrollOrchestrationService {
 
     this.ngZone.runOutsideAngular(() => {
       gsap.registerPlugin(ScrollTrigger);
+      this.lastScrollY = window.scrollY || 0;
       this.setupSections();
       this.isInitialized = true;
     });
@@ -87,7 +105,6 @@ export class ScrollOrchestrationService {
 
       sections.push(section);
 
-      // Create ScrollTrigger for each section
       const trigger = ScrollTrigger.create({
         trigger: element,
         start: 'top bottom',
@@ -103,12 +120,22 @@ export class ScrollOrchestrationService {
           }
           this.updateMetrics();
         },
-        // Apply reduced motion settings
         ...(this.prefersReducedMotion ? {} : {
-          pin: index === 1 || index === 3, // Pin filosofia and trabalhos sections
-          scrub: 1,
+          pin: index === 1 || index === 3,
+          scrub: true,
           snap: {
-            snapTo: 'labels',
+            snapTo: (progress: number) => {
+              const snapPoints = [0, 1];
+              const threshold = 0.1;
+              const k = 0.3 + Math.pow(Math.abs(0.5 - progress), 2);
+              
+              for (const point of snapPoints) {
+                if (Math.abs(progress - point) < threshold * k) {
+                  return point;
+                }
+              }
+              return progress;
+            },
             duration: { min: 0.2, max: 0.6 },
             delay: 0.1
           }
@@ -118,14 +145,12 @@ export class ScrollOrchestrationService {
       this.scrollTriggers.push(trigger);
     });
 
-    // Update sections in metrics
     const currentMetrics = this.metricsSubject.value;
     this.metricsSubject.next({
       ...currentMetrics,
       sections
     });
 
-    // Setup global scroll progress
     this.setupGlobalProgress();
   }
 
@@ -135,13 +160,32 @@ export class ScrollOrchestrationService {
       start: 'top top',
       end: 'bottom bottom',
       onUpdate: (self) => {
-        const velocity = (ScrollTrigger as any).getVelocity?.() || 0;
+        const currentScrollY = window.scrollY || 0;
+        const velocityRaw = (ScrollTrigger as any).getVelocity?.() || 0;
+        const velocity = velocityRaw / 1000;
+        
+        if (currentScrollY > this.lastScrollY + 5) {
+          this.scrollDirection = 'down';
+        } else if (currentScrollY < this.lastScrollY - 5) {
+          this.scrollDirection = 'up';
+        } else {
+          this.scrollDirection = 'none';
+        }
+        this.lastScrollY = currentScrollY;
+        
         const currentMetrics = this.metricsSubject.value;
         
         this.metricsSubject.next({
           ...currentMetrics,
           globalProgress: self.progress,
-          velocity: velocity / 1000 // Normalize velocity
+          velocity: Math.abs(velocity)
+        });
+        
+        this.scrollStateSubject.next({
+          globalProgress: self.progress,
+          velocity: Math.abs(velocity),
+          activeSection: currentMetrics.activeSection,
+          direction: this.scrollDirection
         });
       }
     });
@@ -149,20 +193,25 @@ export class ScrollOrchestrationService {
 
   private setActiveSection(index: number): void {
     const currentMetrics = this.metricsSubject.value;
+    const currentScrollState = this.scrollStateSubject.value;
+    
     this.metricsSubject.next({
       ...currentMetrics,
+      activeSection: index
+    });
+    
+    this.scrollStateSubject.next({
+      ...currentScrollState,
       activeSection: index
     });
   }
 
   private updateMetrics(): void {
-    // Trigger update to emit current metrics
     const current = this.metricsSubject.value;
     this.metricsSubject.next({ ...current });
   }
 
   private updateAnimationSettings(): void {
-    // Refresh ScrollTrigger with new settings
     ScrollTrigger.getAll().forEach(trigger => trigger.kill());
     this.scrollTriggers = [];
     this.setupSections();
@@ -170,6 +219,10 @@ export class ScrollOrchestrationService {
 
   getSection(id: string): ScrollSection | undefined {
     return this.metricsSubject.value.sections.find(section => section.id === id);
+  }
+
+  getScrollState(): ScrollState {
+    return this.scrollStateSubject.value;
   }
 
   scrollToSection(id: string, duration: number = 1): void {
