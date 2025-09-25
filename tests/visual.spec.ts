@@ -45,3 +45,76 @@ test('scroll orchestration infrastructure check', async ({ page }) => {
   const pageTitle = await page.title();
   expect(pageTitle).toContain('Athenity');
 });
+
+// Scrollytelling snapshot tests for the 5 acts
+test('scrollytelling act 1 - hero section snapshot', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  
+  // Scroll to hero section (top of page)
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(1000); // Allow animations to complete
+  
+  // Take snapshot of hero section
+  await expect(page.locator('#hero')).toHaveScreenshot('act1-hero.png', { threshold: 0.3 });
+});
+
+test('scrollytelling act 2 - filosofia section snapshot', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  
+  // Scroll to filosofia section
+  await page.evaluate(() => {
+    const element = document.querySelector('#filosofia');
+    if (element) element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  await page.waitForTimeout(1000);
+  
+  // Take snapshot of filosofia section
+  await expect(page.locator('#filosofia')).toHaveScreenshot('act2-filosofia.png', { threshold: 0.3 });
+});
+
+test('scrollytelling act 3 - servicos section snapshot', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  
+  // Scroll to servicos section
+  await page.evaluate(() => {
+    const element = document.querySelector('#servicos');
+    if (element) element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  await page.waitForTimeout(1000);
+  
+  // Take snapshot of servicos section
+  await expect(page.locator('#servicos')).toHaveScreenshot('act3-servicos.png', { threshold: 0.3 });
+});
+
+test('scrollytelling act 4 - trabalhos section snapshot', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  
+  // Scroll to trabalhos section
+  await page.evaluate(() => {
+    const element = document.querySelector('#trabalhos');
+    if (element) element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  await page.waitForTimeout(1000);
+  
+  // Take snapshot of trabalhos section
+  await expect(page.locator('#trabalhos')).toHaveScreenshot('act4-trabalhos.png', { threshold: 0.3 });
+});
+
+test('scrollytelling act 5 - cta section snapshot', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  
+  // Scroll to cta section
+  await page.evaluate(() => {
+    const element = document.querySelector('#cta');
+    if (element) element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  await page.waitForTimeout(1000);
+  
+  // Take snapshot of cta section
+  await expect(page.locator('#cta')).toHaveScreenshot('act5-cta.png', { threshold: 0.3 });
+});

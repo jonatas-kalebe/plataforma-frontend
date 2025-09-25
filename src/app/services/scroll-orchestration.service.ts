@@ -105,8 +105,8 @@ export class ScrollOrchestrationService {
         },
         // Apply reduced motion settings
         ...(this.prefersReducedMotion ? {} : {
-          pin: index === 1 || index === 3, // Pin filosofia and trabalhos sections
-          scrub: 1,
+          pin: index === 0 || index === 3, // Pin hero (0) and trabalhos (3) sections for immersion
+          scrub: index > 0 ? 1 : false, // Scrub for all sections except hero
           snap: {
             snapTo: 'labels',
             duration: { min: 0.2, max: 0.6 },

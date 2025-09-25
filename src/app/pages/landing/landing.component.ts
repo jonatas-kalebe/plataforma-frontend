@@ -51,38 +51,63 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   }
 
   private initGSAP(): void {
-    const tl = gsap.timeline({ defaults: { ease: 'power3.out', duration: 1 } });
-    tl.from('#hero-title', { opacity: 0, y: 50, delay: 0.2 })
+    // Timeline para seção Hero (Ato 1) - animação inicial sem scrub
+    const heroTl = gsap.timeline({ defaults: { ease: 'power3.out', duration: 1 } });
+    heroTl.from('#hero-title', { opacity: 0, y: 50, delay: 0.2 })
       .from('#hero-subtitle', { opacity: 0, y: 40 }, '-=0.8')
       .from('#hero-cta', { opacity: 0, y: 30 }, '-=0.6');
 
-    gsap.utils.toArray<HTMLElement>('.service-card').forEach(card => {
-      gsap.from(card, {
-        opacity: 0,
-        y: 100,
-        duration: 0.8,
-        ease: 'power3.out',
-        scrollTrigger: {
-          trigger: card,
-          start: 'top 85%',
-          toggleActions: 'play none none reverse' // 'reverse' para a animação reverter ao sair
-        }
-      });
-    });
-
-    // Animação para a seção de filosofia
-    gsap.from('#filosofia > div', {
-      opacity: 0,
-      y: 80,
-      duration: 1,
-      stagger: 0.2,
-      ease: 'power3.out',
+    // Timeline para seção Filosofia (Ato 2) - com scrub para scrollytelling
+    const filosofiaTl = gsap.timeline({
+      ease: 'none',
       scrollTrigger: {
         trigger: '#filosofia',
-        start: 'top 75%',
-        toggleActions: 'play none none reverse'
+        start: 'top bottom',
+        end: 'bottom top',
+        scrub: 1
       }
     });
+    filosofiaTl.from('#filosofia > div > div:first-child', { opacity: 0, y: 80, duration: 1 })
+              .from('#filosofia > div > div:last-child', { opacity: 0, x: 50, duration: 1 }, '-=0.5');
+
+    // Timeline para seção Serviços (Ato 3) - com scrub
+    const servicosTl = gsap.timeline({
+      ease: 'none',
+      scrollTrigger: {
+        trigger: '#servicos',
+        start: 'top bottom',
+        end: 'bottom top',
+        scrub: 1
+      }
+    });
+    servicosTl.from('#servicos h3', { opacity: 0, y: 50, duration: 0.5 })
+              .from('.service-card', { opacity: 0, y: 100, duration: 1, stagger: 0.2 }, '-=0.3');
+
+    // Timeline para seção Trabalhos (Ato 4) - com scrub
+    const trabalhosTl = gsap.timeline({
+      ease: 'none',
+      scrollTrigger: {
+        trigger: '#trabalhos',
+        start: 'top bottom',
+        end: 'bottom top',
+        scrub: 1
+      }
+    });
+    trabalhosTl.from('#trabalhos h3', { opacity: 0, y: 50, duration: 0.5 })
+               .from('#trabalhos app-work-card-ring', { opacity: 0, scale: 0.8, duration: 1 }, '-=0.3');
+
+    // Timeline para seção CTA (Ato 5) - com scrub
+    const ctaTl = gsap.timeline({
+      ease: 'none',
+      scrollTrigger: {
+        trigger: '#cta',
+        start: 'top bottom',
+        end: 'bottom top',
+        scrub: 1
+      }
+    });
+    ctaTl.from('#cta h3', { opacity: 0, y: 50, duration: 0.5 })
+         .from('#cta a', { opacity: 0, y: 30, scale: 0.9, duration: 0.5 }, '-=0.3');
   }
 
   private initKnot(): void {
@@ -131,19 +156,19 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       ctx.stroke();
     };
 
-    // Animação controlada por GSAP e ScrollTrigger
+    // Animação controlada por GSAP e ScrollTrigger com scrub para scrollytelling
     gsap.to({ val: 0 }, {
       val: 1,
-      duration: 1.5,
-      ease: 'power2.inOut',
-      onUpdate: function() {
-        t = this["targets"]()[0].val;
-        draw();
-      },
+      ease: 'none',
       scrollTrigger: {
         trigger: '#filosofia',
-        start: 'top 70%',
-        toggleActions: 'play none none reverse'
+        start: 'top bottom',
+        end: 'bottom top',
+        scrub: 1,
+        onUpdate: function(self) {
+          t = self.progress;
+          draw();
+        }
       }
     });
   }

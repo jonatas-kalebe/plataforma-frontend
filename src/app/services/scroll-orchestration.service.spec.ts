@@ -39,7 +39,7 @@ describe('ScrollOrchestrationService', () => {
       ]
     });
     service = TestBed.inject(ScrollOrchestrationService);
-    platformId = TestBed.inject(PLATFORM_ID);
+    platformId = TestBed.inject(PLATFORM_ID) as string;
   });
 
   afterEach(() => {
