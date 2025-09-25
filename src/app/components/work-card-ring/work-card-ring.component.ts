@@ -1,7 +1,9 @@
-import { Component, ElementRef, NgZone, ViewChild, AfterViewInit, OnDestroy, PLATFORM_ID, inject } from '@angular/core';
+import { Component, ElementRef, NgZone, ViewChild, AfterViewInit, OnDestroy, PLATFORM_ID, inject, Input } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { ScrollOrchestrationService, ScrollState } from '../../services/scroll-orchestration.service';
+import { Subject, takeUntil } from 'rxjs';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -24,16 +26,26 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
   private targetYRotate = 0;
   private velocity = 0;
   private animationFrameId: number | null = null;
+  private destroy$ = new Subject<void>();
+  private scrollRotationOffset = 0;
+  private baseRotation = 0;
+  private isSnapped = false;
+  private prefersReducedMotion = false;
 
-  constructor(private zone: NgZone) {}
+  constructor(
+    private zone: NgZone,
+    private scrollService: ScrollOrchestrationService
+  ) {}
 
   ngAfterViewInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
     
     this.zone.runOutsideAngular(() => {
+      this.checkReducedMotion();
       gsap.registerPlugin(ScrollTrigger);
       this.initAnimation();
       this.setupDragEvents();
+      this.setupScrollIntegration();
       this.smoothRotate();
     });
   }
@@ -41,10 +53,38 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     if (!isPlatformBrowser(this.platformId)) return;
     
+    this.destroy$.next();
+    this.destroy$.complete();
     this.removeDragEvents();
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
   }
 
+  private checkReducedMotion(): void {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+      this.prefersReducedMotion = mediaQuery.matches;
+    }
+  }
+
+  private setupScrollIntegration(): void {
+    this.scrollService.scrollState$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(state => {
+        const trabalhosSection = this.scrollService.getSection('trabalhos');
+        if (trabalhosSection && !this.isDragging) {
+          const progress = trabalhosSection.progress;
+          const k = 0.3 + Math.pow(Math.abs(0.5 - progress), 2);
+          
+          if (Math.abs(progress - 0.5) < 0.1 * k) {
+            this.isSnapped = true;
+            this.scrollRotationOffset = this.baseRotation + progress * 180;
+          } else {
+            this.isSnapped = false;
+            this.scrollRotationOffset = this.baseRotation + progress * 360 * k;
+          }
+        }
+      });
+  }
   private initAnimation(): void {
     gsap.from(this.ring.nativeElement, {
       scrollTrigger: {
@@ -52,10 +92,10 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
         start: 'top 80%',
         toggleActions: 'play none none reverse'
       },
-      rotateY: -60,
+      rotateY: this.prefersReducedMotion ? 0 : -60,
       opacity: 0,
-      duration: 1.2,
-      ease: 'power3.out'
+      duration: this.prefersReducedMotion ? 0.3 : 1.2,
+      ease: this.prefersReducedMotion ? 'none' : 'power3.out'
     });
   }
 
@@ -83,6 +123,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
     this.isDragging = true;
     this.startX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     this.velocity = 0;
+    this.baseRotation = this.currentYRotate;
     this.ring.nativeElement.style.cursor = 'grabbing';
   };
 
@@ -91,13 +132,14 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
     const currentX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const deltaX = currentX - this.startX;
     const sensitivity = 0.25;
-    this.targetYRotate += deltaX * sensitivity;
+    this.targetYRotate = this.baseRotation + deltaX * sensitivity;
     this.velocity = deltaX * sensitivity;
     this.startX = currentX;
   };
 
   private onDragEnd = (): void => {
     this.isDragging = false;
+    this.baseRotation = this.targetYRotate;
     this.ring.nativeElement.style.cursor = 'grab';
   };
 
@@ -105,9 +147,15 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
     if (!this.isDragging) {
       this.velocity *= 0.95;
       if (Math.abs(this.velocity) < 0.01) this.velocity = 0;
-      this.targetYRotate += this.velocity;
+      
+      if (!this.isSnapped) {
+        this.targetYRotate = this.scrollRotationOffset;
+      } else {
+        this.targetYRotate += this.velocity * 0.1;
+      }
     }
-    const lerpFactor = 0.1;
+    
+    const lerpFactor = this.isSnapped ? 0.05 : 0.1;
     this.currentYRotate += (this.targetYRotate - this.currentYRotate) * lerpFactor;
     this.ring.nativeElement.style.transform = `rotateY(${this.currentYRotate}deg)`;
     this.animationFrameId = requestAnimationFrame(this.smoothRotate);
