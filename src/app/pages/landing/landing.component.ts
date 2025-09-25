@@ -63,7 +63,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         pin: true,
         pinSpacing: false,
         scrub: 1,
-        snap: { snapTo: 1, duration: { min: 0.2, max: 1 } }
+        snap: { snapTo: 1, duration: 0.5 }
       });
     }
   }

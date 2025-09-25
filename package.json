@@ -5,10 +5,12 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:ssr": "ng build --ssr",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "serve:ssr:frontend": "node dist/frontend/server/server.mjs",
-    "tailwind:init": "tailwindcss init"
+    "tailwind:init": "tailwindcss init",
+    "test:e2e": "playwright test"
   },
   "private": true,
   "dependencies": {
