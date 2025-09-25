@@ -1,4 +1,5 @@
-import {AfterViewInit, Component, ElementRef, HostListener, NgZone, OnDestroy} from '@angular/core';
+import {AfterViewInit, Component, ElementRef, HostListener, NgZone, OnDestroy, PLATFORM_ID, inject} from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import * as THREE from 'three';
 
 interface Shockwave {
@@ -25,6 +26,7 @@ interface Shockwave {
   `]
 })
 export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestroy {
+  private readonly platformId = inject(PLATFORM_ID);
   private scene!: THREE.Scene;
   private camera!: THREE.PerspectiveCamera;
   private renderer!: THREE.WebGLRenderer;
@@ -62,6 +64,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   constructor(private el: ElementRef, private ngZone: NgZone) {}
 
   ngAfterViewInit(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     this.ngZone.runOutsideAngular(() => {
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
       if (mediaQuery.matches) this.prefersReducedMotion = true;
@@ -78,6 +82,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   }
 
   ngOnDestroy(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     window.removeEventListener('resize', this.onWindowResize);
     window.removeEventListener('click', this.tryEnableGyro as any);

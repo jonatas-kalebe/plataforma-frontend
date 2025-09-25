@@ -1,5 +1,5 @@
-import { Component, ElementRef, NgZone, ViewChild, AfterViewInit, OnDestroy } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, ElementRef, NgZone, ViewChild, AfterViewInit, OnDestroy, PLATFORM_ID, inject } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -13,6 +13,7 @@ gsap.registerPlugin(ScrollTrigger);
   styleUrls: ['./work-card-ring.component.css']
 })
 export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
+  private readonly platformId = inject(PLATFORM_ID);
   @ViewChild('ring', { static: true }) ring!: ElementRef<HTMLDivElement>;
 
   items = Array.from({ length: 8 }).map((_, i) => ({ i, title: `Projeto ${i + 1}` }));
@@ -27,7 +28,10 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
   constructor(private zone: NgZone) {}
 
   ngAfterViewInit(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     this.zone.runOutsideAngular(() => {
+      gsap.registerPlugin(ScrollTrigger);
       this.initAnimation();
       this.setupDragEvents();
       this.smoothRotate();
@@ -35,6 +39,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     this.removeDragEvents();
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
   }
