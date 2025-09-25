@@ -26,7 +26,7 @@ Object.defineProperty(window, 'matchMedia', {
 
 describe('ScrollOrchestrationService', () => {
   let service: ScrollOrchestrationService;
-  let platformId: string;
+  let platformId: Object;
 
   beforeEach(() => {
     // Mock GSAP modules
