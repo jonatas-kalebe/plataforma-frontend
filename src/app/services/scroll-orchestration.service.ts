@@ -105,43 +105,46 @@ export class ScrollOrchestrationService {
 
       sections.push(section);
 
-      const trigger = ScrollTrigger.create({
+      const baseConfig = {
         trigger: element,
         start: 'top bottom',
         end: 'bottom top',
-        onUpdate: (self) => {
+        onUpdate: (self: any) => {
           section.progress = self.progress;
           this.updateMetrics();
         },
-        onToggle: (self) => {
+        onToggle: (self: any) => {
           section.isActive = self.isActive;
           if (self.isActive) {
             this.setActiveSection(index);
           }
           this.updateMetrics();
-        },
-        ...(this.prefersReducedMotion ? {} : {
-          pin: index === 1 || index === 3,
-          scrub: true,
-          snap: {
-            snapTo: (progress: number) => {
-              const snapPoints = [0, 1];
-              const threshold = 0.1;
-              const k = 0.3 + Math.pow(Math.abs(0.5 - progress), 2);
-              
-              for (const point of snapPoints) {
-                if (Math.abs(progress - point) < threshold * k) {
-                  return point;
-                }
-              }
-              return progress;
-            },
-            duration: { min: 0.2, max: 0.6 },
-            delay: 0.1
-          }
-        })
-      });
+        }
+      };
 
+      const advancedConfig = this.prefersReducedMotion ? {} : {
+        pin: index === 1 || index === 3,
+        scrub: true,
+        snap: {
+          snapTo: (progress: number) => {
+            const snapPoints = [0, 1];
+            const threshold = 0.15;
+            const k = 0.3 + Math.pow(Math.abs(0.5 - progress), 2);
+            
+            for (const point of snapPoints) {
+              if (Math.abs(progress - point) < threshold * k) {
+                return point;
+              }
+            }
+            return progress;
+          },
+          duration: { min: 0.3, max: 0.8 },
+          delay: 0.1,
+          ease: 'power2.inOut'
+        }
+      };
+
+      const trigger = ScrollTrigger.create({ ...baseConfig, ...advancedConfig });
       this.scrollTriggers.push(trigger);
     });
 
