@@ -17,17 +17,25 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: nohup node dist/frontend/server/server.mjs >/dev/null 2>&1 &
+      - run: nohup npm run serve:ssr:frontend >/dev/null 2>&1 &
       - run: |
           for i in $(seq 1 60); do
             curl -sSf http://localhost:4000 >/dev/null && exit 0
             sleep 2
           done
           exit 1
-      - uses: google-github-actions/run-gemini-cli@v0.1.12
+      - run: npx playwright install --with-deps
+      - run: npm run test:e2e
+      - uses: google-github-actions/run-gemini-cli@v0
+        id: gemini
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           prompt: |
-            Você está auditando http://localhost:4000.
-            Avalie acessibilidade (WCAG AA), contraste, tipografia, hierarquia visual e responsividade.
-            Responda em Markdown com: Sumário, Achados Críticos, Melhorias Rápidas, Sugestões.
+            Projeto Angular 19 SSR rodando em http://localhost:4000.
+            Analise acessibilidade, contraste, hierarquia tipográfica, responsividade e sinais de jank nas transições controladas por scroll.
+            Entregue em Markdown com: Sumário, Achados Críticos, Melhorias Rápidas, Sugestões.
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `### Auditoria Gemini\n\n${{ steps.gemini.outputs.summary || 'Sem saída.' }}`;
+            github.rest.issues.createComment({owner: context.repo.owner, repo: context.repo.repo, issue_number: context.payload.pull_request.number, body});
