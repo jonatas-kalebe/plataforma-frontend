@@ -1,5 +1,6 @@
 import {AfterViewInit, Component, ElementRef, HostListener, NgZone, OnDestroy} from '@angular/core';
 import * as THREE from 'three';
+import { ScrollOrchestratorService } from '../../services/scroll-orchestrator.service';
 
 interface Shockwave {
   pos: THREE.Vector2;
@@ -58,8 +59,11 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   private readonly desktopParticleCount = 120;
   private readonly gyroPositionGain = 0.02;
   private readonly gyroSpinGain = 0.012;
+  private scrollModulatorCleanup?: () => void;
+  private scrollVelocityEffect = 0;
+  private scrollProgressEffect = 0;
 
-  constructor(private el: ElementRef, private ngZone: NgZone) {}
+  constructor(private el: ElementRef, private ngZone: NgZone, private scrollOrchestrator: ScrollOrchestratorService) {}
 
   ngAfterViewInit(): void {
     this.ngZone.runOutsideAngular(() => {
@@ -67,6 +71,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       if (mediaQuery.matches) this.prefersReducedMotion = true;
       this.initThree();
       this.createParticles();
+      this.setupScrollModulation();
       this.lastTime = performance.now();
       if (!this.prefersReducedMotion) {
         window.addEventListener('click', this.tryEnableGyro, { once: true, passive: true });
@@ -78,6 +83,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   }
 
   ngOnDestroy(): void {
+    if (this.scrollModulatorCleanup) this.scrollModulatorCleanup();
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     window.removeEventListener('resize', this.onWindowResize);
     window.removeEventListener('click', this.tryEnableGyro as any);
@@ -236,6 +242,14 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.gyroParallaxTarget.set(THREE.MathUtils.clamp(tx, -2.5, 2.5), THREE.MathUtils.clamp(ty, -2.5, 2.5));
   };
 
+  private setupScrollModulation(): void {
+    this.scrollModulatorCleanup = this.scrollOrchestrator.registerParticleModulator((state) => {
+      const maxVelocity = 20;
+      this.scrollVelocityEffect = THREE.MathUtils.clamp(Math.abs(state.velocity) / maxVelocity, 0, 1);
+      this.scrollProgressEffect = state.progress;
+    });
+  }
+
   private animate = () => {
     this.animationFrameId = requestAnimationFrame(this.animate);
     const now = performance.now();
@@ -258,9 +272,11 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.mouseVelocity = THREE.MathUtils.lerp(this.mouseVelocity, rawVelocity, 0.08);
     this.lastMousePosition.copy(this.smoothedMouse);
     if (!this.prefersReducedMotion) {
-      this.baseSpinY += 0.0003;
-      this.particles.rotation.y = this.baseSpinY + this.accumYaw * this.gyroSpinGain;
-      this.baseSpinX += 0.00005;
+      const scrollSpinBoost = this.scrollVelocityEffect * 0.005;
+      const scrollProgressOffset = this.scrollProgressEffect * 0.002;
+      this.baseSpinY += 0.0003 + scrollSpinBoost;
+      this.particles.rotation.y = this.baseSpinY + scrollProgressOffset + this.accumYaw * this.gyroSpinGain;
+      this.baseSpinX += 0.00005 + scrollSpinBoost * 0.3;
       this.particles.rotation.x = this.baseSpinX + this.accumPitch * this.gyroSpinGain * 0.5;
     }
     this.accumulator += dt;
