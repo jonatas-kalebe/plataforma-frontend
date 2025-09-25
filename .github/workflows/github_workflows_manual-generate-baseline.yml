@@ -1,0 +1,40 @@
+name: Playwright Baseline (Manual)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  generate-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build:ssr:frontend
+      - run: nohup npm run serve:ssr:frontend > server.log 2>&1 &
+      - run: |
+          for i in $(seq 1 40); do
+            curl -sSf http://localhost:4000 >/dev/null && break
+            sleep 2
+          done
+      - run: npx playwright install --with-deps
+      - name: Generate baseline
+        run: npx playwright test --update-snapshots
+      - name: Commit snapshots (se existirem mudanças)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "chore(test): baseline Playwright atualizada"
+            git push
+          else
+            echo "Sem mudanças de baseline."
