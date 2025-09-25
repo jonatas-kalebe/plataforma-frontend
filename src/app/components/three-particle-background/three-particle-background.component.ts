@@ -1,5 +1,6 @@
-import {AfterViewInit, Component, ElementRef, HostListener, NgZone, OnDestroy} from '@angular/core';
+import {AfterViewInit, Component, ElementRef, HostListener, NgZone, OnDestroy, Input} from '@angular/core';
 import * as THREE from 'three';
+import { ScrollState } from '../../core/scroll-orchestrator.service';
 
 interface Shockwave {
   pos: THREE.Vector2;
@@ -25,6 +26,8 @@ interface Shockwave {
   `]
 })
 export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestroy {
+  @Input() scrollState?: ScrollState;
+
   private scene!: THREE.Scene;
   private camera!: THREE.PerspectiveCamera;
   private renderer!: THREE.WebGLRenderer;
@@ -244,12 +247,16 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     const useGyro = this.gyroEnabled && !this.isTouching;
     if (useGyro) this.parallaxTarget.lerp(this.gyroParallaxTarget, 0.12);
     this.parallaxCurrent.lerp(this.parallaxTarget, 0.08);
+    
+    const scrollInfluence = this.scrollState ? this.scrollState.globalProgress : 0;
+    const velocityInfluence = this.scrollState ? Math.min(this.scrollState.velocity * 0.01, 0.1) : 0;
+    
     if (this.isMobile) {
-      this.camera.position.x = -this.parallaxCurrent.x * 12;
-      this.camera.position.y = this.parallaxCurrent.y * 15;
+      this.camera.position.x = -this.parallaxCurrent.x * 12 + scrollInfluence * 2;
+      this.camera.position.y = this.parallaxCurrent.y * 15 + scrollInfluence * 1.5;
     } else {
-      this.camera.position.x = -this.parallaxCurrent.x * 3;
-      this.camera.position.y = this.parallaxCurrent.y * 5;
+      this.camera.position.x = -this.parallaxCurrent.x * 3 + scrollInfluence * 1;
+      this.camera.position.y = this.parallaxCurrent.y * 5 + scrollInfluence * 0.8;
     }
     this.camera.lookAt(0, 0, 0);
     this.camera.updateMatrixWorld();
@@ -258,9 +265,10 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.mouseVelocity = THREE.MathUtils.lerp(this.mouseVelocity, rawVelocity, 0.08);
     this.lastMousePosition.copy(this.smoothedMouse);
     if (!this.prefersReducedMotion) {
-      this.baseSpinY += 0.0003;
+      const scrollSpeedMultiplier = 1 + velocityInfluence * 2;
+      this.baseSpinY += 0.0003 * scrollSpeedMultiplier;
       this.particles.rotation.y = this.baseSpinY + this.accumYaw * this.gyroSpinGain;
-      this.baseSpinX += 0.00005;
+      this.baseSpinX += 0.00005 * scrollSpeedMultiplier;
       this.particles.rotation.x = this.baseSpinX + this.accumPitch * this.gyroSpinGain * 0.5;
     }
     this.accumulator += dt;

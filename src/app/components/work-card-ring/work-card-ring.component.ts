@@ -1,7 +1,8 @@
-import { Component, ElementRef, NgZone, ViewChild, AfterViewInit, OnDestroy } from '@angular/core';
+import { Component, ElementRef, NgZone, ViewChild, AfterViewInit, OnDestroy, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { ScrollState } from '../../core/scroll-orchestrator.service';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -14,6 +15,7 @@ gsap.registerPlugin(ScrollTrigger);
 })
 export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
   @ViewChild('ring', { static: true }) ring!: ElementRef<HTMLDivElement>;
+  @Input() scrollState?: ScrollState;
 
   items = Array.from({ length: 8 }).map((_, i) => ({ i, title: `Projeto ${i + 1}` }));
 
@@ -23,6 +25,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
   private targetYRotate = 0;
   private velocity = 0;
   private animationFrameId: number | null = null;
+  private baseScrollRotation = 0;
 
   constructor(private zone: NgZone) {}
 
@@ -101,9 +104,17 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
       if (Math.abs(this.velocity) < 0.01) this.velocity = 0;
       this.targetYRotate += this.velocity;
     }
+
+    if (this.scrollState && this.scrollState.sectionIndex === 3) {
+      const scrollProgress = this.scrollState.sectionProgress;
+      const nonLinearProgress = Math.pow(scrollProgress, 1.8);
+      this.baseScrollRotation = nonLinearProgress * 360;
+    }
+
     const lerpFactor = 0.1;
     this.currentYRotate += (this.targetYRotate - this.currentYRotate) * lerpFactor;
-    this.ring.nativeElement.style.transform = `rotateY(${this.currentYRotate}deg)`;
+    const totalRotation = this.currentYRotate + this.baseScrollRotation;
+    this.ring.nativeElement.style.transform = `rotateY(${totalRotation}deg)`;
     this.animationFrameId = requestAnimationFrame(this.smoothRotate);
   };
 }
