@@ -5,9 +5,10 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:ssr:frontend": "ng build --ssr --configuration development",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "serve:ssr:frontend": "node dist/frontend/server/server.mjs",
+    "serve:ssr:frontend": "node dist/frontend/server/main.server.mjs",
     "tailwind:init": "tailwindcss init",
     "test:e2e": "playwright test",
     "test:e2e:update": "playwright test --update-snapshots"
