@@ -31,13 +31,13 @@ export interface ScrollState {
 export class ScrollOrchestrationService {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly ngZone = inject(NgZone);
-  
+
   private isInitialized = false;
   private scrollTriggers: ScrollTrigger[] = [];
   private prefersReducedMotion = false;
   private lastScrollY = 0;
   private scrollDirection: 'up' | 'down' | 'none' = 'none';
-  
+
   private metricsSubject = new BehaviorSubject<ScrollMetrics>({
     globalProgress: 0,
     velocity: 0,
@@ -78,7 +78,7 @@ export class ScrollOrchestrationService {
     if (typeof window !== 'undefined' && window.matchMedia) {
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
       this.prefersReducedMotion = mediaQuery.matches;
-      
+
       mediaQuery.addEventListener('change', (e) => {
         this.prefersReducedMotion = e.matches;
         if (this.isInitialized) {
@@ -122,15 +122,14 @@ export class ScrollOrchestrationService {
         }
       };
 
+      // Sem pin aqui para evitar pin duplo e espaçadores extras
       const advancedConfig = this.prefersReducedMotion ? {} : {
-        pin: index === 1 || index === 3,
         scrub: true,
         snap: {
           snapTo: (progress: number) => {
             const snapPoints = [0, 1];
             const threshold = 0.15;
             const k = 0.3 + Math.pow(Math.abs(0.5 - progress), 2);
-            
             for (const point of snapPoints) {
               if (Math.abs(progress - point) < threshold * k) {
                 return point;
@@ -166,7 +165,7 @@ export class ScrollOrchestrationService {
         const currentScrollY = window.scrollY || 0;
         const velocityRaw = (ScrollTrigger as any).getVelocity?.() || 0;
         const velocity = velocityRaw / 1000;
-        
+
         if (currentScrollY > this.lastScrollY + 5) {
           this.scrollDirection = 'down';
         } else if (currentScrollY < this.lastScrollY - 5) {
@@ -175,15 +174,15 @@ export class ScrollOrchestrationService {
           this.scrollDirection = 'none';
         }
         this.lastScrollY = currentScrollY;
-        
+
         const currentMetrics = this.metricsSubject.value;
-        
+
         this.metricsSubject.next({
           ...currentMetrics,
           globalProgress: self.progress,
           velocity: Math.abs(velocity)
         });
-        
+
         this.scrollStateSubject.next({
           globalProgress: self.progress,
           velocity: Math.abs(velocity),
@@ -197,12 +196,12 @@ export class ScrollOrchestrationService {
   private setActiveSection(index: number): void {
     const currentMetrics = this.metricsSubject.value;
     const currentScrollState = this.scrollStateSubject.value;
-    
+
     this.metricsSubject.next({
       ...currentMetrics,
       activeSection: index
     });
-    
+
     this.scrollStateSubject.next({
       ...currentScrollState,
       activeSection: index

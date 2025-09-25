@@ -37,19 +37,19 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
-    
+
     this.zone.runOutsideAngular(() => {
       this.checkReducedMotion();
       gsap.registerPlugin(ScrollTrigger);
-      
+
       this.scrollService.initialize();
-      
+
       this.scrollService.scrollState$
         .pipe(takeUntil(this.destroy$))
         .subscribe(state => {
           this.scrollState = state;
         });
-      
+
       this.initScrollytellingTimelines();
       this.initKnot();
     });
@@ -57,10 +57,10 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (!isPlatformBrowser(this.platformId)) return;
-    
+
     this.destroy$.next();
     this.destroy$.complete();
-    
+
     cancelAnimationFrame(this.knotId);
     this.timelines.forEach(tl => tl.kill());
     ScrollTrigger.getAll().forEach(st => st.kill());
@@ -86,7 +86,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     const tl = gsap.timeline({
       defaults: { ease: this.prefersReducedMotion ? 'none' : 'power3.out', duration: this.prefersReducedMotion ? 0.3 : 1 }
     });
-    
+
     tl.from('#hero-title', { opacity: 0, y: this.prefersReducedMotion ? 0 : 50, delay: 0.2 })
       .from('#hero-subtitle', { opacity: 0, y: this.prefersReducedMotion ? 0 : 40 }, '-=0.8')
       .from('#hero-cta', { opacity: 0, y: this.prefersReducedMotion ? 0 : 30 }, '-=0.6');
@@ -126,12 +126,12 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       duration: this.prefersReducedMotion ? 0.3 : 1,
       ease: this.prefersReducedMotion ? 'none' : 'power3.out'
     })
-    .from('#filosofia p', {
-      opacity: 0,
-      y: this.prefersReducedMotion ? 0 : 60,
-      duration: this.prefersReducedMotion ? 0.3 : 0.8,
-      ease: this.prefersReducedMotion ? 'none' : 'power3.out'
-    }, '-=0.4');
+      .from('#filosofia p', {
+        opacity: 0,
+        y: this.prefersReducedMotion ? 0 : 60,
+        duration: this.prefersReducedMotion ? 0.3 : 0.8,
+        ease: this.prefersReducedMotion ? 'none' : 'power3.out'
+      }, '-=0.4');
 
     this.timelines.push(tl);
   }
@@ -172,9 +172,9 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         trigger: '#trabalhos',
         start: 'top center',
         end: 'bottom center',
-        ...(this.prefersReducedMotion ? { toggleActions: 'play none none reverse' } : { 
+        ...(this.prefersReducedMotion ? { toggleActions: 'play none none reverse' } : {
           scrub: 1,
-          pin: true 
+          pin: true
         })
       }
     });
@@ -205,12 +205,12 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       duration: this.prefersReducedMotion ? 0.3 : 0.8,
       ease: this.prefersReducedMotion ? 'none' : 'power3.out'
     })
-    .from('#cta a', {
-      opacity: 0,
-      y: this.prefersReducedMotion ? 0 : 30,
-      duration: this.prefersReducedMotion ? 0.3 : 0.6,
-      ease: this.prefersReducedMotion ? 'none' : 'power3.out'
-    }, '-=0.4');
+      .from('#cta a', {
+        opacity: 0,
+        y: this.prefersReducedMotion ? 0 : 30,
+        duration: this.prefersReducedMotion ? 0.3 : 0.6,
+        ease: this.prefersReducedMotion ? 'none' : 'power3.out'
+      }, '-=0.4');
 
     this.timelines.push(tl);
   }
@@ -264,8 +264,10 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     const knotTl = gsap.timeline({
       scrollTrigger: {
         trigger: '#filosofia',
-        start: 'top 70%',
-        end: this.prefersReducedMotion ? 'top 70%' : 'bottom center',
+        // Começa quando a seção entra na viewport e termina quando o centro da seção
+        // encontra o centro da tela — a linha fica reta exatamente no meio da tela.
+        start: 'top bottom',
+        end: this.prefersReducedMotion ? 'top bottom' : 'center center',
         ...(this.prefersReducedMotion ? { toggleActions: 'play none none reverse' } : { scrub: 1 })
       }
     });
@@ -273,7 +275,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     knotTl.to({ val: 0 }, {
       val: 1,
       duration: this.prefersReducedMotion ? 0.3 : 1.5,
-      ease: this.prefersReducedMotion ? 'none' : 'power2.inOut',
+      ease: 'none', // linear com o scroll para sincronizar perfeitamente o "reta no centro"
       onUpdate: function() {
         t = (this as any).targets()[0].val;
         draw();
