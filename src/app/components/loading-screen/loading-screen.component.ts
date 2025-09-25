@@ -10,9 +10,10 @@ import {
   OnDestroy,
   OnInit,
   Output,
-  ViewEncapsulation
+  ViewEncapsulation,
+  PLATFORM_ID
 } from '@angular/core';
-import {CommonModule} from '@angular/common';
+import {CommonModule, isPlatformBrowser} from '@angular/common';
 import {HttpClient} from '@angular/common/http';
 import {DomSanitizer, SafeHtml} from '@angular/platform-browser';
 import gsap from 'gsap';
@@ -38,6 +39,7 @@ export class LoadingScreenComponent implements OnInit, AfterViewInit, OnDestroy 
   private hostRef = inject(ElementRef<HTMLElement>);
   private cdr = inject(ChangeDetectorRef);
   private zone = inject(NgZone);
+  private platformId = inject(PLATFORM_ID);
   private tl: gsap.core.Timeline | null = null;
   private isDone = false;
   private onSkip = () => this.skipAnimation();
@@ -63,6 +65,8 @@ export class LoadingScreenComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   ngAfterViewInit(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     this.hostRef.nativeElement.addEventListener('click', this.onSkip);
     if (!this.isLoadingSvg) {
       this.initAnimation();
@@ -78,7 +82,9 @@ export class LoadingScreenComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   ngOnDestroy(): void {
-    this.hostRef.nativeElement.removeEventListener('click', this.onSkip);
+    if (isPlatformBrowser(this.platformId)) {
+      this.hostRef.nativeElement.removeEventListener('click', this.onSkip);
+    }
     this.tl?.kill();
   }
 

@@ -1,11 +1,12 @@
-import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, ViewChild, PLATFORM_ID, inject } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { WorkCardRingComponent } from '../../components/work-card-ring/work-card-ring.component';
 import {
   ThreeParticleBackgroundComponent
 } from '../../components/three-particle-background/three-particle-background.component';
+import { ScrollOrchestrationService } from '../../services/scroll-orchestration.service';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -18,23 +19,35 @@ gsap.registerPlugin(ScrollTrigger);
   styleUrls: ['./landing.component.css']
 })
 export class LandingComponent implements AfterViewInit, OnDestroy {
+  private readonly platformId = inject(PLATFORM_ID);
   @ViewChild('knotCanvas', { static: true }) knotCanvas!: ElementRef<HTMLCanvasElement>;
 
   private zone = new NgZone({ enableLongStackTrace: false });
   private knotCtx!: CanvasRenderingContext2D | null;
   private knotId = 0;
 
+  constructor(private scrollService: ScrollOrchestrationService) {}
+
   ngAfterViewInit(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     this.zone.runOutsideAngular(() => {
+      gsap.registerPlugin(ScrollTrigger);
       this.initGSAP();
       this.initKnot();
+      
+      // Initialize scroll orchestration service
+      this.scrollService.initialize();
     });
   }
 
   ngOnDestroy(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     // Limpa apenas o que este componente controla
     cancelAnimationFrame(this.knotId);
     ScrollTrigger.getAll().forEach(st => st.kill());
+    this.scrollService.destroy();
   }
 
   private initGSAP(): void {
