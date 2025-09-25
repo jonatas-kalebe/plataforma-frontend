@@ -1,6 +1,6 @@
 import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
 import { provideClientHydration } from '@angular/platform-browser';
-import { provideHttpClient } from '@angular/common/http';
+import {provideHttpClient, withFetch} from '@angular/common/http';
 import { routes } from './app.routes';
 import { PreloadAllModules, provideRouter, withPreloading } from '@angular/router';
 
@@ -9,6 +9,6 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes, withPreloading(PreloadAllModules)),
     provideClientHydration(),
-    provideHttpClient()
+    provideHttpClient(withFetch())
   ]
 };
