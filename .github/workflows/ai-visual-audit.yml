@@ -1,0 +1,33 @@
+name: ai-visual-audit
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: nohup node dist/frontend/server/server.mjs >/dev/null 2>&1 &
+      - run: |
+          for i in $(seq 1 60); do
+            curl -sSf http://localhost:4000 >/dev/null && exit 0
+            sleep 2
+          done
+          exit 1
+      - uses: google-github-actions/run-gemini-cli@v1
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          prompt: |
+            Você está auditando http://localhost:4000.
+            Avalie acessibilidade (WCAG AA), contraste, tipografia, hierarquia visual e responsividade.
+            Responda em Markdown com: Sumário, Achados Críticos, Melhorias Rápidas, Sugestões.
