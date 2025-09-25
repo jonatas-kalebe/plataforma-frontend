@@ -1,11 +1,13 @@
 import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Subscription } from 'rxjs';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { WorkCardRingComponent } from '../../components/work-card-ring/work-card-ring.component';
 import {
   ThreeParticleBackgroundComponent
 } from '../../components/three-particle-background/three-particle-background.component';
+import { ScrollOrchestratorService, ScrollState } from '../../core/scroll-orchestrator.service';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -23,53 +25,157 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   private zone = new NgZone({ enableLongStackTrace: false });
   private knotCtx!: CanvasRenderingContext2D | null;
   private knotId = 0;
+  private subscriptions: Subscription[] = [];
+  
+  scrollState: ScrollState | undefined;
+
+  constructor(private scrollOrchestrator: ScrollOrchestratorService) {}
 
   ngAfterViewInit(): void {
     this.zone.runOutsideAngular(() => {
-      this.initGSAP();
+      this.setupScrollOrchestrator();
       this.initKnot();
+      this.initScrolltelling();
     });
   }
 
   ngOnDestroy(): void {
-    // Limpa apenas o que este componente controla
     cancelAnimationFrame(this.knotId);
-    ScrollTrigger.getAll().forEach(st => st.kill());
+    this.subscriptions.forEach(sub => sub.unsubscribe());
+    this.scrollOrchestrator.destroy();
   }
 
-  private initGSAP(): void {
-    const tl = gsap.timeline({ defaults: { ease: 'power3.out', duration: 1 } });
-    tl.from('#hero-title', { opacity: 0, y: 50, delay: 0.2 })
-      .from('#hero-subtitle', { opacity: 0, y: 40 }, '-=0.8')
-      .from('#hero-cta', { opacity: 0, y: 30 }, '-=0.6');
-
-    gsap.utils.toArray<HTMLElement>('.service-card').forEach(card => {
-      gsap.from(card, {
-        opacity: 0,
-        y: 100,
-        duration: 0.8,
-        ease: 'power3.out',
-        scrollTrigger: {
-          trigger: card,
-          start: 'top 85%',
-          toggleActions: 'play none none reverse' // 'reverse' para a animação reverter ao sair
-        }
-      });
+  private setupScrollOrchestrator(): void {
+    this.scrollOrchestrator.registerSection({
+      id: 'hero',
+      pin: true,
+      snap: true,
+      scrub: true
+    });
+    
+    this.scrollOrchestrator.registerSection({
+      id: 'filosofia',
+      scrub: true
+    });
+    
+    this.scrollOrchestrator.registerSection({
+      id: 'servicos',
+      scrub: true
+    });
+    
+    this.scrollOrchestrator.registerSection({
+      id: 'trabalhos',
+      pin: true,
+      snap: true,
+      scrub: true
+    });
+    
+    this.scrollOrchestrator.registerSection({
+      id: 'cta',
+      snap: true
     });
 
-    // Animação para a seção de filosofia
-    gsap.from('#filosofia > div', {
-      opacity: 0,
-      y: 80,
-      duration: 1,
-      stagger: 0.2,
-      ease: 'power3.out',
+    const stateSubscription = this.scrollOrchestrator.scrollState.subscribe(state => {
+      this.scrollState = state;
+    });
+    
+    this.subscriptions.push(stateSubscription);
+    this.scrollOrchestrator.initialize();
+  }
+
+  private initScrolltelling(): void {
+    this.createActI();
+    this.createActII();
+    this.createActIII();
+    this.createActIV();
+    this.createActV();
+  }
+
+  private createActI(): void {
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: '#hero',
+        start: 'top top',
+        end: 'bottom top',
+        scrub: true,
+        pin: false
+      }
+    });
+
+    tl.set('#hero-title, #hero-subtitle, #hero-cta', { opacity: 0, y: 50 })
+      .to('#hero-title', { opacity: 1, y: 0, ease: 'none' }, 0)
+      .to('#hero-subtitle', { opacity: 1, y: 0, ease: 'none' }, 0.2)
+      .to('#hero-cta', { opacity: 1, y: 0, ease: 'none' }, 0.4);
+  }
+
+  private createActII(): void {
+    const tl = gsap.timeline({
       scrollTrigger: {
         trigger: '#filosofia',
         start: 'top 75%',
-        toggleActions: 'play none none reverse'
+        end: 'bottom center',
+        scrub: 1
       }
     });
+
+    const blocks = gsap.utils.toArray('#filosofia > div > *');
+    tl.set(blocks, { opacity: 0, y: 80 })
+      .to(blocks, { 
+        opacity: 1, 
+        y: 0, 
+        stagger: 0.3,
+        ease: 'none'
+      });
+  }
+
+  private createActIII(): void {
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: '#trabalhos',
+        start: 'top top',
+        end: 'bottom top',
+        scrub: 1,
+        pin: false
+      }
+    });
+
+    tl.to('.ring', {
+      rotation: '+=360',
+      ease: 'none'
+    });
+  }
+
+  private createActIV(): void {
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: '#servicos',
+        start: 'top bottom',
+        end: 'bottom top',
+        scrub: 2
+      }
+    });
+
+    gsap.utils.toArray('.service-card').forEach((card, index) => {
+      tl.from(card as HTMLElement, {
+        opacity: 0,
+        y: 100,
+        ease: 'none'
+      }, index * 0.2);
+    });
+  }
+
+  private createActV(): void {
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: '#cta',
+        start: 'top 80%',
+        end: 'bottom center',
+        scrub: 1
+      }
+    });
+
+    tl.from('#cta h3', { opacity: 0, y: 50, ease: 'none' })
+      .from('#cta a', { opacity: 0, y: 30, ease: 'none' }, '-=0.5');
   }
 
   private initKnot(): void {

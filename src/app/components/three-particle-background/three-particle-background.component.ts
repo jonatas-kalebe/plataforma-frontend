@@ -1,5 +1,6 @@
-import {AfterViewInit, Component, ElementRef, HostListener, NgZone, OnDestroy} from '@angular/core';
+import {AfterViewInit, Component, ElementRef, HostListener, NgZone, OnDestroy, Input} from '@angular/core';
 import * as THREE from 'three';
+import { ScrollState } from '../../core/scroll-orchestrator.service';
 
 interface Shockwave {
   pos: THREE.Vector2;
@@ -25,6 +26,8 @@ interface Shockwave {
   `]
 })
 export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestroy {
+  @Input() scrollState?: ScrollState;
+  
   private scene!: THREE.Scene;
   private camera!: THREE.PerspectiveCamera;
   private renderer!: THREE.WebGLRenderer;
