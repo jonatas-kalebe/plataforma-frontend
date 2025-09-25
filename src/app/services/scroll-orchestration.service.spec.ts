@@ -5,14 +5,29 @@ import { ScrollOrchestrationService } from './scroll-orchestration.service';
 // Mock GSAP
 const mockGsap = {
   registerPlugin: jasmine.createSpy('registerPlugin'),
-  to: jasmine.createSpy('to')
+  to: jasmine.createSpy('to'),
+  timeline: jasmine.createSpy('timeline').and.returnValue({
+    from: jasmine.createSpy('from').and.returnValue({
+      from: jasmine.createSpy('from').and.returnValue({
+        from: jasmine.createSpy('from')
+      })
+    })
+  }),
+  from: jasmine.createSpy('from'),
+  utils: {
+    toArray: jasmine.createSpy('toArray').and.returnValue([])
+  }
 };
 
 const mockScrollTrigger = {
-  create: jasmine.createSpy('create').and.returnValue({ kill: jasmine.createSpy('kill') }),
+  create: jasmine.createSpy('create').and.returnValue({ 
+    kill: jasmine.createSpy('kill'),
+    refresh: jasmine.createSpy('refresh')
+  }),
   getAll: jasmine.createSpy('getAll').and.returnValue([]),
   killAll: jasmine.createSpy('killAll'),
-  getVelocity: jasmine.createSpy('getVelocity').and.returnValue(0)
+  getVelocity: jasmine.createSpy('getVelocity').and.returnValue(0),
+  refresh: jasmine.createSpy('refresh')
 };
 
 // Mock window.matchMedia for reduced motion
@@ -24,6 +39,24 @@ Object.defineProperty(window, 'matchMedia', {
   })
 });
 
+// Mock DOM elements
+const mockElement = {
+  getBoundingClientRect: () => ({ top: 0, bottom: 1000, height: 1000 }),
+  offsetTop: 0,
+  offsetHeight: 1000,
+  style: {},
+  addEventListener: jasmine.createSpy('addEventListener'),
+  removeEventListener: jasmine.createSpy('removeEventListener')
+};
+
+const mockBody = {
+  scrollTop: 0,
+  scrollHeight: 5000,
+  clientHeight: 1000,
+  addEventListener: jasmine.createSpy('addEventListener'),
+  removeEventListener: jasmine.createSpy('removeEventListener')
+};
+
 describe('ScrollOrchestrationService', () => {
   let service: ScrollOrchestrationService;
   let platformId: Object;
@@ -32,6 +65,17 @@ describe('ScrollOrchestrationService', () => {
     // Mock GSAP modules
     (window as any).gsap = mockGsap;
     (window as any).ScrollTrigger = mockScrollTrigger;
+    
+    // Mock document.querySelector to return mock elements
+    spyOn(document, 'querySelector').and.callFake((selector: string) => {
+      if (selector.includes('#')) {
+        return mockElement;
+      }
+      return mockElement;
+    });
+    
+    // Mock document.body
+    spyOnProperty(document, 'body', 'get').and.returnValue(mockBody as any);
 
     TestBed.configureTestingModule({
       providers: [
@@ -50,6 +94,9 @@ describe('ScrollOrchestrationService', () => {
     mockScrollTrigger.getAll.calls.reset();
     mockScrollTrigger.killAll.calls.reset();
     mockScrollTrigger.getVelocity.calls.reset();
+    
+    // Clear DOM mocks
+    (document.querySelector as jasmine.Spy).calls.reset();
   });
 
   it('should be created', () => {
@@ -71,22 +118,18 @@ describe('ScrollOrchestrationService', () => {
   });
 
   it('should initialize correctly on browser platform', () => {
-    // Mock DOM elements
-    const mockElement = document.createElement('div');
-    spyOn(document, 'querySelector').and.returnValue(mockElement);
-    spyOnProperty(document, 'body', 'get').and.returnValue(document.createElement('body'));
-
     service.initialize();
 
     expect(mockGsap.registerPlugin).toHaveBeenCalled();
     expect(mockScrollTrigger.create).toHaveBeenCalled();
+    expect(document.querySelector).toHaveBeenCalledWith('#hero');
   });
 
   it('should check for reduced motion preference', () => {
     expect(window.matchMedia).toHaveBeenCalledWith('(prefers-reduced-motion: reduce)');
   });
 
-  it('should provide scroll metrics observable', () => {
+  it('should provide scroll metrics observable', (done) => {
     expect(service.metrics$).toBeDefined();
     
     service.metrics$.subscribe(metrics => {
@@ -96,6 +139,7 @@ describe('ScrollOrchestrationService', () => {
         activeSection: jasmine.any(Number),
         sections: jasmine.any(Array)
       }));
+      done();
     });
   });
 
@@ -126,16 +170,28 @@ describe('ScrollOrchestrationService', () => {
   });
 
   it('should get section by id', () => {
-    // Initialize the service to create sections
-    const mockElement = document.createElement('div');
-    spyOn(document, 'querySelector').and.returnValue(mockElement);
-    spyOnProperty(document, 'body', 'get').and.returnValue(document.createElement('body'));
+    service.initialize();
+    
+    // Since sections are created during initialization with proper DOM mocking
+    const section = service.getSection('hero');
+    expect(section).toBeDefined();
+  });
+
+  it('should handle reduced motion preference changes', () => {
+    let mockMediaQuery = {
+      matches: false,
+      addEventListener: jasmine.createSpy('addEventListener')
+    };
+    
+    (window.matchMedia as jasmine.Spy).and.returnValue(mockMediaQuery);
     
     service.initialize();
     
-    // Since sections are created during initialization, we need to check the service state
-    const section = service.getSection('hero');
-    // The section might be undefined if DOM elements aren't properly mocked
-    expect(section).toBeUndefined(); // Expected since we don't have real DOM elements
+    // Simulate change to reduced motion
+    mockMediaQuery.matches = true;
+    const changeHandler = mockMediaQuery.addEventListener.calls.argsFor(0)[1];
+    changeHandler({ matches: true });
+    
+    expect(mockScrollTrigger.getAll).toHaveBeenCalled();
   });
 });
