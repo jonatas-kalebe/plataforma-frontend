@@ -6,7 +6,7 @@ test.describe('Work Card Ring Component Tests', () => {
     await page.waitForLoadState('networkidle');
     
     // Scroll to trabalhos section where ring is located
-    await page.locator('#trabalhos').scrollIntoView();
+    await page.locator('#trabalhos').scrollIntoViewIfNeeded();
     await page.waitForTimeout(1000);
   });
 
@@ -20,10 +20,10 @@ test.describe('Work Card Ring Component Tests', () => {
 
   test('should animate ring on scroll into view', async ({ page }) => {
     // Scroll away and back to trigger animation
-    await page.locator('#cta').scrollIntoView();
+    await page.locator('#cta').scrollIntoViewIfNeeded();
     await page.waitForTimeout(500);
     
-    await page.locator('#trabalhos').scrollIntoView();
+    await page.locator('#trabalhos').scrollIntoViewIfNeeded();
     await page.waitForTimeout(1000);
     
     // Ring should animate in (opacity and rotation)
@@ -81,7 +81,7 @@ test.describe('Work Card Ring Component Tests', () => {
     
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.locator('#trabalhos').scrollIntoView();
+    await page.locator('#trabalhos').scrollIntoViewIfNeeded();
     await page.waitForTimeout(1000);
     
     const ringElement = page.locator('app-work-card-ring').first();
@@ -185,7 +185,7 @@ test.describe('Work Card Ring Component Tests', () => {
     
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.locator('#trabalhos').scrollIntoView();
+    await page.locator('#trabalhos').scrollIntoViewIfNeeded();
     await page.waitForTimeout(1000);
     
     // Ring should reinitialize properly
@@ -244,7 +244,7 @@ test.describe('Ring Visual Regression', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     
-    await page.locator('#trabalhos').scrollIntoView();
+    await page.locator('#trabalhos').scrollIntoViewIfNeeded();
     await page.waitForTimeout(2000);
     
     // Take screenshot of trabalhos section with ring
@@ -267,7 +267,7 @@ test.describe('Ring Visual Regression', () => {
     
     for (const viewport of viewports) {
       await page.setViewportSize(viewport);
-      await page.locator('#trabalhos').scrollIntoView();
+      await page.locator('#trabalhos').scrollIntoViewIfNeeded();
       await page.waitForTimeout(1000);
       
       const ringComponent = page.locator('app-work-card-ring');

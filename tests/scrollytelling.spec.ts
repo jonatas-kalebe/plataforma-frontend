@@ -51,7 +51,7 @@ test.describe('Scrollytelling & GSAP Animations', () => {
     await page.waitForTimeout(500);
     
     // Test scroll to filosofia section
-    await page.locator('#filosofia').scrollIntoView();
+    await page.locator('#filosofia').scrollIntoViewIfNeeded();
     await page.waitForTimeout(1000);
     
     // Verify filosofia section is in view
@@ -72,7 +72,7 @@ test.describe('Scrollytelling & GSAP Animations', () => {
       const nextSection = sections[i + 1];
       
       // Scroll to section
-      await page.locator(nextSection).scrollIntoView({ behavior: 'smooth' });
+      await page.locator(nextSection).scrollIntoViewIfNeeded();
       await page.waitForTimeout(1000);
       
       // Check snap tolerance (≤24px from section start)
@@ -88,7 +88,7 @@ test.describe('Scrollytelling & GSAP Animations', () => {
 
   test('should pin trabalhos section (ring clímax)', async ({ page }) => {
     // Scroll to trabalhos section
-    await page.locator('#trabalhos').scrollIntoView();
+    await page.locator('#trabalhos').scrollIntoViewIfNeeded();
     await page.waitForTimeout(1000);
     
     // Check if section is pinned
@@ -111,7 +111,7 @@ test.describe('Scrollytelling & GSAP Animations', () => {
   });
 
   test('should animate ring based on scroll progress', async ({ page }) => {
-    await page.locator('#trabalhos').scrollIntoView();
+    await page.locator('#trabalhos').scrollIntoViewIfNeeded();
     await page.waitForTimeout(1000);
     
     // Get initial ring transformation
@@ -171,7 +171,7 @@ test.describe('Reduced Motion Support', () => {
     await page.waitForTimeout(1000);
     
     // Scroll to trabalhos section
-    await page.locator('#trabalhos').scrollIntoView();
+    await page.locator('#trabalhos').scrollIntoViewIfNeeded();
     await page.waitForTimeout(500);
     
     const initialPosition = await page.evaluate(() => {
@@ -208,7 +208,7 @@ test.describe('Reduced Motion Support', () => {
     await expect(heroTitle).toBeVisible();
     
     // Scroll to trigger animations
-    await page.locator('#filosofia').scrollIntoView();
+    await page.locator('#filosofia').scrollIntoViewIfNeeded();
     await page.waitForTimeout(500);
     
     // Animation should complete but quickly

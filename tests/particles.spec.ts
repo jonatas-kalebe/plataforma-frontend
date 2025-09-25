@@ -186,13 +186,13 @@ test.describe('Three.js Particle System Tests', () => {
     const performanceStart = Date.now();
     
     // Interact with page while particles are running
-    await page.locator('#filosofia').scrollIntoView();
+    await page.locator('#filosofia').scrollIntoViewIfNeeded();
     await page.waitForTimeout(500);
     
-    await page.locator('#servicos').scrollIntoView();
+    await page.locator('#servicos').scrollIntoViewIfNeeded();
     await page.waitForTimeout(500);
     
-    await page.locator('#trabalhos').scrollIntoView();
+    await page.locator('#trabalhos').scrollIntoViewIfNeeded();
     await page.waitForTimeout(500);
     
     const performanceEnd = Date.now();
