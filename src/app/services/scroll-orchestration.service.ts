@@ -71,18 +71,38 @@ export class ScrollOrchestrationService {
 
   initialize(): void {
     if (!isPlatformBrowser(this.platformId) || this.isInitialized) {
+      console.log('ScrollOrchestrationService: initialize called but skipped', { 
+        isPlatformBrowser: isPlatformBrowser(this.platformId), 
+        isInitialized: this.isInitialized 
+      });
       return;
     }
 
+    console.log('ScrollOrchestrationService: Initializing...');
+    
     this.ngZone.runOutsideAngular(() => {
       const gsapInstance = (window as any).gsap || gsap;
       const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
+
+      console.log('ScrollOrchestrationService: GSAP/ScrollTrigger available:', { 
+        gsap: !!gsapInstance, 
+        scrollTrigger: !!ScrollTriggerInstance 
+      });
 
       gsapInstance.registerPlugin(ScrollTriggerInstance, ScrollToPlugin);
       this.lastScrollY = window.scrollY || 0;
       this.setupSections();
       this.isInitialized = true;
+      
+      console.log('ScrollOrchestrationService: Successfully initialized');
     });
+  }
+
+  // Manual initialization method for debugging
+  manualInit(): void {
+    console.log('ScrollOrchestrationService: Manual initialization called');
+    this.isInitialized = false; // Force re-initialization
+    this.initialize();
   }
 
   private detectMobile(): void {
@@ -317,8 +337,14 @@ export class ScrollOrchestrationService {
   }
 
   private checkMagneticSnap(): void {
-    if (!this.activeSectionTrigger) return;
-    if (this.prefersReducedMotion) return;
+    if (!this.activeSectionTrigger) {
+      // console.log('ScrollOrchestrationService: checkMagneticSnap - no active section trigger');
+      return;
+    }
+    if (this.prefersReducedMotion) {
+      console.log('ScrollOrchestrationService: Reduced motion enabled, skipping snap');
+      return;
+    }
 
     const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
 
@@ -333,6 +359,13 @@ export class ScrollOrchestrationService {
     // Use our own velocity tracking since ScrollTrigger.getVelocity() doesn't exist
     const currentVelocity = this.scrollStateSubject.value.velocity * 1000; // Convert to pixels per second
 
+    console.log('ScrollOrchestrationService: checkMagneticSnap', { 
+      progress, 
+      direction, 
+      currentVelocity,
+      velocityThreshold: Math.abs(currentVelocity) < 500
+    });
+
     if (this.snapTimeoutId) {
       clearTimeout(this.snapTimeoutId);
       this.snapTimeoutId = null;
@@ -341,6 +374,7 @@ export class ScrollOrchestrationService {
     // Only snap when velocity is low (user has stopped or is scrolling slowly)
     if (Math.abs(currentVelocity) < 500) { // Increased threshold for more responsive snapping
       const delay = this.isMobile ? 250 : 100; // Reduced delay for quicker response
+      console.log('ScrollOrchestrationService: Setting snap timeout with delay', delay);
       this.snapTimeoutId = window.setTimeout(() => {
         this.performMagneticSnap();
       }, delay);
@@ -348,20 +382,43 @@ export class ScrollOrchestrationService {
   }
 
   private performMagneticSnap(): void {
-    if (!this.activeSectionTrigger) return;
+    console.log('ScrollOrchestrationService: performMagneticSnap called');
+    
+    if (!this.activeSectionTrigger) {
+      console.log('ScrollOrchestrationService: No active section trigger, aborting snap');
+      return;
+    }
 
     const activeId = this.scrollStateSubject.value.activeSection?.id;
+    console.log('ScrollOrchestrationService: Active section ID:', activeId);
+    
     // ALTERAÇÃO: proteção extra
-    if (activeId === 'trabalhos') return;
+    if (activeId === 'trabalhos') {
+      console.log('ScrollOrchestrationService: Trabalhos section active, skipping snap');
+      return;
+    }
 
     const gsapInstance = (window as any).gsap || gsap;
     const progress = this.activeSectionTrigger.progress || 0;
     const direction = this.activeSectionTrigger.direction || 0;
     const sectionId = this.activeSectionTrigger.vars?.id;
 
+    console.log('ScrollOrchestrationService: Snap check', { 
+      progress, 
+      direction, 
+      sectionId,
+      threshold85: progress >= 0.85,
+      threshold15: progress <= 0.15 && direction < 0
+    });
+
     // Snap forward when progress >= 85% 
     if (progress >= 0.85) {
       const nextSectionElement = this.getNextSectionElement(sectionId);
+      console.log('ScrollOrchestrationService: Forward snap triggered', { 
+        nextSectionElement: !!nextSectionElement,
+        targetY: nextSectionElement?.offsetTop 
+      });
+      
       if (nextSectionElement) {
         gsapInstance.to(window, {
           scrollTo: { y: nextSectionElement.offsetTop, autoKill: false },
@@ -376,6 +433,11 @@ export class ScrollOrchestrationService {
     // Snap backward when progress <= 15% and moving backward
     if (progress <= 0.15 && direction < 0) {
       const prevSectionElement = this.getPrevSectionElement(sectionId);
+      console.log('ScrollOrchestrationService: Backward snap triggered', { 
+        prevSectionElement: !!prevSectionElement,
+        targetY: prevSectionElement?.offsetTop 
+      });
+      
       if (prevSectionElement) {
         gsapInstance.to(window, {
           scrollTo: { y: prevSectionElement.offsetTop, autoKill: false },
@@ -386,6 +448,8 @@ export class ScrollOrchestrationService {
         return;
       }
     }
+    
+    console.log('ScrollOrchestrationService: No snap condition met');
   }
 
   private getNextSectionElement(currentSectionId: string): HTMLElement | null {

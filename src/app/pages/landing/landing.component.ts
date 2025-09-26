@@ -41,16 +41,24 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
   public scrollState: ScrollState | null = null;
 
-  constructor(private scrollService: ScrollOrchestrationService) {}
+  constructor(private scrollService: ScrollOrchestrationService) {
+    console.log('LandingComponent: constructor called');
+  }
 
   ngAfterViewInit(): void {
+    console.log('LandingComponent: ngAfterViewInit called', { isPlatformBrowser: isPlatformBrowser(this.platformId) });
+    
     if (!isPlatformBrowser(this.platformId)) return;
 
     this.zone.runOutsideAngular(() => {
       this.checkReducedMotion();
 
+      console.log('LandingComponent: About to initialize ScrollOrchestrationService');
+      
       // Initialize the scroll orchestration service
       this.scrollService.initialize();
+      
+      console.log('LandingComponent: ScrollOrchestrationService.initialize() called');
 
       this.scrollService.scrollState$
         .pipe(takeUntil(this.destroy$))
