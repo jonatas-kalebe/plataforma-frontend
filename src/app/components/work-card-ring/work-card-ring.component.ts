@@ -1,7 +1,8 @@
-import { Component, ElementRef, NgZone, ViewChild, AfterViewInit, OnDestroy, PLATFORM_ID, inject, Input } from '@angular/core';
+import { Component, ElementRef, NgZone, ViewChild, AfterViewInit, OnDestroy, PLATFORM_ID, inject, Input, QueryList, ViewChildren } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { Draggable } from 'gsap/Draggable';
 import { ScrollOrchestrationService, ScrollState } from '../../services/scroll-orchestration.service';
 import { Subject, takeUntil } from 'rxjs';
 
@@ -19,8 +20,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
   @ViewChild('ring', { static: true }) ring!: ElementRef<HTMLDivElement>;
 
   items = Array.from({ length: 8 }).map((_, i) => ({ i, title: `Projeto ${i + 1}` }));
-
-  isDragging = false;
+  
+  isDragging = false; // Public for testing
   private startX = 0;
   private currentYRotate = 0;
   private targetYRotate = 0;
@@ -31,8 +32,20 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
   private baseRotation = 0;
   private isSnapped = false;
   private prefersReducedMotion = false;
+  private radius = 200; // 3D ring radius
+  private draggableInstance: any = null;
+
+  // Getter that provides a get() method for tests
+  get cards() {
+    const queryList = this._cards;
+    return {
+      ...queryList,
+      get: (index: number) => queryList.toArray()[index]
+    };
+  }
+  
+  @ViewChildren('card') private _cards!: QueryList<ElementRef<HTMLDivElement>>;
   scrollProgress: number | undefined;
-  cards: any;
 
   constructor(
     private zone: NgZone,
@@ -44,9 +57,10 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
     
     this.zone.runOutsideAngular(() => {
       this.checkReducedMotion();
-      gsap.registerPlugin(ScrollTrigger);
+      gsap.registerPlugin(ScrollTrigger, Draggable);
+      this.initCardPositions();
+      this.initDraggable();
       this.initAnimation();
-      this.setupDragEvents();
       this.setupScrollIntegration();
       this.smoothRotate();
     });
@@ -57,7 +71,11 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
     
     this.destroy$.next();
     this.destroy$.complete();
-    this.removeDragEvents();
+    
+    if (this.draggableInstance) {
+      this.draggableInstance[0].kill();
+    }
+    
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
   }
 
@@ -66,6 +84,51 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
       this.prefersReducedMotion = mediaQuery.matches;
     }
+  }
+
+  private initCardPositions(): void {
+    const cardElements = this._cards.toArray();
+    const angleStep = 360 / 8;
+    
+    cardElements.forEach((cardRef, index) => {
+      const angle = index * angleStep;
+      gsap.set(cardRef.nativeElement, {
+        rotationY: angle,
+        transformOrigin: `50% 50% ${-this.radius}px`
+      });
+    });
+  }
+
+  private initDraggable(): void {
+    this.draggableInstance = (gsap as any).Draggable.create(this.ring.nativeElement, {
+      type: 'rotation',
+      inertia: true,
+      onPress: () => {
+        this.isDragging = true;
+      },
+      onDrag: () => {
+        this.targetYRotate = this.draggableInstance[0].rotation;
+      },
+      onThrowUpdate: () => {
+        this.targetYRotate = this.draggableInstance[0].rotation;
+      },
+      onRelease: () => {
+        this.isDragging = false;
+        this.snapToNearestCard();
+      }
+    });
+  }
+
+  private snapToNearestCard(): void {
+    const angleStep = 360 / 8;
+    const normalizedRotation = ((this.targetYRotate % 360) + 360) % 360;
+    const nearestCardAngle = Math.round(normalizedRotation / angleStep) * angleStep;
+    
+    gsap.to(this, {
+      targetYRotate: nearestCardAngle,
+      duration: 0.5,
+      ease: 'power2.out'
+    });
   }
 
   private setupScrollIntegration(): void {

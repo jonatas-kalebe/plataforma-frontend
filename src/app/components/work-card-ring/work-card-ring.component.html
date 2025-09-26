@@ -1,6 +1,6 @@
 <div class="ring-wrap">
   <div #ring class="ring">
-    <div class="work-card" *ngFor="let item of items; index as idx" [style.--i]="idx">
+    <div #card class="work-card" *ngFor="let item of items; index as idx" [style.--i]="idx">
       <div class="work-card-inner">
         {{ item.title }}
       </div>
