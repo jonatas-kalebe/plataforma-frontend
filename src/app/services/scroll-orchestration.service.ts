@@ -155,26 +155,51 @@ export class ScrollOrchestrationService {
         }
       };
 
-      // Sem pin aqui para evitar pin duplo e espaçadores extras
-      const advancedConfig = this.prefersReducedMotion ? {} : {
-        scrub: true,
-        snap: {
-          snapTo: (progress: number) => {
-            const snapPoints = [0, 1];
-            const threshold = 0.15;
-            const k = 0.3 + Math.pow(Math.abs(0.5 - progress), 2);
-            for (const point of snapPoints) {
-              if (Math.abs(progress - point) < threshold * k) {
-                return point;
+      // Add trabalhos-specific pin configuration by modifying advancedConfig
+      let advancedConfig;
+      if (id === '#trabalhos' && !this.prefersReducedMotion) {
+        advancedConfig = {
+          scrub: true,
+          pin: true, // Pin the trabalhos section for extended interaction
+          end: '+=100%', // Extended pin duration as specified
+          snap: {
+            snapTo: (progress: number) => {
+              const snapPoints = [0, 1];
+              const threshold = 0.15;
+              const k = 0.3 + Math.pow(Math.abs(0.5 - progress), 2);
+              for (const point of snapPoints) {
+                if (Math.abs(progress - point) < threshold * k) {
+                  return point;
+                }
               }
-            }
-            return progress;
-          },
-          duration: { min: 0.3, max: 0.8 },
-          delay: 0.1,
-          ease: 'power2.inOut'
-        }
-      };
+              return progress;
+            },
+            duration: { min: 0.3, max: 0.8 },
+            delay: 0.1,
+            ease: 'power2.inOut'
+          }
+        };
+      } else {
+        advancedConfig = this.prefersReducedMotion ? {} : {
+          scrub: true,
+          snap: {
+            snapTo: (progress: number) => {
+              const snapPoints = [0, 1];
+              const threshold = 0.15;
+              const k = 0.3 + Math.pow(Math.abs(0.5 - progress), 2);
+              for (const point of snapPoints) {
+                if (Math.abs(progress - point) < threshold * k) {
+                  return point;
+                }
+              }
+              return progress;
+            },
+            duration: { min: 0.3, max: 0.8 },
+            delay: 0.1,
+            ease: 'power2.inOut'
+          }
+        };
+      }
 
       const trigger = ScrollTriggerInstance.create({ ...baseConfig, ...advancedConfig });
       this.scrollTriggers.push(trigger);
@@ -195,24 +220,32 @@ export class ScrollOrchestrationService {
       }
 
       if (id === '#filosofia') {
+        const filosofiaConfig = this.prefersReducedMotion ? {} : {
+          scrub: 1
+        };
+        
         const filosofiaTimeline = gsapInstance.timeline({
           scrollTrigger: {
             trigger: '#filosofia',
             start: 'top center',
             end: 'bottom top',
-            scrub: 1
+            ...filosofiaConfig
           }
         });
         // Store timeline for cleanup if needed
       }
 
       if (id === '#servicos') {
+        const servicosConfig = this.prefersReducedMotion ? {} : {
+          scrub: 1
+        };
+        
         const servicosTimeline = gsapInstance.timeline({
           scrollTrigger: {
             trigger: '#servicos',
             start: 'top bottom',
             end: 'bottom top',
-            scrub: 1
+            ...servicosConfig
           }
         });
         // Store timeline for cleanup if needed
