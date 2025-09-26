@@ -139,7 +139,7 @@ describe('WorkCardRingComponent', () => {
       const firstCardArgs = mockGsap.set.calls.argsFor(0);
       const secondCardArgs = mockGsap.set.calls.argsFor(1);
 
-      expect(firstCardArgs[0]).toBe(component.cards.get(0).nativeElement);
+      expect(firstCardArgs[0]).toBe(component.cards.toArray ? component.cards.toArray()[0].nativeElement : (component.cards as any)._results[0].nativeElement);
       expect(firstCardArgs[1].rotationY).toBe(0);
       expect(firstCardArgs[1].transformOrigin).toBe(`50% 50% ${-radius}px`);
 

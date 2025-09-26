@@ -113,7 +113,7 @@ describe('ScrollOrchestrationService', () => {
     });
 
     it('should register GSAP plugins', () => {
-      expect(mockGsap.registerPlugin).toHaveBeenCalledWith(mockScrollTrigger);
+      expect(mockGsap.registerPlugin).toHaveBeenCalledWith(mockScrollTrigger, jasmine.any(Object));
     });
 
     it('should create a ScrollTrigger for each section', () => {
