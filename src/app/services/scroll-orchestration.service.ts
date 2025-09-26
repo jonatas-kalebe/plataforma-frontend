@@ -217,6 +217,11 @@ export class ScrollOrchestrationService {
             section.progress = self.progress;
           }
         };
+      } else if (id === '#hero' && !this.prefersReducedMotion) {
+        // Special configuration for Hero - but we'll create the animation separately
+        advancedConfig = {
+          scrub: true
+        };
       } else {
         // ALTERAÇÃO: remover snap por seção para evitar conflito com pin/snap magnético
         advancedConfig = this.prefersReducedMotion ? {} : {
@@ -228,86 +233,6 @@ export class ScrollOrchestrationService {
       const trigger = ScrollTriggerInstance.create({ ...baseConfig, ...advancedConfig });
       this.scrollTriggers.push(trigger);
 
-      // Timelines auxiliares
-      if (id === '#hero' && !this.prefersReducedMotion) {
-        const heroTimeline = gsapInstance.timeline({
-          scrollTrigger: {
-            trigger: '#hero',
-            start: 'top top',
-            end: 'bottom top',
-            scrub: 1
-          }
-        });
-
-        const heroTitle = document.querySelector('#hero-title');
-        const heroSubtitle = document.querySelector('#hero-subtitle');
-        const heroCta = document.querySelector('#hero-cta');
-
-        if (heroTitle) {
-          // 0-20%: gentle resistance - counter-scroll to reduce apparent movement
-          heroTimeline.fromTo(heroTitle, 
-            { y: 0, opacity: 1 },
-            { y: 53, opacity: 0.8, ease: 'power1.out' },
-            0
-          );
-          
-          // 20-100%: accelerated transition with larger movement
-          heroTimeline.to(heroTitle, 
-            { y: -150, opacity: 0.1, ease: 'power2.in' },
-            0.2
-          );
-        }
-
-        if (heroSubtitle) {
-          heroTimeline.fromTo(heroSubtitle, 
-            { y: 0, opacity: 1 },
-            { y: -40, opacity: 0.7, ease: 'power1.out' },
-            0
-          );
-          
-          heroTimeline.to(heroSubtitle, 
-            { y: -120, opacity: 0, ease: 'power2.in' },
-            0.25
-          );
-        }
-
-        if (heroCta) {
-          heroTimeline.fromTo(heroCta, 
-            { y: 0, opacity: 1 },
-            { y: -50, opacity: 0.6, ease: 'power1.out' },
-            0
-          );
-          
-          heroTimeline.to(heroCta, 
-            { y: -100, opacity: 0, ease: 'power2.in' },
-            0.3
-          );
-        }
-      }
-
-      if (id === '#filosofia') {
-        const filosofiaConfig = this.prefersReducedMotion ? {} : { scrub: 1 };
-        gsapInstance.timeline({
-          scrollTrigger: {
-            trigger: '#filosofia',
-            start: 'top center',
-            end: 'bottom top',
-            ...filosofiaConfig
-          }
-        });
-      }
-
-      if (id === '#servicos') {
-        const servicosConfig = this.prefersReducedMotion ? {} : { scrub: 1 };
-        gsapInstance.timeline({
-          scrollTrigger: {
-            trigger: '#servicos',
-            start: 'top bottom',
-            end: 'bottom top',
-            ...servicosConfig
-          }
-        });
-      }
     });
 
     const currentMetrics = this.metricsSubject.value;
@@ -316,7 +241,144 @@ export class ScrollOrchestrationService {
       sections
     });
 
+    // Create specialized Hero animation after base triggers are set up
+    if (!this.prefersReducedMotion) {
+      this.createHeroScrollAnimation(gsapInstance, ScrollTriggerInstance);
+    }
+
     this.setupGlobalProgress();
+  }
+
+  private createHeroAnimation(gsapInstance: any): any {
+    const heroTimeline = gsapInstance.timeline();
+    
+    const heroTitle = document.querySelector('#hero-title');
+    const heroSubtitle = document.querySelector('#hero-subtitle');
+    const heroCta = document.querySelector('#hero-cta');
+
+    if (heroTitle) {
+      // 0-20%: gentle resistance - counter-scroll to reduce apparent movement
+      heroTimeline.fromTo(heroTitle, 
+        { y: 0, opacity: 1 },
+        { y: 53, opacity: 0.8, ease: 'power1.out' },
+        0
+      );
+      
+      // 20-100%: accelerated transition with larger movement
+      heroTimeline.to(heroTitle, 
+        { y: -150, opacity: 0.1, ease: 'power2.in' },
+        0.2
+      );
+    }
+
+    if (heroSubtitle) {
+      heroTimeline.fromTo(heroSubtitle, 
+        { y: 0, opacity: 1 },
+        { y: -40, opacity: 0.7, ease: 'power1.out' },
+        0
+      );
+      
+      heroTimeline.to(heroSubtitle, 
+        { y: -120, opacity: 0, ease: 'power2.in' },
+        0.25
+      );
+    }
+
+    if (heroCta) {
+      heroTimeline.fromTo(heroCta, 
+        { y: 0, opacity: 1 },
+        { y: -50, opacity: 0.6, ease: 'power1.out' },
+        0
+      );
+      
+      heroTimeline.to(heroCta, 
+        { y: -100, opacity: 0, ease: 'power2.in' },
+        0.3
+      );
+    }
+
+    return heroTimeline;
+  }
+
+  private createHeroScrollAnimation(gsapInstance: any, ScrollTriggerInstance: any): void {
+    const heroTitle = document.querySelector('#hero-title');
+    const heroSubtitle = document.querySelector('#hero-subtitle'); 
+    const heroCta = document.querySelector('#hero-cta');
+
+    if (heroTitle) {
+      // Create a timeline for the hero title animation
+      const heroTl = gsapInstance.timeline({
+        scrollTrigger: {
+          trigger: '#hero',
+          start: 'top top',
+          end: 'bottom top',
+          scrub: 1
+        }
+      });
+
+      // 0-20%: gentle resistance - counter-scroll to reduce apparent movement
+      heroTl.fromTo(heroTitle, 
+        { y: 0, opacity: 1 },
+        { y: 59.9, opacity: 0.7, ease: 'power1.out' },
+        0
+      );
+      
+      // 20-100%: accelerated transition with larger movement
+      heroTl.to(heroTitle, 
+        { y: -150, opacity: 0.1, ease: 'power2.in' },
+        0.2
+      );
+
+      this.scrollTriggers.push(heroTl.scrollTrigger);
+    }
+
+    if (heroSubtitle) {
+      const subtitleTl = gsapInstance.timeline({
+        scrollTrigger: {
+          trigger: '#hero',
+          start: 'top top',
+          end: 'bottom top',
+          scrub: 1
+        }
+      });
+
+      subtitleTl.fromTo(heroSubtitle, 
+        { y: 0, opacity: 1 },
+        { y: -40, opacity: 0.7, ease: 'power1.out' },
+        0
+      );
+      
+      subtitleTl.to(heroSubtitle, 
+        { y: -120, opacity: 0, ease: 'power2.in' },
+        0.25
+      );
+
+      this.scrollTriggers.push(subtitleTl.scrollTrigger);
+    }
+
+    if (heroCta) {
+      const ctaTl = gsapInstance.timeline({
+        scrollTrigger: {
+          trigger: '#hero',
+          start: 'top top',
+          end: 'bottom top',
+          scrub: 1
+        }
+      });
+
+      ctaTl.fromTo(heroCta, 
+        { y: 0, opacity: 1 },
+        { y: -50, opacity: 0.6, ease: 'power1.out' },
+        0
+      );
+      
+      ctaTl.to(heroCta, 
+        { y: -100, opacity: 0, ease: 'power2.in' },
+        0.3
+      );
+
+      this.scrollTriggers.push(ctaTl.scrollTrigger);
+    }
   }
 
   private setupGlobalProgress(): void {
