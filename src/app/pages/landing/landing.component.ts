@@ -2,6 +2,7 @@ import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, ViewChild, PLA
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
 import { WorkCardRingComponent } from '../../components/work-card-ring/work-card-ring.component';
 import {
   ThreeParticleBackgroundComponent
@@ -9,7 +10,13 @@ import {
 import { ScrollOrchestrationService, ScrollState } from '../../services/scroll-orchestration.service';
 import { Subject, takeUntil } from 'rxjs';
 
-gsap.registerPlugin(ScrollTrigger);
+// Expose GSAP globally for the scroll service
+if (typeof window !== 'undefined') {
+  (window as any).gsap = gsap;
+  (window as any).ScrollTrigger = ScrollTrigger;
+}
+
+gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
 @Component({
   selector: 'app-landing',
@@ -40,14 +47,17 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
     this.zone.runOutsideAngular(() => {
       this.checkReducedMotion();
-      gsap.registerPlugin(ScrollTrigger);
-
+      // GSAP is already registered globally, just make sure the service can access it
+      
       this.scrollService.initialize();
 
       this.scrollService.scrollState$
         .pipe(takeUntil(this.destroy$))
         .subscribe(state => {
-          this.scrollState = state;
+          // Use setTimeout to avoid ExpressionChangedAfterItHasBeenCheckedError
+          setTimeout(() => {
+            this.scrollState = state;
+          });
         });
 
       this.initScrollytellingTimelines();
