@@ -117,6 +117,12 @@ export class ScrollOrchestrationService {
       const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
 
       gsapInstance.registerPlugin(ScrollTriggerInstance, ScrollToPlugin);
+      
+      // Expose ScrollTrigger globally for debugging/testing
+      if (typeof window !== 'undefined') {
+        (window as any).ScrollTrigger = ScrollTriggerInstance;
+      }
+      
       this.lastScrollY = window.scrollY || 0;
       this.setupSections();
       this.isInitialized = true;
@@ -223,62 +229,59 @@ export class ScrollOrchestrationService {
       this.scrollTriggers.push(trigger);
 
       // Timelines auxiliares
-      if (id === '#hero') {
-        const heroConfig = this.prefersReducedMotion ? {} : { scrub: 1 };
+      if (id === '#hero' && !this.prefersReducedMotion) {
         const heroTimeline = gsapInstance.timeline({
           scrollTrigger: {
             trigger: '#hero',
             start: 'top top',
             end: 'bottom top',
-            ...heroConfig
+            scrub: 1
           }
         });
 
-        if (!this.prefersReducedMotion) {
-          const heroTitle = document.querySelector('#hero-title');
-          const heroSubtitle = document.querySelector('#hero-subtitle');
-          const heroCta = document.querySelector('#hero-cta');
+        const heroTitle = document.querySelector('#hero-title');
+        const heroSubtitle = document.querySelector('#hero-subtitle');
+        const heroCta = document.querySelector('#hero-cta');
 
-          if (heroTitle) {
-            // 0-20%: gentle resistance - counter-scroll to reduce apparent movement
-            heroTimeline.fromTo(heroTitle, 
-              { y: 0, opacity: 1 },
-              { y: 53, opacity: 0.85, ease: 'power1.out' },  // Fine-tuned counter-movement
-              0
-            );
-            
-            // 20-100%: accelerated transition with larger movement
-            heroTimeline.to(heroTitle, 
-              { y: -150, opacity: 0.1, ease: 'power2.in' },
-              0.2
-            );
-          }
+        if (heroTitle) {
+          // 0-20%: gentle resistance - counter-scroll to reduce apparent movement
+          heroTimeline.fromTo(heroTitle, 
+            { y: 0, opacity: 1 },
+            { y: 53, opacity: 0.8, ease: 'power1.out' },
+            0
+          );
+          
+          // 20-100%: accelerated transition with larger movement
+          heroTimeline.to(heroTitle, 
+            { y: -150, opacity: 0.1, ease: 'power2.in' },
+            0.2
+          );
+        }
 
-          if (heroSubtitle) {
-            heroTimeline.fromTo(heroSubtitle, 
-              { y: 0, opacity: 1 },
-              { y: -40, opacity: 0.7, ease: 'power1.out' },
-              0
-            );
-            
-            heroTimeline.to(heroSubtitle, 
-              { y: -120, opacity: 0, ease: 'power2.in' },
-              0.25
-            );
-          }
+        if (heroSubtitle) {
+          heroTimeline.fromTo(heroSubtitle, 
+            { y: 0, opacity: 1 },
+            { y: -40, opacity: 0.7, ease: 'power1.out' },
+            0
+          );
+          
+          heroTimeline.to(heroSubtitle, 
+            { y: -120, opacity: 0, ease: 'power2.in' },
+            0.25
+          );
+        }
 
-          if (heroCta) {
-            heroTimeline.fromTo(heroCta, 
-              { y: 0, opacity: 1 },
-              { y: -50, opacity: 0.6, ease: 'power1.out' },
-              0
-            );
-            
-            heroTimeline.to(heroCta, 
-              { y: -100, opacity: 0, ease: 'power2.in' },
-              0.3
-            );
-          }
+        if (heroCta) {
+          heroTimeline.fromTo(heroCta, 
+            { y: 0, opacity: 1 },
+            { y: -50, opacity: 0.6, ease: 'power1.out' },
+            0
+          );
+          
+          heroTimeline.to(heroCta, 
+            { y: -100, opacity: 0, ease: 'power2.in' },
+            0.3
+          );
         }
       }
 
