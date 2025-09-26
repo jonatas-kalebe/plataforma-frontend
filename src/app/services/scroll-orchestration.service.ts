@@ -202,6 +202,18 @@ export class ScrollOrchestrationService {
         };
       }
 
+      // Handle trabalhos section with extended pin behavior
+      if (id === '#trabalhos' && !this.prefersReducedMotion) {
+        advancedConfig = {
+          scrub: true,
+          pin: true,
+          end: '+=100%', // Extended pin duration
+          onUpdate: (self: any) => {
+            section.progress = self.progress;
+          }
+        };
+      }
+
       const trigger = ScrollTriggerInstance.create({ ...baseConfig, ...advancedConfig });
       this.scrollTriggers.push(trigger);
 
@@ -457,6 +469,12 @@ export class ScrollOrchestrationService {
   private getNextSectionElement(currentSectionId: string): HTMLElement | null {
     const sectionOrder = ['hero', 'filosofia', 'servicos', 'trabalhos', 'cta'];
     const currentIndex = sectionOrder.indexOf(currentSectionId);
+    
+    // CTA is the last section - no next section
+    if (currentSectionId === 'cta') {
+      return null;
+    }
+    
     if (currentIndex >= 0 && currentIndex < sectionOrder.length - 1) {
       const nextSectionId = sectionOrder[currentIndex + 1];
       return document.querySelector(`#${nextSectionId}`) as HTMLElement;
