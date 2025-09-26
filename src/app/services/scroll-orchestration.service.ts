@@ -75,6 +75,44 @@ export class ScrollOrchestrationService {
     }
 
     this.ngZone.runOutsideAngular(() => {
+      // Try immediate initialization first
+      if (this.tryInitialize()) {
+        return;
+      }
+
+      // Fallback: Wait for DOM to be ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+          this.tryInitialize();
+        });
+      } else {
+        // DOM is ready, but elements might not be rendered yet
+        // Use requestAnimationFrame to ensure elements are available
+        requestAnimationFrame(() => {
+          if (!this.tryInitialize()) {
+            // Final fallback: retry after a short delay
+            setTimeout(() => this.tryInitialize(), 100);
+          }
+        });
+      }
+    });
+  }
+
+  private tryInitialize(): boolean {
+    if (this.isInitialized) {
+      return true;
+    }
+
+    // Check if essential DOM elements exist
+    const heroElement = document.querySelector('#hero');
+    const filosofiaElement = document.querySelector('#filosofia');
+    
+    if (!heroElement || !filosofiaElement) {
+      console.warn('ScrollOrchestrationService: Essential sections not found, retrying...');
+      return false;
+    }
+
+    try {
       const gsapInstance = (window as any).gsap || gsap;
       const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
 
@@ -82,7 +120,13 @@ export class ScrollOrchestrationService {
       this.lastScrollY = window.scrollY || 0;
       this.setupSections();
       this.isInitialized = true;
-    });
+      
+      console.log('ScrollOrchestrationService: Successfully initialized');
+      return true;
+    } catch (error) {
+      console.error('ScrollOrchestrationService: Initialization failed:', error);
+      return false;
+    }
   }
 
   private detectMobile(): void {
@@ -450,6 +494,22 @@ export class ScrollOrchestrationService {
 
   getScrollState(): ScrollState {
     return this.scrollStateSubject.value;
+  }
+
+  // Method to check and ensure service is properly initialized
+  ensureInitialized(): boolean {
+    if (!isPlatformBrowser(this.platformId)) {
+      return false;
+    }
+
+    if (this.isInitialized && this.scrollTriggers.length > 0) {
+      return true;
+    }
+
+    console.warn('ScrollOrchestrationService: Service not properly initialized, attempting re-initialization...');
+    this.isInitialized = false;
+    this.initialize();
+    return this.isInitialized;
   }
 
   scrollToSection(id: string, duration: number = 1): void {

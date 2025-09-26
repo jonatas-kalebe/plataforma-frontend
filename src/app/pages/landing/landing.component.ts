@@ -49,16 +49,19 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     this.zone.runOutsideAngular(() => {
       this.checkReducedMotion();
 
-      // Initialize the scroll orchestration service
-      this.scrollService.initialize();
+      // Ensure DOM is fully rendered before initializing scroll service
+      requestAnimationFrame(() => {
+        // Initialize the scroll orchestration service
+        this.scrollService.initialize();
 
-      this.scrollService.scrollState$
-        .pipe(takeUntil(this.destroy$))
-        .subscribe(state => {
-          setTimeout(() => {
-            this.scrollState = state;
+        this.scrollService.scrollState$
+          .pipe(takeUntil(this.destroy$))
+          .subscribe(state => {
+            setTimeout(() => {
+              this.scrollState = state;
+            });
           });
-        });
+      });
 
       this.initScrollytellingTimelines();
       this.initKnot();
