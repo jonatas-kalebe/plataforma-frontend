@@ -71,17 +71,33 @@ export class ScrollOrchestrationService {
 
   initialize(): void {
     if (!isPlatformBrowser(this.platformId) || this.isInitialized) {
+      console.log('ScrollOrchestration: Initialize skipped', { 
+        isBrowser: isPlatformBrowser(this.platformId), 
+        isInitialized: this.isInitialized 
+      });
       return;
     }
 
+    console.log('ScrollOrchestration: Starting initialization');
+    
     this.ngZone.runOutsideAngular(() => {
       const gsapInstance = (window as any).gsap || gsap;
       const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
 
       gsapInstance.registerPlugin(ScrollTriggerInstance, ScrollToPlugin);
+      
+      // Initialize platform-specific settings
+      this.detectMobile();
+      this.checkReducedMotion();
+      
       this.lastScrollY = window.scrollY || 0;
-      this.setupSections();
+      
+      // Use simpler approach: direct scroll event listener for magnetic scroll
+      this.setupSimpleMagneticScroll();
+      
       this.isInitialized = true;
+      
+      console.log('ScrollOrchestration: Initialization completed');
     });
   }
 
@@ -220,63 +236,135 @@ export class ScrollOrchestrationService {
       ...currentMetrics,
       sections
     });
-
-    this.setupGlobalProgress();
   }
 
-  private setupGlobalProgress(): void {
-    const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
-    let lastUpdateTime = performance.now();
-
-    const globalTrigger = ScrollTriggerInstance.create({
-      id: 'global-progress',
-      trigger: document.body,
-      start: 'top top',
-      end: 'bottom bottom',
-      onUpdate: (self: any) => {
-        const currentTime = performance.now();
-        const currentScrollY = window.scrollY || 0;
-        const deltaTime = Math.max(currentTime - lastUpdateTime, 1); // Prevent division by zero
-        const deltaScroll = Math.abs(currentScrollY - this.lastScrollY);
-        
-        // Calculate velocity in pixels per second
-        const velocityRaw = (deltaScroll / deltaTime) * 1000;
-        // Apply smoothing to avoid jittery values
-        const smoothedVelocity = velocityRaw * 0.3 + (this.metricsSubject.value.velocity || 0) * 0.7;
-
-        if (currentScrollY > this.lastScrollY + 5) {
-          this.scrollDirection = 'down';
-        } else if (currentScrollY < this.lastScrollY - 5) {
-          this.scrollDirection = 'up';
-        } else {
-          this.scrollDirection = 'none';
-        }
-
-        this.lastScrollY = currentScrollY;
-        lastUpdateTime = currentTime;
-
-        const currentMetrics = this.metricsSubject.value;
-
-        this.metricsSubject.next({
-          ...currentMetrics,
-          globalProgress: self.progress,
-          velocity: Math.abs(smoothedVelocity)
-        });
-
-        this.scrollStateSubject.next({
-          globalProgress: self.progress,
-          velocity: Math.abs(smoothedVelocity),
-          activeSection: currentMetrics.activeSection,
-          direction: this.scrollDirection
-        });
-
-        this.updateActiveSectionTrigger(currentScrollY);
-        this.detectScrollIntention();
-        this.checkMagneticSnap(); // mantém chamada
+  private setupSimpleMagneticScroll(): void {
+    console.log('setupSimpleMagneticScroll: Setting up direct scroll listener');
+    
+    let scrollTimeout: number | null = null;
+    let lastVelocity = 0;
+    let lastScrollTime = performance.now();
+    
+    const handleScroll = () => {
+      const currentTime = performance.now();
+      const currentScrollY = window.scrollY;
+      const deltaTime = currentTime - lastScrollTime;
+      const deltaScroll = Math.abs(currentScrollY - this.lastScrollY);
+      
+      // Calculate velocity
+      const velocity = deltaTime > 0 ? (deltaScroll / deltaTime) * 1000 : 0;
+      lastVelocity = velocity;
+      
+      // Update scroll direction
+      if (currentScrollY > this.lastScrollY + 5) {
+        this.scrollDirection = 'down';
+      } else if (currentScrollY < this.lastScrollY - 5) {
+        this.scrollDirection = 'up';
       }
-    });
+      
+      this.lastScrollY = currentScrollY;
+      lastScrollTime = currentTime;
+      
+      // Clear existing timeout
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout);
+      }
+      
+      // Set new timeout for magnetic snap
+      const delay = this.isMobile ? 250 : 150;
+      scrollTimeout = window.setTimeout(() => {
+        this.checkAndPerformMagneticSnap(currentScrollY, lastVelocity);
+      }, delay);
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    console.log('setupSimpleMagneticScroll: Scroll listener attached');
+  }
 
-    this.scrollTriggers.push(globalTrigger);
+  private checkAndPerformMagneticSnap(scrollY: number, velocity: number): void {
+    if (this.prefersReducedMotion) {
+      console.log('checkAndPerformMagneticSnap: Reduced motion enabled, skipping');
+      return;
+    }
+    
+    // Only snap if velocity is low (user has stopped scrolling)
+    if (velocity > 300) { // Threshold in px/s
+      console.log('checkAndPerformMagneticSnap: Velocity too high', velocity + 'px/s');
+      return;
+    }
+    
+    const sections = [
+      { id: 'hero', start: 0, height: window.innerHeight },
+      { id: 'filosofia', start: window.innerHeight, height: window.innerHeight },
+      { id: 'servicos', start: window.innerHeight * 2, height: window.innerHeight },
+      { id: 'trabalhos', start: window.innerHeight * 3, height: window.innerHeight },
+      { id: 'cta', start: window.innerHeight * 4, height: window.innerHeight }
+    ];
+    
+    // Find current section
+    let currentSection = null;
+    for (const section of sections) {
+      if (scrollY >= section.start && scrollY < section.start + section.height) {
+        currentSection = section;
+        break;
+      }
+    }
+    
+    if (!currentSection) {
+      console.log('checkAndPerformMagneticSnap: No current section found');
+      return;
+    }
+    
+    // Skip snap for trabalhos section (has its own interactions)
+    if (currentSection.id === 'trabalhos') {
+      console.log('checkAndPerformMagneticSnap: Skipping trabalhos section');
+      return;
+    }
+    
+    const sectionProgress = (scrollY - currentSection.start) / currentSection.height;
+    
+    console.log('checkAndPerformMagneticSnap:', {
+      section: currentSection.id,
+      progress: Math.round(sectionProgress * 100) + '%',
+      velocity: Math.round(velocity) + 'px/s',
+      scrollY,
+      sectionStart: currentSection.start
+    });
+    
+    const gsapInstance = (window as any).gsap || gsap;
+    
+    // Snap forward when progress >= 85%
+    if (sectionProgress >= 0.85) {
+      const nextSectionStart = currentSection.start + currentSection.height;
+      const totalHeight = window.innerHeight * sections.length;
+      
+      if (nextSectionStart < totalHeight) {
+        console.log('checkAndPerformMagneticSnap: Snapping forward to', nextSectionStart);
+        gsapInstance.to(window, {
+          scrollTo: { y: nextSectionStart, autoKill: false },
+          ease: 'power2.inOut',
+          duration: 0.8
+        });
+        return;
+      }
+    }
+    
+    // Snap backward when progress <= 15% and moving backward  
+    if (sectionProgress <= 0.15 && this.scrollDirection === 'up') {
+      const prevSectionStart = currentSection.start - currentSection.height;
+      
+      if (prevSectionStart >= 0) {
+        console.log('checkAndPerformMagneticSnap: Snapping backward to', prevSectionStart);
+        gsapInstance.to(window, {
+          scrollTo: { y: prevSectionStart, autoKill: false },
+          ease: 'power2.inOut',
+          duration: 0.8
+        });
+        return;
+      }
+    }
+    
+    console.log('checkAndPerformMagneticSnap: No snap needed');
   }
 
   private updateActiveSectionTrigger(currentScrollY: number): void {
@@ -291,13 +379,21 @@ export class ScrollOrchestrationService {
 
       if (currentScrollY >= sectionTop && currentScrollY < sectionBottom) {
         const sectionProgress = (currentScrollY - sectionTop) / sectionHeight;
-        this.activeSectionTrigger = {
-          progress: sectionProgress,
-          direction: this.scrollDirection === 'down' ? 1 : (this.scrollDirection === 'up' ? -1 : 0),
-          vars: { id: sectionId },
-          start: sectionTop,
-          end: sectionBottom
-        };
+        
+        // Update existing activeSectionTrigger or create new one
+        if (!this.activeSectionTrigger || this.activeSectionTrigger.vars?.id !== sectionId) {
+          this.activeSectionTrigger = {
+            progress: sectionProgress,
+            direction: this.scrollDirection === 'down' ? 1 : (this.scrollDirection === 'up' ? -1 : 0),
+            vars: { id: sectionId },
+            start: sectionTop,
+            end: sectionBottom
+          };
+        } else {
+          // Update existing trigger with new progress and direction
+          this.activeSectionTrigger.progress = sectionProgress;
+          this.activeSectionTrigger.direction = this.scrollDirection === 'down' ? 1 : (this.scrollDirection === 'up' ? -1 : 0);
+        }
         break;
       }
     }
@@ -317,21 +413,42 @@ export class ScrollOrchestrationService {
   }
 
   private checkMagneticSnap(): void {
-    if (!this.activeSectionTrigger) return;
-    if (this.prefersReducedMotion) return;
+    if (!this.activeSectionTrigger) {
+      console.log('checkMagneticSnap: No activeSectionTrigger');
+      return;
+    }
+    if (this.prefersReducedMotion) {
+      console.log('checkMagneticSnap: Reduced motion enabled');
+      return;
+    }
 
     const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
 
     // ALTERAÇÃO: se seção ativa for "trabalhos" OU se qualquer trigger com pin estiver ativo, não fazer snap
     const activeId = this.scrollStateSubject.value.activeSection?.id;
-    if (activeId === 'trabalhos') return; // não snap durante pin de "trabalhos"
+    if (activeId === 'trabalhos') {
+      console.log('checkMagneticSnap: Skipping trabalhos section');
+      return; // não snap durante pin de "trabalhos"
+    }
     const anyPinnedActive = ScrollTriggerInstance.getAll().some((t: any) => t.pin && t.isActive);
-    if (anyPinnedActive) return;
+    if (anyPinnedActive) {
+      console.log('checkMagneticSnap: Pinned trigger active');
+      return;
+    }
 
     const progress = this.activeSectionTrigger.progress || 0;
     const direction = this.activeSectionTrigger.direction || 0;
+    const sectionId = this.activeSectionTrigger.vars?.id;
     // Use our own velocity tracking since ScrollTrigger.getVelocity() doesn't exist
     const currentVelocity = this.scrollStateSubject.value.velocity * 1000; // Convert to pixels per second
+
+    console.log('checkMagneticSnap:', {
+      progress: Math.round(progress * 100) + '%',
+      direction,
+      sectionId,
+      velocity: Math.round(currentVelocity) + 'px/s',
+      velocityLowEnough: Math.abs(currentVelocity) < 500
+    });
 
     if (this.snapTimeoutId) {
       clearTimeout(this.snapTimeoutId);
@@ -341,6 +458,7 @@ export class ScrollOrchestrationService {
     // Only snap when velocity is low (user has stopped or is scrolling slowly)
     if (Math.abs(currentVelocity) < 500) { // Increased threshold for more responsive snapping
       const delay = this.isMobile ? 250 : 100; // Reduced delay for quicker response
+      console.log('checkMagneticSnap: Setting timeout with delay', delay + 'ms');
       this.snapTimeoutId = window.setTimeout(() => {
         this.performMagneticSnap();
       }, delay);
@@ -348,21 +466,36 @@ export class ScrollOrchestrationService {
   }
 
   private performMagneticSnap(): void {
-    if (!this.activeSectionTrigger) return;
+    if (!this.activeSectionTrigger) {
+      console.log('performMagneticSnap: No activeSectionTrigger');
+      return;
+    }
 
     const activeId = this.scrollStateSubject.value.activeSection?.id;
     // ALTERAÇÃO: proteção extra
-    if (activeId === 'trabalhos') return;
+    if (activeId === 'trabalhos') {
+      console.log('performMagneticSnap: Skipping trabalhos section');
+      return;
+    }
 
     const gsapInstance = (window as any).gsap || gsap;
     const progress = this.activeSectionTrigger.progress || 0;
     const direction = this.activeSectionTrigger.direction || 0;
     const sectionId = this.activeSectionTrigger.vars?.id;
 
+    console.log('performMagneticSnap:', {
+      progress: Math.round(progress * 100) + '%',
+      direction,
+      sectionId,
+      threshold85: progress >= 0.85,
+      threshold15: progress <= 0.15
+    });
+
     // Snap forward when progress >= 85% 
     if (progress >= 0.85) {
       const nextSectionElement = this.getNextSectionElement(sectionId);
       if (nextSectionElement) {
+        console.log('performMagneticSnap: Snapping forward to', nextSectionElement.id, 'at position', nextSectionElement.offsetTop);
         gsapInstance.to(window, {
           scrollTo: { y: nextSectionElement.offsetTop, autoKill: false },
           ease: 'power2.inOut',
@@ -377,6 +510,7 @@ export class ScrollOrchestrationService {
     if (progress <= 0.15 && direction < 0) {
       const prevSectionElement = this.getPrevSectionElement(sectionId);
       if (prevSectionElement) {
+        console.log('performMagneticSnap: Snapping backward to', prevSectionElement.id, 'at position', prevSectionElement.offsetTop);
         gsapInstance.to(window, {
           scrollTo: { y: prevSectionElement.offsetTop, autoKill: false },
           ease: 'power2.inOut',
