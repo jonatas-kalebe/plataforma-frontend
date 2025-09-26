@@ -71,7 +71,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
-    
+
     // Subscribe to scroll metrics to react to scroll changes
     if (this.scrollService && this.scrollService.metrics$) {
       this.scrollService.metrics$.subscribe(metrics => {
@@ -129,17 +129,17 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   // Handle scroll changes for particle effects
   private handleScrollChange(metrics: any): void {
     if (!this.particles) return;
-    
+
     // Update particle rotation speed based on velocity
     const velocityFactor = Math.min(metrics.velocity / 1000, 1);
     this.spin.y += velocityFactor * 0.01;
-    
+
     // Update particle color based on global progress
     if (this.particles.material && (this.particles.material as any).color) {
       const color = this.interpolateColor(metrics.globalProgress);
       (this.particles.material as any).color.set(color);
     }
-    
+
     // Check for transitions and trigger particle formations
     if (this.isInTransition(metrics)) {
       this.formShape('transition');
@@ -149,7 +149,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   // Update particles method expected by tests
   private updateParticles(): void {
     if (!this.particles) return;
-    
+
     // Apply spin rotation
     if (this.particles.rotation) {
       this.particles.rotation.y = this.spin.y;
@@ -161,7 +161,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     // Simple color interpolation - can be enhanced
     const startColor = 0x2d5b8c; // Blue
     const endColor = 0x8c2d5b;   // Purple
-    
+
     // Simple linear interpolation for demonstration
     return Math.floor(startColor + (endColor - startColor) * progress);
   }
@@ -210,7 +210,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   private initThree(): void {
     // Use window.THREE if available (for tests), otherwise use imported THREE
     const ThreeInstance = (window as any).THREE || THREE;
-    
+
     const host = this.el.nativeElement;
     this.isMobile = ('ontouchstart' in window) || (navigator as any).maxTouchPoints > 0;
     this.scene = new ThreeInstance.Scene();
@@ -219,19 +219,19 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.renderer = new ThreeInstance.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     this.renderer.setSize(host.clientWidth, host.clientHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.isMobile ? 1.5 : 1.75));
-    
+
     // Only call setClearColor if it exists (may be missing in tests)
     if (typeof this.renderer.setClearColor === 'function') {
       this.renderer.setClearColor(0x000000, 0);
     }
-    
+
     host.appendChild(this.renderer.domElement);
   }
 
   private createParticles(): void {
     // Use window.THREE if available (for tests), otherwise use imported THREE
     const ThreeInstance = (window as any).THREE || THREE;
-    
+
     const particleCount = this.isMobile ? this.mobileParticleCount : this.desktopParticleCount;
     const geometry = new ThreeInstance.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
@@ -263,7 +263,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   private createParticleTexture(): any {
     const ThreeInstance = (window as any).THREE || THREE;
-    
+
     const canvas = document.createElement('canvas');
     canvas.width = 64;
     canvas.height = 64;
@@ -426,5 +426,34 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       positions[i + 2] += v[i + 2];
     }
     (this.particles.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+  }
+
+  /**
+   * Triggers a ripple/shockwave effect at the center of the canvas (or pointer if available).
+   */
+  public triggerRipple(): void {
+    if (!isPlatformBrowser(this.platformId) || this.prefersReducedMotion) return;
+    // Center of the canvas
+    const el = this.el.nativeElement as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    const center = new THREE.Vector2(rect.width / 2, rect.height / 2);
+    this.shockwaves.push({
+      pos: center,
+      startTime: performance.now(),
+      maxStrength: 1.0
+    });
+  }
+
+  /**
+   * Sets the scroll velocity, intensifying the spin/energy of the particles.
+   * @param velocity Scroll velocity (0 = stopped, >0 = fast)
+   */
+  public setScrollVelocity(velocity: number): void {
+    if (!isPlatformBrowser(this.platformId) || this.prefersReducedMotion) return;
+    // Clamp and map velocity to spin/energy
+    const v = Math.min(Math.abs(velocity), 2.5);
+    this.spin.x = v * 0.12;
+    this.spin.y = v * 0.18;
+    // Optionally, could animate spin decay back to normal when velocity drops
   }
 }

@@ -107,33 +107,27 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
     this.timelines.push(tl);
 
-    // Custom scroll-based animation with elastic resistance
+    // Custom scroll-based animation with elastic resistance e thresholds
     if (!this.prefersReducedMotion) {
       const heroScrollTrigger = ScrollTrigger.create({
         trigger: '#hero',
         start: 'top top',
         end: 'bottom top',
+        scrub: 1,
         onUpdate: self => {
           const progress = self.progress;
-          console.log('Hero ScrollTrigger progress:', progress, 'scroll:', window.scrollY);
+          // Parallax e resistência inicial até 20%, aceleração após
           let yMultiplier, opacityMultiplier;
-
           if (progress <= 0.2) {
-            // Strong resistance for 0-20%: counter the scroll movement with positive transforms
-            yMultiplier = progress * 0.8; // Resistance that counteracts scroll
-            opacityMultiplier = progress * 0.3; // Very gentle fade
+            yMultiplier = progress * 0.8;
+            opacityMultiplier = progress * 0.3;
           } else {
-            // Accelerate after 20% by reducing the counter-movement
-            const acceleratedProgress = 0.16 - (progress - 0.2) * 0.4; // Reduce resistance, then add movement
-            yMultiplier = Math.max(-1.0, acceleratedProgress); // Allow negative for acceleration
-            opacityMultiplier = (progress - 0.2) * 2.5 + 0.06; // Accelerate opacity change
+            const acceleratedProgress = 0.16 - (progress - 0.2) * 0.4;
+            yMultiplier = Math.max(-1.0, acceleratedProgress);
+            opacityMultiplier = (progress - 0.2) * 2.5 + 0.06;
           }
-
-          console.log('Applying yMultiplier:', yMultiplier, 'for progress:', progress);
-
-          // Apply transforms - positive Y values to counteract downward scroll (create resistance)
           gsap.set('#hero-title', {
-            y: 50 * yMultiplier, // Positive Y to create upward resistance
+            y: 50 * yMultiplier,
             opacity: Math.max(1 - opacityMultiplier * 0.8, 0.2)
           });
           gsap.set('#hero-subtitle', {
@@ -144,9 +138,21 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
             y: 20 * yMultiplier,
             opacity: Math.max(1 - opacityMultiplier * 0.4, 0.6)
           });
+          // Feedback visual: fade-out ao cruzar 85%, fade-in ao voltar (<15%)
+          if (progress >= 0.85) {
+            gsap.to('#hero-title, #hero-subtitle, #hero-cta', { opacity: 0, duration: 0.3, ease: 'power2.in' });
+          } else if (progress <= 0.15) {
+            gsap.to('#hero-title, #hero-subtitle, #hero-cta', { opacity: 1, duration: 0.3, ease: 'power2.out' });
+          }
+          // Integrar partículas: ripple ao cruzar 85% (transição), resposta à velocidade
+          if (progress >= 0.85 && this.particleBackground) {
+            this.particleBackground.triggerRipple();
+          }
+          if (this.particleBackground && this.scrollState) {
+            this.particleBackground.setScrollVelocity(this.scrollState.velocity || 0);
+          }
         }
       });
-
       this.scrollTriggers.push(heroScrollTrigger);
     }
   }
