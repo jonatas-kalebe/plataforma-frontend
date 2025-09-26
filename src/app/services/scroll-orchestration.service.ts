@@ -43,6 +43,7 @@ export class ScrollOrchestrationService {
   // Properties for magnetic snapping
   private activeSectionTrigger: any = null;
   private snapTimeoutId: number | null = null;
+  private intentionDetected: { direction: 'forward' | 'backward' | null, at: number } = { direction: null, at: 0 };
 
   private metricsSubject = new BehaviorSubject<ScrollMetrics>({
     globalProgress: 0,
@@ -201,6 +202,18 @@ export class ScrollOrchestrationService {
         };
       }
 
+      // Handle trabalhos section with extended pin behavior
+      if (id === '#trabalhos' && !this.prefersReducedMotion) {
+        advancedConfig = {
+          scrub: true,
+          pin: true,
+          end: '+=100%', // Extended pin duration
+          onUpdate: (self: any) => {
+            section.progress = self.progress;
+          }
+        };
+      }
+
       const trigger = ScrollTriggerInstance.create({ ...baseConfig, ...advancedConfig });
       this.scrollTriggers.push(trigger);
 
@@ -303,6 +316,9 @@ export class ScrollOrchestrationService {
         // Update active section trigger based on current scroll position
         this.updateActiveSectionTrigger(currentScrollY);
 
+        // Track intention detection at 20% threshold
+        this.detectScrollIntention();
+
         // Magnetic snapping logic
         this.checkMagneticSnap();
       }
@@ -342,8 +358,33 @@ export class ScrollOrchestrationService {
     }
   }
 
+  private detectScrollIntention(): void {
+    if (!this.activeSectionTrigger || this.prefersReducedMotion) return;
+    
+    const progress = this.activeSectionTrigger.progress || 0;
+    const direction = this.activeSectionTrigger.direction || 0;
+    
+    // Detect forward intention when crossing 20% threshold
+    if (progress > 0.2 && direction > 0 && this.intentionDetected.direction !== 'forward') {
+      this.intentionDetected = { direction: 'forward', at: progress };
+      console.log(`Forward intention detected at ${progress.toFixed(3)}`);
+    }
+    // Reset intention if user scrolls back before 20%
+    else if (progress <= 0.2) {
+      this.intentionDetected = { direction: null, at: 0 };
+    }
+    // Detect backward intention at top
+    else if (progress <= 0.15 && direction < 0 && this.intentionDetected.direction !== 'backward') {
+      this.intentionDetected = { direction: 'backward', at: progress };
+      console.log(`Backward intention detected at ${progress.toFixed(3)}`);
+    }
+  }
+
   private checkMagneticSnap(): void {
     if (!this.activeSectionTrigger) return;
+
+    // Skip magnetic snapping if reduced motion is preferred
+    if (this.prefersReducedMotion) return;
 
     const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
     const progress = this.activeSectionTrigger.progress || 0;
@@ -351,6 +392,8 @@ export class ScrollOrchestrationService {
     
     // Get velocity from ScrollTrigger if available, otherwise use our calculation
     const velocity = ScrollTriggerInstance.getVelocity ? ScrollTriggerInstance.getVelocity() : 0;
+    
+    console.log(`checkMagneticSnap: progress=${progress.toFixed(3)}, velocity=${velocity}, direction=${direction}`);
 
     // Clear existing snap timeout
     if (this.snapTimeoutId) {
@@ -359,7 +402,7 @@ export class ScrollOrchestrationService {
     }
 
     // Only snap when velocity is zero (user stopped scrolling)
-    if (velocity === 0) {
+    if (Math.abs(velocity) < 50) { // Use threshold instead of exact zero
       const delay = this.isMobile ? 150 : 100;
       this.snapTimeoutId = window.setTimeout(() => {
         this.performMagneticSnap();
@@ -375,8 +418,25 @@ export class ScrollOrchestrationService {
     const direction = this.activeSectionTrigger.direction || 0;
     const sectionId = this.activeSectionTrigger.vars?.id;
 
-    // Snap forward if progress > 85% and direction is positive (forward)
-    if (progress > 0.85 && direction > 0) {
+    // Magnetic snapping logic based on specifications:
+
+    // 1. Use intention detected at 20% threshold when user pauses
+    if (this.intentionDetected.direction === 'forward' && progress > 0.2) {
+      const nextSectionElement = this.getNextSectionElement(sectionId);
+      if (nextSectionElement) {
+        gsapInstance.to(window, {
+          scrollTo: { y: nextSectionElement.offsetTop, autoKill: false },
+          ease: 'power2.inOut',
+          duration: 0.6
+        });
+        // Reset intention after snapping
+        this.intentionDetected = { direction: null, at: 0 };
+        return;
+      }
+    }
+
+    // 2. Snap forward if progress >= 85% (pause after significant progress)
+    if (progress >= 0.85) {
       const nextSectionElement = this.getNextSectionElement(sectionId);
       if (nextSectionElement) {
         gsapInstance.to(window, {
@@ -384,10 +444,14 @@ export class ScrollOrchestrationService {
           ease: 'power2.inOut',
           duration: 0.8
         });
+        // Reset intention after snapping
+        this.intentionDetected = { direction: null, at: 0 };
+        return;
       }
     }
-    // Snap backward if progress < 15% and direction is negative (backward)
-    else if (progress < 0.15 && direction < 0) {
+
+    // 3. Snap backward if progress <= 15% in reverse scroll or backward intention
+    if ((progress <= 0.15 && direction < 0) || this.intentionDetected.direction === 'backward') {
       const prevSectionElement = this.getPrevSectionElement(sectionId);
       if (prevSectionElement) {
         gsapInstance.to(window, {
@@ -395,6 +459,9 @@ export class ScrollOrchestrationService {
           ease: 'power2.inOut',
           duration: 0.8
         });
+        // Reset intention after snapping
+        this.intentionDetected = { direction: null, at: 0 };
+        return;
       }
     }
   }
@@ -402,6 +469,12 @@ export class ScrollOrchestrationService {
   private getNextSectionElement(currentSectionId: string): HTMLElement | null {
     const sectionOrder = ['hero', 'filosofia', 'servicos', 'trabalhos', 'cta'];
     const currentIndex = sectionOrder.indexOf(currentSectionId);
+    
+    // CTA is the last section - no next section
+    if (currentSectionId === 'cta') {
+      return null;
+    }
+    
     if (currentIndex >= 0 && currentIndex < sectionOrder.length - 1) {
       const nextSectionId = sectionOrder[currentIndex + 1];
       return document.querySelector(`#${nextSectionId}`) as HTMLElement;

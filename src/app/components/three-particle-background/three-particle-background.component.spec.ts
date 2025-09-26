@@ -2,12 +2,18 @@ import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testin
 import { PLATFORM_ID, NgZone } from '@angular/core';
 import { ThreeParticleBackgroundComponent } from './three-particle-background.component';
 import { ScrollOrchestrationService } from '../../services/scroll-orchestration.service';
-import { of } from 'rxjs';
+import { of, BehaviorSubject } from 'rxjs';
 
 // Mocks para Three.js
 const mockVector3 = { x: 0, y: 0, z: 0, clone: () => mockVector3, lerp: jasmine.createSpy('lerp') };
 const mockScene = { add: jasmine.createSpy('add'), remove: jasmine.createSpy('remove') };
-const mockCamera = { position: { x: 0, y: 0, z: 500 }, aspect: 1, updateProjectionMatrix: jasmine.createSpy('updateProjectionMatrix'), lookAt: jasmine.createSpy('lookAt') };
+const mockCamera = { 
+  position: { x: 0, y: 0, z: 500 }, 
+  aspect: 1, 
+  updateProjectionMatrix: jasmine.createSpy('updateProjectionMatrix'), 
+  lookAt: jasmine.createSpy('lookAt'),
+  updateMatrixWorld: jasmine.createSpy('updateMatrixWorld')
+};
 const mockRenderer = { setSize: jasmine.createSpy('setSize'), setPixelRatio: jasmine.createSpy('setPixelRatio'), render: jasmine.createSpy('render'), domElement: document.createElement('canvas'), dispose: jasmine.createSpy('dispose') };
 const mockGeometry = { dispose: jasmine.createSpy('dispose'), setAttribute: jasmine.createSpy('setAttribute'), attributes: { position: { array: new Float32Array(3), needsUpdate: false } } };
 const mockMaterial = { dispose: jasmine.createSpy('dispose'), color: { set: jasmine.createSpy('set') }, size: 1, opacity: 1, needsUpdate: false };
@@ -27,7 +33,7 @@ const mockPoints = { geometry: mockGeometry, material: mockMaterial, rotation: {
 
 // Mock para ScrollOrchestrationService
 const mockScrollService = {
-  metrics$: of({
+  metrics$: new BehaviorSubject({
     globalProgress: 0,
     velocity: 0,
     activeSection: 0,

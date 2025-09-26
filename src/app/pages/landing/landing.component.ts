@@ -119,12 +119,13 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
           // Parallax e resistência inicial até 20%, aceleração após
           let yMultiplier, opacityMultiplier;
           if (progress <= 0.2) {
-            yMultiplier = progress * 0.8;
-            opacityMultiplier = progress * 0.3;
+            // Stronger resistance in first 20% - limit movement to ~50px max
+            yMultiplier = progress * 0.5; // Reduced from 0.8 to 0.5
+            opacityMultiplier = progress * 0.2; // Reduced from 0.3 to 0.2
           } else {
-            const acceleratedProgress = 0.16 - (progress - 0.2) * 0.4;
-            yMultiplier = Math.max(-1.0, acceleratedProgress);
-            opacityMultiplier = (progress - 0.2) * 2.5 + 0.06;
+            const acceleratedProgress = 0.1 + (progress - 0.2) * 1.2; // Accelerated movement after 20%
+            yMultiplier = Math.min(1.0, acceleratedProgress);
+            opacityMultiplier = (progress - 0.2) * 2.0 + 0.04;
           }
           gsap.set('#hero-title', {
             y: 50 * yMultiplier,
