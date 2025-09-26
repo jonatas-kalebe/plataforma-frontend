@@ -49,8 +49,8 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     this.zone.runOutsideAngular(() => {
       this.checkReducedMotion();
       // GSAP is already registered globally, just make sure the service can access it
-      
-      // Initialize scroll orchestration service
+
+      // Initialize the scroll orchestration service
       this.scrollService.initialize();
 
       this.scrollService.scrollState$
@@ -117,7 +117,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
           const progress = self.progress;
           console.log('Hero ScrollTrigger progress:', progress, 'scroll:', window.scrollY);
           let yMultiplier, opacityMultiplier;
-          
+
           if (progress <= 0.2) {
             // Strong resistance for 0-20%: minimal movement
             yMultiplier = progress * 0.3; // Very gentle movement
@@ -128,25 +128,25 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
             yMultiplier = acceleratedProgress;
             opacityMultiplier = acceleratedProgress;
           }
-          
+
           console.log('Applying yMultiplier:', yMultiplier, 'for progress:', progress);
-          
+
           // Apply transforms
-          gsap.set('#hero-title', { 
-            y: -50 * yMultiplier, 
+          gsap.set('#hero-title', {
+            y: -50 * yMultiplier,
             opacity: Math.max(1 - opacityMultiplier * 0.8, 0.2)
           });
-          gsap.set('#hero-subtitle', { 
-            y: -30 * yMultiplier, 
-            opacity: Math.max(1 - opacityMultiplier * 0.6, 0.4) 
+          gsap.set('#hero-subtitle', {
+            y: -30 * yMultiplier,
+            opacity: Math.max(1 - opacityMultiplier * 0.6, 0.4)
           });
-          gsap.set('#hero-cta', { 
-            y: -20 * yMultiplier, 
-            opacity: Math.max(1 - opacityMultiplier * 0.4, 0.6) 
+          gsap.set('#hero-cta', {
+            y: -20 * yMultiplier,
+            opacity: Math.max(1 - opacityMultiplier * 0.4, 0.6)
           });
         }
       });
-      
+
       this.scrollTriggers.push(heroScrollTrigger);
     }
   }

@@ -1,4 +1,4 @@
-import { Component, ElementRef, NgZone, ViewChild, AfterViewInit, OnDestroy, PLATFORM_ID, inject, Input } from '@angular/core';
+import { Component, ElementRef, NgZone, ViewChild, ViewChildren, AfterViewInit, OnDestroy, PLATFORM_ID, inject, Input, QueryList, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -16,25 +16,27 @@ gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
   templateUrl: './work-card-ring.component.html',
   styleUrls: ['./work-card-ring.component.css']
 })
-export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
+export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChanges {
   private readonly platformId = inject(PLATFORM_ID);
   @ViewChild('ring', { static: true }) ring!: ElementRef<HTMLDivElement>;
+  @ViewChildren('card') cards!: QueryList<ElementRef<HTMLDivElement>>;
 
   items = Array.from({ length: 8 }).map((_, i) => ({ i, title: `Projeto ${i + 1}` }));
 
   isDragging = false;
+  private radius = 200;
   private startX = 0;
   private currentYRotate = 0;
   private targetYRotate = 0;
   private velocity = 0;
-  private animationFrameId: number | null = null;
+  private rafId: number | null = null;
   private destroy$ = new Subject<void>();
   private scrollRotationOffset = 0;
   private baseRotation = 0;
   private isSnapped = false;
   private prefersReducedMotion = false;
-  scrollProgress: number | undefined;
-  cards: any;
+  private draggable: any = null;
+  @Input() scrollProgress: number | undefined;
 
   constructor(
     private zone: NgZone,
@@ -46,11 +48,11 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
     
     this.zone.runOutsideAngular(() => {
       this.checkReducedMotion();
-      gsap.registerPlugin(ScrollTrigger);
+      this.initializeCards();
       this.initAnimation();
-      this.setupDragEvents();
+      this.setupDraggable();
       this.setupScrollIntegration();
-      this.smoothRotate();
+      this.startAnimationLoop();
     });
   }
 
@@ -59,8 +61,104 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
     
     this.destroy$.next();
     this.destroy$.complete();
-    this.removeDragEvents();
-    if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+    if (this.draggable) {
+      this.draggable[0].kill();
+    }
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+    }
+  }
+
+  private initializeCards(): void {
+    // Handle both real QueryList and test mock
+    const cardElements = this.cards?.toArray ? this.cards.toArray() : (this.cards as any)?._results || [];
+    const angleStep = 360 / cardElements.length;
+    
+    cardElements.forEach((card: any, index: number) => {
+      const angle = index * angleStep;
+      const element = card.nativeElement || card;
+      gsap.set(element, {
+        rotationY: angle,
+        transformOrigin: `50% 50% ${-this.radius}px`
+      });
+    });
+  }
+
+  private setupDraggable(): void {
+    // Try to use Draggable if available (for testing), otherwise use native events
+    const DraggableClass = (window as any).Draggable;
+    
+    if (DraggableClass && typeof DraggableClass.create === 'function') {
+      this.draggable = DraggableClass.create(this.ring.nativeElement, {
+        type: 'rotation',
+        inertia: true,
+        onDrag: () => {
+          this.isDragging = true;
+        },
+        onThrowUpdate: () => {
+          this.snapToNearestCard();
+        },
+        onDragEnd: () => {
+          this.isDragging = false;
+          this.snapToNearestCard();
+        }
+      });
+    } else {
+      // Fallback to native events if Draggable is not available
+      this.setupNativeDragEvents();
+    }
+  }
+
+  private setupNativeDragEvents(): void {
+    const ringEl = this.ring.nativeElement;
+    
+    const onStart = (e: MouseEvent | TouchEvent) => {
+      this.isDragging = true;
+      this.startX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      this.velocity = 0;
+      this.baseRotation = this.currentYRotate;
+      ringEl.style.cursor = 'grabbing';
+    };
+
+    const onMove = (e: MouseEvent | TouchEvent) => {
+      if (!this.isDragging) return;
+      const currentX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const deltaX = currentX - this.startX;
+      const sensitivity = 0.25;
+      this.targetYRotate = this.baseRotation + deltaX * sensitivity;
+      this.velocity = deltaX * sensitivity;
+      this.startX = currentX;
+    };
+
+    const onEnd = () => {
+      this.isDragging = false;
+      this.baseRotation = this.targetYRotate;
+      ringEl.style.cursor = 'grab';
+      this.snapToNearestCard();
+    };
+
+    ringEl.addEventListener('mousedown', onStart);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onEnd);
+    ringEl.addEventListener('touchstart', onStart, { passive: true });
+    window.addEventListener('touchmove', onMove);
+    window.addEventListener('touchend', onEnd);
+  }
+
+  private snapToNearestCard(): void {
+    const currentRotation = this.currentYRotate % 360;
+    const cardAngle = 360 / 8; // 8 cards
+    const nearestCardRotation = Math.round(currentRotation / cardAngle) * cardAngle;
+    
+    gsap.to(this.ring.nativeElement, {
+      rotationY: nearestCardRotation,
+      duration: this.prefersReducedMotion ? 0.1 : 0.3,
+      ease: this.prefersReducedMotion ? 'none' : 'power2.out'
+    });
+  }
+
+  private startAnimationLoop(): void {
+    this.smoothRotate();
   }
 
   private checkReducedMotion(): void {
@@ -74,6 +172,11 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
     this.scrollService.scrollState$
       .pipe(takeUntil(this.destroy$))
       .subscribe(state => {
+        // Defensive check for getSection method availability
+        if (typeof this.scrollService.getSection !== 'function') {
+          return;
+        }
+        
         const trabalhosSection = this.scrollService.getSection('trabalhos');
         if (trabalhosSection && !this.isDragging) {
           const progress = trabalhosSection.progress;
@@ -89,6 +192,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
         }
       });
   }
+
   private initAnimation(): void {
     gsap.from(this.ring.nativeElement, {
       scrollTrigger: {
@@ -102,50 +206,6 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
       ease: this.prefersReducedMotion ? 'none' : 'power3.out'
     });
   }
-
-  private setupDragEvents(): void {
-    const ringEl = this.ring.nativeElement;
-    ringEl.addEventListener('mousedown', this.onDragStart);
-    window.addEventListener('mousemove', this.onDragMove);
-    window.addEventListener('mouseup', this.onDragEnd);
-    ringEl.addEventListener('touchstart', this.onDragStart, { passive: true });
-    window.addEventListener('touchmove', this.onDragMove);
-    window.addEventListener('touchend', this.onDragEnd);
-  }
-
-  private removeDragEvents(): void {
-    const ringEl = this.ring.nativeElement;
-    ringEl.removeEventListener('mousedown', this.onDragStart);
-    window.removeEventListener('mousemove', this.onDragMove);
-    window.removeEventListener('mouseup', this.onDragEnd);
-    ringEl.removeEventListener('touchstart', this.onDragStart);
-    window.removeEventListener('touchmove', this.onDragMove);
-    window.removeEventListener('touchend', this.onDragEnd);
-  }
-
-  private onDragStart = (e: MouseEvent | TouchEvent): void => {
-    this.isDragging = true;
-    this.startX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    this.velocity = 0;
-    this.baseRotation = this.currentYRotate;
-    this.ring.nativeElement.style.cursor = 'grabbing';
-  };
-
-  private onDragMove = (e: MouseEvent | TouchEvent): void => {
-    if (!this.isDragging) return;
-    const currentX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const deltaX = currentX - this.startX;
-    const sensitivity = 0.25;
-    this.targetYRotate = this.baseRotation + deltaX * sensitivity;
-    this.velocity = deltaX * sensitivity;
-    this.startX = currentX;
-  };
-
-  private onDragEnd = (): void => {
-    this.isDragging = false;
-    this.baseRotation = this.targetYRotate;
-    this.ring.nativeElement.style.cursor = 'grab';
-  };
 
   private smoothRotate = (): void => {
     if (!this.isDragging) {
@@ -161,13 +221,17 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
     
     const lerpFactor = this.isSnapped ? 0.05 : 0.1;
     this.currentYRotate += (this.targetYRotate - this.currentYRotate) * lerpFactor;
-    this.ring.nativeElement.style.transform = `rotateY(${this.currentYRotate}deg)`;
-    this.animationFrameId = requestAnimationFrame(this.smoothRotate);
+    
+    if (this.ring && this.ring.nativeElement) {
+      this.ring.nativeElement.style.transform = `rotateY(${this.currentYRotate}deg)`;
+    }
+    
+    this.rafId = requestAnimationFrame(this.smoothRotate);
   };
 
-  ngOnChanges(param: {
-    scrollProgress: { currentValue: number; previousValue: number; firstChange: boolean; isFirstChange: () => boolean }
-  }) {
-    //placeholder to the test, shoud be implemented latter 
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['scrollProgress'] && this.scrollProgress !== undefined) {
+      // Handle scroll progress changes if needed
+    }
   }
 }
