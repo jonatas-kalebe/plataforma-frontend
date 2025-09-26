@@ -359,19 +359,7 @@ export class ScrollOrchestrationService {
     const direction = this.activeSectionTrigger.direction || 0;
     const sectionId = this.activeSectionTrigger.vars?.id;
 
-    if (this.intentionDetected.direction === 'forward' && progress > 0.2) {
-      const nextSectionElement = this.getNextSectionElement(sectionId);
-      if (nextSectionElement) {
-        gsapInstance.to(window, {
-          scrollTo: { y: nextSectionElement.offsetTop, autoKill: false },
-          ease: 'power2.inOut',
-          duration: 0.6
-        });
-        this.intentionDetected = { direction: null, at: 0 };
-        return;
-      }
-    }
-
+    // Snap forward when progress >= 85% 
     if (progress >= 0.85) {
       const nextSectionElement = this.getNextSectionElement(sectionId);
       if (nextSectionElement) {
@@ -385,7 +373,8 @@ export class ScrollOrchestrationService {
       }
     }
 
-    if ((progress <= 0.15 && direction < 0) || this.intentionDetected.direction === 'backward') {
+    // Snap backward when progress <= 15% and moving backward
+    if (progress <= 0.15 && direction < 0) {
       const prevSectionElement = this.getPrevSectionElement(sectionId);
       if (prevSectionElement) {
         gsapInstance.to(window, {
