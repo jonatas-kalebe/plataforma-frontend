@@ -200,24 +200,37 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       this.isDragging = false;
       ringEl.style.cursor = 'grab';
       
-      // Apply momentum/inertia effect
+      // Add haptic feedback for mobile (if supported)
+      if ('vibrate' in navigator && Math.abs(velocity) > 50) {
+        navigator.vibrate(10); // Short vibration for snapping
+      }
+      
+      // Apply momentum/inertia effect with improved physics
       if (Math.abs(velocity) > 10) {
         const startInertiaTime = performance.now();
         const startInertiaRotation = this.rotation.target;
+        const initialVelocity = velocity;
         
         const inertiaAnimation = () => {
           const elapsed = performance.now() - startInertiaTime;
           const progress = Math.min(elapsed / 1000, 1); // 1 second max
           
-          // Apply exponential decay to velocity
+          // Apply exponential decay to velocity with better curve
           velocity *= inertiaDecay;
           
-          if (Math.abs(velocity) > 1 && progress < 1) {
-            this.rotation.target += velocity * 0.016; // 60fps frame time
+          // Add slight easing curve for more natural feeling
+          const easedVelocity = velocity * (1 - progress * 0.3);
+          
+          if (Math.abs(easedVelocity) > 1 && progress < 1) {
+            this.rotation.target += easedVelocity * 0.016; // 60fps frame time
             animationId = requestAnimationFrame(inertiaAnimation);
           } else {
             // Snap to nearest card when inertia stops
             this.snapToNearestCard();
+            // Small haptic feedback for snap completion
+            if ('vibrate' in navigator && Math.abs(initialVelocity) > 100) {
+              navigator.vibrate(5);
+            }
             animationId = null;
           }
         };
@@ -306,6 +319,9 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
           // Apply momentum to rotation
           this.rotation.target = scrollRotation + (velocityFactor * 10);
           
+          // Dynamic radius based on velocity (as requested in requirements)
+          this.updateRadiusBasedOnVelocity(scrollVelocity);
+          
           // Implement magnetic snapping during scroll
           const cardAngle = 360 / 8; // 45 degrees per card
           const nearestCardProgress = Math.round(progress * 8) / 8; // Snap to 8th positions
@@ -317,6 +333,18 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
           }
         }
       });
+  }
+
+  private updateRadiusBasedOnVelocity(velocity: number): void {
+    // Slightly increase radius based on velocity (subtle effect)
+    const baseRadius = 200;
+    const velocityMultiplier = Math.min(velocity * 0.001, 0.2); // Cap at 20% increase
+    const dynamicRadius = baseRadius * (1 + velocityMultiplier);
+    
+    // Update CSS custom property for radius
+    if (this.ring?.nativeElement) {
+      this.ring.nativeElement.style.setProperty('--dynamic-radius', `${dynamicRadius}px`);
+    }
   }
 
   private initAnimation(): void {

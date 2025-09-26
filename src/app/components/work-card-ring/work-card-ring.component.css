@@ -24,7 +24,8 @@
 
 .work-card {
   --count: 8;
-  --radius: 200px; /* Match the radius in component (200px) */
+  --radius: 200px; /* Base radius */
+  --dynamic-radius: var(--radius); /* Dynamic radius (updated via JS) */
   position: absolute;
   top: 50%;
   left: 50%;
@@ -35,10 +36,14 @@
   margin-left: -120px; /* Half of width */
   
   /* FIXED: Proper 3D ring positioning - cards face outward from center */
+  /* Using dynamic radius that changes based on scroll velocity */
   transform: 
     rotateY(calc((360deg / var(--count)) * var(--i))) 
-    translateZ(var(--radius))
+    translateZ(var(--dynamic-radius))
     rotateY(180deg); /* Rotate 180deg to face outward */
+    
+  /* Smooth transition for radius changes */
+  transition: transform 0.1s ease-out;
 }
 
 .work-card-inner {
@@ -53,11 +58,47 @@
   font-size: 1.25rem;
   font-weight: 700;
   transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
   
   /* Enhanced neon effect */
   box-shadow: 
     0 0 10px rgba(100, 255, 218, 0.3),
     inset 0 0 10px rgba(100, 255, 218, 0.1);
+}
+
+/* Add subtle light trail effect */
+.work-card-inner::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent,
+    rgba(100, 255, 218, 0.1),
+    transparent
+  );
+  transform: rotate(45deg);
+  animation: lightTrail 4s linear infinite;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes lightTrail {
+  0% { 
+    transform: translateX(-100%) rotate(45deg);
+    opacity: 0;
+  }
+  50% { 
+    opacity: 0.3;
+  }
+  100% { 
+    transform: translateX(100%) rotate(45deg);
+    opacity: 0;
+  }
 }
 
 .work-card-inner:hover {
@@ -66,6 +107,10 @@
     0 0 20px rgba(100, 255, 218, 0.5),
     inset 0 0 15px rgba(100, 255, 218, 0.2);
   transform: scale(1.02);
+}
+
+.work-card-inner:hover::before {
+  animation-duration: 2s; /* Faster light trail on hover */
 }
 
 /* Mobile optimizations */
