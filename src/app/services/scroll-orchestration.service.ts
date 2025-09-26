@@ -347,7 +347,7 @@ export class ScrollOrchestrationService {
   }
 
   private detectScrollIntention(): void {
-    if (!this.activeSectionTrigger) return;
+    if (!this.activeSectionTrigger || this.prefersReducedMotion) return;
     
     const progress = this.activeSectionTrigger.progress || 0;
     const direction = this.activeSectionTrigger.direction || 0;
@@ -371,12 +371,17 @@ export class ScrollOrchestrationService {
   private checkMagneticSnap(): void {
     if (!this.activeSectionTrigger) return;
 
+    // Skip magnetic snapping if reduced motion is preferred
+    if (this.prefersReducedMotion) return;
+
     const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
     const progress = this.activeSectionTrigger.progress || 0;
     const direction = this.activeSectionTrigger.direction || 0;
     
     // Get velocity from ScrollTrigger if available, otherwise use our calculation
     const velocity = ScrollTriggerInstance.getVelocity ? ScrollTriggerInstance.getVelocity() : 0;
+    
+    console.log(`checkMagneticSnap: progress=${progress.toFixed(3)}, velocity=${velocity}, direction=${direction}`);
 
     // Clear existing snap timeout
     if (this.snapTimeoutId) {
@@ -385,7 +390,7 @@ export class ScrollOrchestrationService {
     }
 
     // Only snap when velocity is zero (user stopped scrolling)
-    if (velocity === 0) {
+    if (Math.abs(velocity) < 50) { // Use threshold instead of exact zero
       const delay = this.isMobile ? 150 : 100;
       this.snapTimeoutId = window.setTimeout(() => {
         this.performMagneticSnap();
