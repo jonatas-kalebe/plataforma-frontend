@@ -238,7 +238,7 @@ export class ScrollOrchestrationService {
       end: 'bottom bottom',
       onUpdate: (self: any) => {
         const currentScrollY = window.scrollY || 0;
-        const velocityRaw = (ScrollTriggerInstance as any).getVelocity?.() || 0;
+        const velocityRaw = Math.abs(currentScrollY - this.lastScrollY);
         const velocity = velocityRaw / 1000;
 
         if (currentScrollY > this.lastScrollY + 5) {
@@ -248,6 +248,8 @@ export class ScrollOrchestrationService {
         } else {
           this.scrollDirection = 'none';
         }
+        
+        // Update lastScrollY after velocity calculation
         this.lastScrollY = currentScrollY;
 
         const currentMetrics = this.metricsSubject.value;
@@ -277,7 +279,9 @@ export class ScrollOrchestrationService {
     if (!this.activeSectionTrigger) return;
 
     const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
-    const velocity = Math.abs(ScrollTriggerInstance.getVelocity?.() || 0);
+    
+    // Get velocity using the proper ScrollTrigger method
+    const velocity = Math.abs(this.lastScrollY - (window.scrollY || 0));
     const progress = this.activeSectionTrigger.progress;
     const direction = this.activeSectionTrigger.direction;
 
@@ -288,7 +292,7 @@ export class ScrollOrchestrationService {
     }
 
     // Only snap when velocity is near zero (user stopped scrolling)
-    if (velocity < 50) { // Increased threshold for more responsive snapping
+    if (velocity < 5) { // Lower threshold since we're using position delta
       const delay = this.isMobile ? 150 : 100; // Longer delay for mobile
       this.snapTimeoutId = window.setTimeout(() => {
         this.performMagneticSnap();
