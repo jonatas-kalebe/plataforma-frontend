@@ -50,7 +50,8 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       this.checkReducedMotion();
       // GSAP is already registered globally, just make sure the service can access it
       
-      this.scrollService.initialize();
+      // Temporarily disable scroll service to debug hero behavior
+      // this.scrollService.initialize();
 
       this.scrollService.scrollState$
         .pipe(takeUntil(this.destroy$))
@@ -114,6 +115,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         end: 'bottom top',
         onUpdate: self => {
           const progress = self.progress;
+          console.log('Hero ScrollTrigger progress:', progress, 'scroll:', window.scrollY);
           let yMultiplier, opacityMultiplier;
           
           if (progress <= 0.2) {
@@ -126,6 +128,8 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
             yMultiplier = acceleratedProgress;
             opacityMultiplier = acceleratedProgress;
           }
+          
+          console.log('Applying yMultiplier:', yMultiplier, 'for progress:', progress);
           
           // Apply transforms
           gsap.set('#hero-title', { 
