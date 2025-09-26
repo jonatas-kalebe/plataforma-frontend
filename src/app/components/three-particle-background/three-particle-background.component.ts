@@ -29,7 +29,7 @@ interface Shockwave {
 export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestroy {
   private readonly platformId = inject(PLATFORM_ID);
   @Input() scrollState: ScrollState | null = null;
-  
+
   private scene!: THREE.Scene;
   private camera!: THREE.PerspectiveCamera;
   private renderer!: THREE.WebGLRenderer;
@@ -68,7 +68,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   ngAfterViewInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
-    
+
     this.ngZone.runOutsideAngular(() => {
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
       if (mediaQuery.matches) this.prefersReducedMotion = true;
@@ -86,7 +86,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   ngOnDestroy(): void {
     if (!isPlatformBrowser(this.platformId)) return;
-    
+
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     window.removeEventListener('resize', this.onWindowResize);
     window.removeEventListener('click', this.tryEnableGyro as any);
@@ -253,10 +253,10 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     const useGyro = this.gyroEnabled && !this.isTouching;
     if (useGyro) this.parallaxTarget.lerp(this.gyroParallaxTarget, 0.12);
     this.parallaxCurrent.lerp(this.parallaxTarget, 0.08);
-    
+
     const scrollVelocityModulator = this.scrollState ? Math.min(this.scrollState.velocity * 2, 1) : 0;
     const progressModulator = this.scrollState ? this.scrollState.globalProgress : 0;
-    
+
     if (this.isMobile) {
       this.camera.position.x = -this.parallaxCurrent.x * (12 + scrollVelocityModulator * 3);
       this.camera.position.y = this.parallaxCurrent.y * (15 + scrollVelocityModulator * 2);
@@ -276,13 +276,13 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       this.baseSpinX += 0.00005 + scrollVelocityModulator * 0.00003;
       this.particles.rotation.x = this.baseSpinX + this.accumPitch * this.gyroSpinGain * 0.5;
     }
-    
+
     if (this.particles.material && 'opacity' in this.particles.material) {
       const baseOpacity = 0.6;
       const scrollOpacityBoost = progressModulator * 0.2;
       (this.particles.material as any).opacity = Math.min(baseOpacity + scrollOpacityBoost, 0.8);
     }
-    
+
     this.accumulator += dt;
     let sub = 0;
     while (this.accumulator >= this.dtFixed && sub < 3) {
@@ -344,5 +344,9 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       positions[i + 2] += v[i + 2];
     }
     (this.particles.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+  }
+
+  ngOnInit() {
+    //placeholder para implementacao futura
   }
 }

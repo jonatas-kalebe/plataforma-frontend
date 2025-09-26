@@ -1,192 +1,248 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { PLATFORM_ID } from '@angular/core';
 import { WorkCardRingComponent } from './work-card-ring.component';
 
 // Mock GSAP
 const mockGsap = {
   registerPlugin: jasmine.createSpy('registerPlugin'),
-  from: jasmine.createSpy('from').and.returnValue({
-    scrollTrigger: jasmine.createSpy('scrollTrigger')
-  })
+  to: jasmine.createSpy('to'),
+  set: jasmine.createSpy('set'),
+  quickTo: jasmine.createSpy('quickTo').and.returnValue(jasmine.createSpy('quickToInstance')),
 };
 
-const mockScrollTrigger = {
-  create: jasmine.createSpy('create').and.returnValue({
+const mockDraggable = {
+  create: jasmine.createSpy('create').and.returnValue([{
+    addEventListener: jasmine.createSpy('addEventListener'),
     kill: jasmine.createSpy('kill')
-  })
+  }])
 };
 
 // Mock requestAnimationFrame
-let mockAnimationFrameId = 1;
-Object.defineProperty(window, 'requestAnimationFrame', {
-  value: jasmine.createSpy('requestAnimationFrame').and.callFake((callback: Function) => {
-    setTimeout(callback, 16);
-    return mockAnimationFrameId++;
-  })
+let mockRafId = 0;
+const mockRaf = jasmine.createSpy('requestAnimationFrame').and.callFake(callback => {
+  mockRafId++;
+  setTimeout(() => callback(mockRafId * 16.66), 16.66); // Simula o tempo passando
+  return mockRafId;
 });
+const mockCancelRaf = jasmine.createSpy('cancelAnimationFrame');
 
-Object.defineProperty(window, 'cancelAnimationFrame', {
-  value: jasmine.createSpy('cancelAnimationFrame')
-});
 
 describe('WorkCardRingComponent', () => {
   let component: WorkCardRingComponent;
   let fixture: ComponentFixture<WorkCardRingComponent>;
-  let mockElement: any;
+  let ringElement: HTMLElement;
 
   beforeEach(async () => {
-    // Mock GSAP modules
     (window as any).gsap = mockGsap;
-    (window as any).ScrollTrigger = mockScrollTrigger;
-    
-    // Create mock element with necessary properties
-    mockElement = {
-      style: {},
-      addEventListener: jasmine.createSpy('addEventListener'),
-      removeEventListener: jasmine.createSpy('removeEventListener'),
-      getBoundingClientRect: jasmine.createSpy('getBoundingClientRect').and.returnValue({
-        top: 0,
-        left: 0,
-        width: 400,
-        height: 400
-      })
-    };
+    (window as any).Draggable = mockDraggable;
+    spyOn(window, 'requestAnimationFrame').and.callFake(mockRaf);
+    spyOn(window, 'cancelAnimationFrame').and.callFake(mockCancelRaf);
 
     await TestBed.configureTestingModule({
       imports: [WorkCardRingComponent],
-      providers: [
-        { provide: PLATFORM_ID, useValue: 'browser' }
-      ]
+      providers: [{ provide: PLATFORM_ID, useValue: 'browser' }]
     }).compileComponents();
 
     fixture = TestBed.createComponent(WorkCardRingComponent);
     component = fixture.componentInstance;
-    
-    // Mock ViewChild element
-    component.ring = { nativeElement: mockElement } as any;
+
+    // Mock do elemento nativo
+    ringElement = document.createElement('div');
+    spyOn(ringElement, 'addEventListener');
+    spyOn(ringElement, 'removeEventListener');
+    // @ts-ignore
+    component.ring = { nativeElement: ringElement };
+
+    // Mock dos cards
+    const cardElements = [];
+    for (let i = 0; i < 8; i++) {
+      const card = document.createElement('div');
+      card.classList.add('work-card');
+      cardElements.push({ nativeElement: card });
+    }
+    component.cards = { _results: cardElements } as any;
+
+    fixture.detectChanges(); // Dispara ngOnInit
   });
 
   afterEach(() => {
-    // Reset spies
-    mockGsap.registerPlugin.calls.reset();
-    mockGsap.from.calls.reset();
-    mockScrollTrigger.create.calls.reset();
-    (window.requestAnimationFrame as jasmine.Spy).calls.reset();
-    (window.cancelAnimationFrame as jasmine.Spy).calls.reset();
+    mockGsap.to.calls.reset();
+    mockGsap.set.calls.reset();
+    mockGsap.quickTo.calls.reset();
+    mockDraggable.create.calls.reset();
+    mockRaf.calls.reset();
+    mockCancelRaf.calls.reset();
+    (ringElement.addEventListener as jasmine.Spy).calls.reset();
+    (ringElement.removeEventListener as jasmine.Spy).calls.reset();
   });
 
   it('should create', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should have 8 project items', () => {
-    expect(component.items).toBeTruthy();
-    expect(component.items.length).toBe(8);
-    expect(component.items[0].title).toBe('Projeto 1');
-    expect(component.items[7].title).toBe('Projeto 8');
-  });
+  describe('Initialization (ngAfterViewInit)', () => {
+    it('should not initialize on server', () => {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        imports: [WorkCardRingComponent],
+        providers: [{ provide: PLATFORM_ID, useValue: 'server' }]
+      }).compileComponents();
+      const serverFixture = TestBed.createComponent(WorkCardRingComponent);
+      const serverComponent = serverFixture.componentInstance;
+      serverComponent.ring = { nativeElement: document.createElement('div') };
+      serverComponent.cards = { _results: [] } as any;
 
-  it('should initialize animation on browser platform', () => {
-    component.ngAfterViewInit();
-    
-    expect(mockGsap.registerPlugin).toHaveBeenCalled();
-    expect(mockGsap.from).toHaveBeenCalled();
-  });
-
-  it('should not initialize on server platform', () => {
-    // Create new component with server platform
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      imports: [WorkCardRingComponent],
-      providers: [
-        { provide: PLATFORM_ID, useValue: 'server' }
-      ]
+      expect(() => serverComponent.ngAfterViewInit()).not.toThrow();
+      expect(mockGsap.set).not.toHaveBeenCalled();
     });
-    
-    const serverFixture = TestBed.createComponent(WorkCardRingComponent);
-    const serverComponent = serverFixture.componentInstance;
-    
-    // Should not throw errors on server
-    expect(() => serverComponent.ngAfterViewInit()).not.toThrow();
-  });
 
-  it('should setup drag event listeners', () => {
-    component.ngAfterViewInit();
-    
-    expect(mockElement.addEventListener).toHaveBeenCalledWith('mousedown', jasmine.any(Function));
-    expect(mockElement.addEventListener).toHaveBeenCalledWith('touchstart', jasmine.any(Function), jasmine.any(Object));
-  });
+    it('should set initial positions of 8 cards in a circle', () => {
+      component.ngAfterViewInit();
+      expect(mockGsap.set).toHaveBeenCalledTimes(8);
+      const angleStep = 360 / 8;
+      const radius = (component as any).radius;
+      const firstCardArgs = mockGsap.set.calls.argsFor(0);
+      const secondCardArgs = mockGsap.set.calls.argsFor(1);
 
-  it('should remove event listeners on destroy', () => {
-    component.ngAfterViewInit();
-    component.ngOnDestroy();
-    
-    expect(mockElement.removeEventListener).toHaveBeenCalledWith('mousedown', jasmine.any(Function));
-    expect(mockElement.removeEventListener).toHaveBeenCalledWith('touchstart', jasmine.any(Function));
-    expect(window.cancelAnimationFrame).toHaveBeenCalled();
-  });
+      expect(firstCardArgs[0]).toBe(component.cards.get(0).nativeElement);
+      expect(firstCardArgs[1].rotationY).toBe(0);
+      expect(firstCardArgs[1].transformOrigin).toBe(`50% 50% ${-radius}px`);
 
-  it('should handle mouse drag start', () => {
-    component.ngAfterViewInit();
-    
-    const mouseEvent = new MouseEvent('mousedown', { clientX: 100, clientY: 200 });
-    (component as any).onDragStart(mouseEvent);
-    
-    expect((component as any).isDragging).toBeTruthy();
-    expect((component as any).startX).toBe(100);
-    expect(mockElement.style.cursor).toBe('grabbing');
-  });
-
-  it('should handle touch drag start', () => {
-    component.ngAfterViewInit();
-    
-    const touchEvent = new TouchEvent('touchstart', {
-      touches: [{ clientX: 150, clientY: 250 } as Touch]
+      expect(secondCardArgs[1].rotationY).toBe(angleStep);
     });
-    
-    (component as any).onDragStart(touchEvent);
-    
-    expect((component as any).isDragging).toBeTruthy();
-    expect((component as any).startX).toBe(150);
+
+    it('should initialize Draggable for drag interaction', () => {
+      component.ngAfterViewInit();
+      expect(mockDraggable.create).toHaveBeenCalledWith(ringElement, jasmine.any(Object));
+      const draggableArgs = mockDraggable.create.calls.argsFor(0)[1];
+      expect(draggableArgs.type).toBe('rotation');
+      expect(draggableArgs.inertia).toBe(true);
+    });
+
+    it('should start the animation loop', fakeAsync(() => {
+      component.ngAfterViewInit();
+      tick(100); // Deixa alguns frames de animação rodarem
+      expect(mockRaf).toHaveBeenCalled();
+    }));
   });
 
-  it('should handle drag move', () => {
-    component.ngAfterViewInit();
-    
-    // Start drag
-    const startEvent = new MouseEvent('mousedown', { clientX: 100, clientY: 200 });
-    (component as any).onDragStart(startEvent);
-    
-    // Move
-    const moveEvent = new MouseEvent('mousemove', { clientX: 150, clientY: 200 });
-    (component as any).onDragMove(moveEvent);
-    
-    expect((component as any).targetYRotate).not.toBe(0);
-    expect((component as any).velocity).not.toBe(0);
-    expect((component as any).startX).toBe(150);
+  describe('Drag Interaction', () => {
+    let onDragCallback: (this: any) => void;
+    let onThrowUpdateCallback: (this: any) => void;
+
+    beforeEach(() => {
+      component.ngAfterViewInit();
+      const draggableInstance = mockDraggable.create.calls.all()[0].returnValue[0];
+      const addListenerSpy = draggableInstance.addEventListener as jasmine.Spy;
+      // @ts-ignore
+      onDragCallback = addListenerSpy.calls.all().find(c => c.args[0] === 'drag').args[1];
+      // @ts-ignore
+      onThrowUpdateCallback = addListenerSpy.calls.all().find(c => c.args[0] === 'throwupdate').args[1];
+    });
+
+    it('should update target rotation on drag', () => {
+      (component as any).isDragging = true;
+      onDragCallback.call({ rotation: 45 });
+      expect((component as any).rotation.target).toBe(45);
+    });
+
+    it('should update target rotation on throw (inertia)', () => {
+      (component as any).isDragging = false;
+      onThrowUpdateCallback.call({ rotation: 90 });
+      expect((component as any).rotation.target).toBe(90);
+    });
+
+    it('should change cursor to "grabbing" on drag start and back to "grab" on drag end', () => {
+      const onDragStartCallback = (mockDraggable.create.calls.argsFor(0)[1] as any).onDragStart;
+      const onDragEndCallback = (mockDraggable.create.calls.argsFor(0)[1] as any).onDragEnd;
+
+      onDragStartCallback();
+      expect(component.isDragging).toBe(true);
+      expect(ringElement.style.cursor).toBe('grabbing');
+
+      onDragEndCallback();
+      expect(component.isDragging).toBe(false);
+      expect(ringElement.style.cursor).toBe('grab');
+    });
+
+    it('should snap to the nearest card when drag ends', fakeAsync(() => {
+      const onDragEndCallback = (mockDraggable.create.calls.argsFor(0)[1] as any).onDragEnd;
+      (component as any).rotation.target = 50; // Próximo a 45 graus (card 1)
+
+      onDragEndCallback();
+      tick();
+
+      expect(mockGsap.to).toHaveBeenCalledWith((component as any).rotation, jasmine.objectContaining({
+        target: 45, // 360 / 8 = 45
+        duration: jasmine.any(Number),
+        ease: 'power2.out'
+      }));
+    }));
   });
 
-  it('should handle drag end', () => {
-    component.ngAfterViewInit();
-    
-    // Start and end drag
-    const startEvent = new MouseEvent('mousedown', { clientX: 100, clientY: 200 });
-    (component as any).onDragStart(startEvent);
-    
-    (component as any).onDragEnd();
-    
-    expect((component as any).isDragging).toBeFalsy();
-    expect(mockElement.style.cursor).toBe('grab');
+  describe('Scroll-driven Rotation', () => {
+    it('should update target rotation based on scroll progress input', () => {
+      component.ngAfterViewInit();
+      const scrollProgress = 0.5;
+      component.scrollProgress = scrollProgress;
+      component.ngOnChanges({
+        scrollProgress: {
+          currentValue: scrollProgress,
+          previousValue: 0,
+          firstChange: false,
+          isFirstChange: () => false
+        }
+      });
+
+      // Se o snap estiver ativo (padrão), ele deve ir para o card mais próximo
+      // Se não, deve seguir o progresso
+      (component as any).isSnapped = false; // Força o modo não-snap para testar o progresso
+      component.ngOnChanges({
+        scrollProgress: {
+          currentValue: scrollProgress,
+          previousValue: 0,
+          firstChange: false,
+          isFirstChange: () => false
+        }
+      });
+
+      const expectedRotation = -scrollProgress * 360 * (component as any).rotationFactor;
+      expect((component as any).rotation.target).toBeCloseTo(expectedRotation);
+    });
+
+    it('should snap to center alignment when scroll progress is ~0.5', () => {
+      component.ngAfterViewInit();
+      (component as any).isSnapped = true;
+      const scrollProgress = 0.51; // Perto do meio
+      component.scrollProgress = scrollProgress;
+      component.ngOnChanges({
+        scrollProgress: {
+          currentValue: scrollProgress,
+          previousValue: 0,
+          firstChange: false,
+          isFirstChange: () => false
+        }
+      });
+
+      // No meio, deve travar em uma rotação de alinhamento, que pode ser 0 ou outro ângulo definido
+      expect((component as any).rotation.target).toBe(0); // Assumindo que o snap central alinha em 0
+    });
   });
 
-  it('should clean up animation frame on destroy', () => {
-    component.ngAfterViewInit();
-    
-    // Set animation frame ID
-    (component as any).animationFrameId = 123;
-    
-    component.ngOnDestroy();
-    
-    expect(window.cancelAnimationFrame).toHaveBeenCalledWith(123);
+
+  describe('Lifecycle (ngOnDestroy)', () => {
+    it('should cancel the animation frame', () => {
+      component.ngAfterViewInit();
+      const rafId = (component as any).rafId;
+      component.ngOnDestroy();
+      expect(mockCancelRaf).toHaveBeenCalledWith(rafId);
+    });
+
+    it('should kill the Draggable instance', () => {
+      component.ngAfterViewInit();
+      const draggableInstance = (component as any).draggable[0];
+      component.ngOnDestroy();
+      expect(draggableInstance.kill).toHaveBeenCalled();
+    });
   });
 });

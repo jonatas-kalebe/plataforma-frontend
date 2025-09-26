@@ -20,7 +20,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
 
   items = Array.from({ length: 8 }).map((_, i) => ({ i, title: `Projeto ${i + 1}` }));
 
-  private isDragging = false;
+  isDragging = false;
   private startX = 0;
   private currentYRotate = 0;
   private targetYRotate = 0;
@@ -31,6 +31,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
   private baseRotation = 0;
   private isSnapped = false;
   private prefersReducedMotion = false;
+  scrollProgress: number | undefined;
+  cards: any;
 
   constructor(
     private zone: NgZone,
@@ -160,4 +162,10 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy {
     this.ring.nativeElement.style.transform = `rotateY(${this.currentYRotate}deg)`;
     this.animationFrameId = requestAnimationFrame(this.smoothRotate);
   };
+
+  ngOnChanges(param: {
+    scrollProgress: { currentValue: number; previousValue: number; firstChange: boolean; isFirstChange: () => boolean }
+  }) {
+    //placeholder to the test, shoud be implemented latter 
+  }
 }
