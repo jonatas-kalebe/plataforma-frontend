@@ -29,7 +29,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private currentYRotate = 0;
   private targetYRotate = 0;
   private velocity = 0;
-  private animationFrameId: number | null = null;
+  private rafId: number | null = null;
   private destroy$ = new Subject<void>();
   private scrollRotationOffset = 0;
   private baseRotation = 0;
@@ -64,12 +64,14 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     if (this.draggable) {
       this.draggable[0].kill();
     }
-    if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+    }
   }
 
   private initializeCards(): void {
     // Handle both real QueryList and test mock
-    const cardElements = this.cards.toArray ? this.cards.toArray() : (this.cards as any)._results || [];
+    const cardElements = this.cards?.toArray ? this.cards.toArray() : (this.cards as any)?._results || [];
     const angleStep = 360 / cardElements.length;
     
     cardElements.forEach((card: any, index: number) => {
@@ -170,6 +172,11 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.scrollService.scrollState$
       .pipe(takeUntil(this.destroy$))
       .subscribe(state => {
+        // Defensive check for getSection method availability
+        if (typeof this.scrollService.getSection !== 'function') {
+          return;
+        }
+        
         const trabalhosSection = this.scrollService.getSection('trabalhos');
         if (trabalhosSection && !this.isDragging) {
           const progress = trabalhosSection.progress;
@@ -219,7 +226,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       this.ring.nativeElement.style.transform = `rotateY(${this.currentYRotate}deg)`;
     }
     
-    this.animationFrameId = requestAnimationFrame(this.smoothRotate);
+    this.rafId = requestAnimationFrame(this.smoothRotate);
   };
 
   ngOnChanges(changes: SimpleChanges) {
