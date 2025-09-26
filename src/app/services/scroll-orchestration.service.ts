@@ -79,8 +79,14 @@ export class ScrollOrchestrationService {
       const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
 
       gsapInstance.registerPlugin(ScrollTriggerInstance, ScrollToPlugin);
+      
+      // Initialize platform-specific settings
+      this.detectMobile();
+      this.checkReducedMotion();
+      
       this.lastScrollY = window.scrollY || 0;
       this.setupSections();
+      this.setupGlobalProgress();
       this.isInitialized = true;
     });
   }
@@ -291,13 +297,21 @@ export class ScrollOrchestrationService {
 
       if (currentScrollY >= sectionTop && currentScrollY < sectionBottom) {
         const sectionProgress = (currentScrollY - sectionTop) / sectionHeight;
-        this.activeSectionTrigger = {
-          progress: sectionProgress,
-          direction: this.scrollDirection === 'down' ? 1 : (this.scrollDirection === 'up' ? -1 : 0),
-          vars: { id: sectionId },
-          start: sectionTop,
-          end: sectionBottom
-        };
+        
+        // Update existing activeSectionTrigger or create new one
+        if (!this.activeSectionTrigger || this.activeSectionTrigger.vars?.id !== sectionId) {
+          this.activeSectionTrigger = {
+            progress: sectionProgress,
+            direction: this.scrollDirection === 'down' ? 1 : (this.scrollDirection === 'up' ? -1 : 0),
+            vars: { id: sectionId },
+            start: sectionTop,
+            end: sectionBottom
+          };
+        } else {
+          // Update existing trigger with new progress and direction
+          this.activeSectionTrigger.progress = sectionProgress;
+          this.activeSectionTrigger.direction = this.scrollDirection === 'down' ? 1 : (this.scrollDirection === 'up' ? -1 : 0);
+        }
         break;
       }
     }
@@ -317,21 +331,42 @@ export class ScrollOrchestrationService {
   }
 
   private checkMagneticSnap(): void {
-    if (!this.activeSectionTrigger) return;
-    if (this.prefersReducedMotion) return;
+    if (!this.activeSectionTrigger) {
+      console.log('checkMagneticSnap: No activeSectionTrigger');
+      return;
+    }
+    if (this.prefersReducedMotion) {
+      console.log('checkMagneticSnap: Reduced motion enabled');
+      return;
+    }
 
     const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
 
     // ALTERAÇÃO: se seção ativa for "trabalhos" OU se qualquer trigger com pin estiver ativo, não fazer snap
     const activeId = this.scrollStateSubject.value.activeSection?.id;
-    if (activeId === 'trabalhos') return; // não snap durante pin de "trabalhos"
+    if (activeId === 'trabalhos') {
+      console.log('checkMagneticSnap: Skipping trabalhos section');
+      return; // não snap durante pin de "trabalhos"
+    }
     const anyPinnedActive = ScrollTriggerInstance.getAll().some((t: any) => t.pin && t.isActive);
-    if (anyPinnedActive) return;
+    if (anyPinnedActive) {
+      console.log('checkMagneticSnap: Pinned trigger active');
+      return;
+    }
 
     const progress = this.activeSectionTrigger.progress || 0;
     const direction = this.activeSectionTrigger.direction || 0;
+    const sectionId = this.activeSectionTrigger.vars?.id;
     // Use our own velocity tracking since ScrollTrigger.getVelocity() doesn't exist
     const currentVelocity = this.scrollStateSubject.value.velocity * 1000; // Convert to pixels per second
+
+    console.log('checkMagneticSnap:', {
+      progress: Math.round(progress * 100) + '%',
+      direction,
+      sectionId,
+      velocity: Math.round(currentVelocity) + 'px/s',
+      velocityLowEnough: Math.abs(currentVelocity) < 500
+    });
 
     if (this.snapTimeoutId) {
       clearTimeout(this.snapTimeoutId);
@@ -341,6 +376,7 @@ export class ScrollOrchestrationService {
     // Only snap when velocity is low (user has stopped or is scrolling slowly)
     if (Math.abs(currentVelocity) < 500) { // Increased threshold for more responsive snapping
       const delay = this.isMobile ? 250 : 100; // Reduced delay for quicker response
+      console.log('checkMagneticSnap: Setting timeout with delay', delay + 'ms');
       this.snapTimeoutId = window.setTimeout(() => {
         this.performMagneticSnap();
       }, delay);
@@ -348,21 +384,36 @@ export class ScrollOrchestrationService {
   }
 
   private performMagneticSnap(): void {
-    if (!this.activeSectionTrigger) return;
+    if (!this.activeSectionTrigger) {
+      console.log('performMagneticSnap: No activeSectionTrigger');
+      return;
+    }
 
     const activeId = this.scrollStateSubject.value.activeSection?.id;
     // ALTERAÇÃO: proteção extra
-    if (activeId === 'trabalhos') return;
+    if (activeId === 'trabalhos') {
+      console.log('performMagneticSnap: Skipping trabalhos section');
+      return;
+    }
 
     const gsapInstance = (window as any).gsap || gsap;
     const progress = this.activeSectionTrigger.progress || 0;
     const direction = this.activeSectionTrigger.direction || 0;
     const sectionId = this.activeSectionTrigger.vars?.id;
 
+    console.log('performMagneticSnap:', {
+      progress: Math.round(progress * 100) + '%',
+      direction,
+      sectionId,
+      threshold85: progress >= 0.85,
+      threshold15: progress <= 0.15
+    });
+
     // Snap forward when progress >= 85% 
     if (progress >= 0.85) {
       const nextSectionElement = this.getNextSectionElement(sectionId);
       if (nextSectionElement) {
+        console.log('performMagneticSnap: Snapping forward to', nextSectionElement.id, 'at position', nextSectionElement.offsetTop);
         gsapInstance.to(window, {
           scrollTo: { y: nextSectionElement.offsetTop, autoKill: false },
           ease: 'power2.inOut',
@@ -377,6 +428,7 @@ export class ScrollOrchestrationService {
     if (progress <= 0.15 && direction < 0) {
       const prevSectionElement = this.getPrevSectionElement(sectionId);
       if (prevSectionElement) {
+        console.log('performMagneticSnap: Snapping backward to', prevSectionElement.id, 'at position', prevSectionElement.offsetTop);
         gsapInstance.to(window, {
           scrollTo: { y: prevSectionElement.offsetTop, autoKill: false },
           ease: 'power2.inOut',
