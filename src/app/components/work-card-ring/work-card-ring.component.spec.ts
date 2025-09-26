@@ -12,11 +12,26 @@ const mockScrollOrchestrationService = {
     activeSection: 0,
     direction: 'none'
   }),
+  metrics$: new BehaviorSubject({
+    globalProgress: 0,
+    velocity: 0,
+    activeSection: 0,
+    sections: []
+  }),
   getSection: jasmine.createSpy('getSection').and.returnValue({
     id: 'trabalhos',
     progress: 0,
     isActive: false
-  })
+  }),
+  getScrollState: jasmine.createSpy('getScrollState').and.returnValue({
+    globalProgress: 0,
+    velocity: 0,
+    activeSection: 0,
+    direction: 'none'
+  }),
+  scrollToSection: jasmine.createSpy('scrollToSection'),
+  initialize: jasmine.createSpy('initialize'),
+  destroy: jasmine.createSpy('destroy')
 };
 
 // Mock GSAP
