@@ -1,3 +1,18 @@
 .shadow-glow {
   box-shadow: 0 0 30px rgba(100, 255, 218, 0.25);
 }
+
+#scroll-hint {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.7;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-5px);
+  }
+}

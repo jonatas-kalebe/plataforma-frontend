@@ -15,14 +15,14 @@ export interface ScrollSection {
 export interface ScrollMetrics {
   globalProgress: number;
   velocity: number;
-  activeSection: number;
+  activeSection: ScrollSection | null;
   sections: ScrollSection[];
 }
 
 export interface ScrollState {
   globalProgress: number;
   velocity: number;
-  activeSection: number;
+  activeSection: ScrollSection | null;
   direction: 'up' | 'down' | 'none';
 }
 
@@ -47,14 +47,14 @@ export class ScrollOrchestrationService {
   private metricsSubject = new BehaviorSubject<ScrollMetrics>({
     globalProgress: 0,
     velocity: 0,
-    activeSection: 0,
+    activeSection: null,
     sections: []
   });
 
   private scrollStateSubject = new BehaviorSubject<ScrollState>({
     globalProgress: 0,
     velocity: 0,
-    activeSection: 0,
+    activeSection: null,
     direction: 'none'
   });
 
@@ -355,15 +355,16 @@ export class ScrollOrchestrationService {
   private setActiveSection(index: number): void {
     const currentMetrics = this.metricsSubject.value;
     const currentScrollState = this.scrollStateSubject.value;
+    const activeSection = currentMetrics.sections[index] || null;
 
     this.metricsSubject.next({
       ...currentMetrics,
-      activeSection: index
+      activeSection: activeSection
     });
 
     this.scrollStateSubject.next({
       ...currentScrollState,
-      activeSection: index
+      activeSection: activeSection
     });
   }
 
@@ -382,6 +383,10 @@ export class ScrollOrchestrationService {
   getSection(id: string): ScrollSection | undefined {
     const sections = this.metricsSubject.value.sections || [];
     return sections.find(section => section.id === id);
+  }
+
+  getMetrics(): ScrollMetrics {
+    return this.metricsSubject.value;
   }
 
   getScrollState(): ScrollState {

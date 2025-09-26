@@ -50,8 +50,8 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       this.checkReducedMotion();
       // GSAP is already registered globally, just make sure the service can access it
       
-      // Temporarily disable scroll service to debug hero behavior
-      // this.scrollService.initialize();
+      // Initialize scroll orchestration service
+      this.scrollService.initialize();
 
       this.scrollService.scrollState$
         .pipe(takeUntil(this.destroy$))
