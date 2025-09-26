@@ -1,0 +1,32 @@
+#trabalhos {
+  background: linear-gradient(135deg, var(--athenity-blue-deep) 0%, rgba(10, 25, 47, 0.98) 100%);
+}
+
+.pin-container {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.8s ease;
+}
+
+.pin-container.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.trabalhos-showcase {
+  opacity: 0;
+  transform: scale(0.95);
+  transition: all 1s ease 0.2s;
+}
+
+.trabalhos-showcase.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .pin-container {
+    padding: 0 1rem;
+  }
+}

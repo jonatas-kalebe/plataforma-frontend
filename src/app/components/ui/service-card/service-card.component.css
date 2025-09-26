@@ -1,0 +1,14 @@
+.service-card {
+  transition-duration: var(--hover-duration, 0.3s);
+  transition-timing-function: ease;
+}
+
+.service-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 0 20px rgba(100, 255, 218, 0.3);
+  border-color: rgba(100, 255, 218, 0.6);
+}
+
+.service-card:hover h4 {
+  color: #64FFDA;
+}

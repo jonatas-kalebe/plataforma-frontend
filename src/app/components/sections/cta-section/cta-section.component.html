@@ -1,0 +1,53 @@
+<section 
+  id="cta" 
+  class="w-full h-screen flex items-center px-6"
+  [attr.data-testid]="testId">
+  
+  <div class="max-w-4xl mx-auto text-center w-full">
+    
+    <!-- Main CTA Title -->
+    <h2 
+      class="text-4xl md:text-5xl font-extrabold text-athenity-text-title font-heading cta-title"
+      [attr.data-testid]="'cta-title'">
+      {{ title }}
+    </h2>
+
+    <!-- Optional Subtitle -->
+    <p *ngIf="subtitle" 
+       class="mt-6 text-lg md:text-xl text-athenity-text-body leading-relaxed cta-subtitle"
+       [attr.data-testid]="'cta-subtitle'">
+      {{ subtitle }}
+    </p>
+
+    <!-- CTA Buttons Container -->
+    <div class="cta-buttons mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center"
+         [attr.data-testid]="'cta-buttons'">
+      
+      <!-- Primary CTA Button -->
+      <a 
+        [href]="primaryCta.href"
+        class="bg-athenity-gold text-athenity-blue-deep font-bold py-4 px-8 rounded-xl text-lg hover:opacity-90 transition transform hover:scale-[1.03] shadow-glow"
+        (click)="onPrimaryCtaClick($event)">
+        {{ primaryCta.label }}
+      </a>
+
+      <!-- Secondary CTA Button (optional) -->
+      <a *ngIf="secondaryCta"
+        [href]="secondaryCta.href"
+        class="border border-athenity-green-circuit text-athenity-green-circuit font-bold py-4 px-8 rounded-xl text-lg hover:bg-athenity-green-circuit hover:text-athenity-blue-deep transition transform hover:scale-[1.03]"
+        (click)="onSecondaryCtaClick($event)">
+        {{ secondaryCta.label }}
+      </a>
+    </div>
+
+    <!-- Optional Additional Content -->
+    <div *ngIf="showAdditionalContent" class="mt-12">
+      <ng-content select="[slot=additional-content]"></ng-content>
+    </div>
+
+    <!-- Optional Footer Content -->
+    <div *ngIf="showFooterContent" class="mt-16 pt-8 border-t border-athenity-text-body/20">
+      <ng-content select="[slot=footer-content]"></ng-content>
+    </div>
+  </div>
+</section>

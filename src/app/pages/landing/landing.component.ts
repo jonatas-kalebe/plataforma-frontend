@@ -7,6 +7,11 @@ import { WorkCardRingComponent } from '../../components/work-card-ring/work-card
 import {
   ThreeParticleBackgroundComponent
 } from '../../components/three-particle-background/three-particle-background.component';
+
+// Import section components
+import { HeroSectionComponent } from '../../components/sections/hero-section/hero-section.component';
+import { FilosofiaSectionComponent } from '../../components/sections/filosofia-section/filosofia-section.component';
+
 import { ScrollOrchestrationService, ScrollState } from '../../services/scroll-orchestration.service';
 import { Subject, takeUntil } from 'rxjs';
 
@@ -21,8 +26,7 @@ gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 @Component({
   selector: 'app-landing',
   standalone: true,
-  // ADICIONA OS NOVOS COMPONENTES AOS IMPORTS
-  imports: [CommonModule, WorkCardRingComponent, ThreeParticleBackgroundComponent],
+  imports: [CommonModule, WorkCardRingComponent, ThreeParticleBackgroundComponent, HeroSectionComponent, FilosofiaSectionComponent],
   templateUrl: './landing.component.html',
   styleUrls: ['./landing.component.css']
 })
@@ -42,6 +46,34 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   public scrollState: ScrollState | null = null;
 
   constructor(private scrollService: ScrollOrchestrationService) {}
+
+  // Event handlers for section components
+  onHeroCta(event: Event): void {
+    // Handle CTA click - scroll to services section
+    this.scrollService.scrollToSection('servicos', 1);
+  }
+
+  onHeroSectionReady(heroBgRef: ElementRef): void {
+    // Store reference for animations if needed
+    console.log('Hero section ready:', heroBgRef);
+  }
+
+  onFilosofiaSectionReady(elementRef: ElementRef): void {
+    console.log('Filosofia section ready:', elementRef);
+  }
+
+  onKnotCanvasReady(canvas: HTMLCanvasElement): void {
+    console.log('Knot canvas ready:', canvas);
+    // The knot canvas animation is handled by the landing component
+    // We need to pass this canvas to the knot animation method
+    this.setupKnotCanvas(canvas);
+  }
+
+  private setupKnotCanvas(canvas: HTMLCanvasElement): void {
+    // Extract knot animation logic for use with component canvas
+    this.knotCanvas = new ElementRef(canvas);
+    this.initKnot();
+  }
 
   ngAfterViewInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;

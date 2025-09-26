@@ -1,0 +1,30 @@
+.filosofia-content {
+  opacity: 0;
+  transform: translateX(-30px);
+  transition: all 0.8s ease;
+}
+
+.filosofia-content.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.filosofia-animation {
+  opacity: 0;
+  transform: translateX(30px);
+  transition: all 0.8s ease 0.2s;
+}
+
+.filosofia-animation.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+#knotCanvas {
+  transition: all 0.3s ease;
+}
+
+#knotCanvas:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 32px rgba(100, 255, 218, 0.2);
+}

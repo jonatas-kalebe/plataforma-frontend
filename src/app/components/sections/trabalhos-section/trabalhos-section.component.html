@@ -1,0 +1,34 @@
+<section 
+  id="trabalhos" 
+  class="w-full h-screen flex items-center px-6"
+  [attr.data-testid]="testId">
+  
+  <div class="pin-container max-w-7xl mx-auto w-full">
+    
+    <!-- Section Header -->
+    <h3 class="text-3xl md:text-4xl font-extrabold text-center text-athenity-text-title font-heading">
+      {{ sectionTitle }}
+    </h3>
+    
+    <!-- Work Card Ring Component -->
+    <div class="trabalhos-showcase" [attr.data-testid]="'work-showcase'">
+      <app-work-card-ring
+        #workCardRing
+        (ringReady)="onRingReady($event)"
+        (cardSelected)="onCardSelected($event)">
+      </app-work-card-ring>
+    </div>
+
+    <!-- Interaction Hint -->
+    <div class="mt-6 text-center">
+      <div class="text-sm text-athenity-text-body/70">
+        {{ hintText }}
+      </div>
+    </div>
+
+    <!-- Optional additional content -->
+    <div *ngIf="showAdditionalContent" class="mt-8 text-center">
+      <ng-content select="[slot=additional-content]"></ng-content>
+    </div>
+  </div>
+</section>
