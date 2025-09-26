@@ -48,7 +48,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
     this.zone.runOutsideAngular(() => {
       this.checkReducedMotion();
-      // GSAP is already registered globally, just make sure the service can access it
 
       // Initialize the scroll orchestration service
       this.scrollService.initialize();
@@ -56,7 +55,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       this.scrollService.scrollState$
         .pipe(takeUntil(this.destroy$))
         .subscribe(state => {
-          // Use setTimeout to avoid ExpressionChangedAfterItHasBeenCheckedError
           setTimeout(() => {
             this.scrollState = state;
           });
@@ -96,7 +94,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   }
 
   private initHeroTimeline(): void {
-    // Initial entrance animation (non-scroll based)
     const tl = gsap.timeline({
       defaults: { ease: this.prefersReducedMotion ? 'none' : 'power3.out', duration: this.prefersReducedMotion ? 0.3 : 1 }
     });
@@ -107,7 +104,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
     this.timelines.push(tl);
 
-    // Custom scroll-based animation with elastic resistance e thresholds
     if (!this.prefersReducedMotion) {
       const heroScrollTrigger = ScrollTrigger.create({
         trigger: '#hero',
@@ -116,14 +112,12 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         scrub: 1,
         onUpdate: self => {
           const progress = self.progress;
-          // Parallax e resistência inicial até 20%, aceleração após
           let yMultiplier, opacityMultiplier;
           if (progress <= 0.2) {
-            // Stronger resistance in first 20% - limit movement to ~50px max
-            yMultiplier = progress * 0.5; // Reduced from 0.8 to 0.5
-            opacityMultiplier = progress * 0.2; // Reduced from 0.3 to 0.2
+            yMultiplier = progress * 0.5;
+            opacityMultiplier = progress * 0.2;
           } else {
-            const acceleratedProgress = 0.1 + (progress - 0.2) * 1.2; // Accelerated movement after 20%
+            const acceleratedProgress = 0.1 + (progress - 0.2) * 1.2;
             yMultiplier = Math.min(1.0, acceleratedProgress);
             opacityMultiplier = (progress - 0.2) * 2.0 + 0.04;
           }
@@ -139,13 +133,11 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
             y: 20 * yMultiplier,
             opacity: Math.max(1 - opacityMultiplier * 0.4, 0.6)
           });
-          // Feedback visual: fade-out ao cruzar 85%, fade-in ao voltar (<15%)
           if (progress >= 0.85) {
             gsap.to('#hero-title, #hero-subtitle, #hero-cta', { opacity: 0, duration: 0.3, ease: 'power2.in' });
           } else if (progress <= 0.15) {
             gsap.to('#hero-title, #hero-subtitle, #hero-cta', { opacity: 1, duration: 0.3, ease: 'power2.out' });
           }
-          // Integrar partículas: ripple ao cruzar 85% (transição), resposta à velocidade
           if (progress >= 0.85 && this.particleBackground) {
             this.particleBackground.triggerRipple();
           }
@@ -221,8 +213,8 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         start: 'top center',
         end: 'bottom center',
         ...(this.prefersReducedMotion ? { toggleActions: 'play none none reverse' } : {
-          scrub: 1,
-          pin: true
+          // ALTERAÇÃO: remover pin aqui (pin é feito no serviço para evitar conflito)
+          scrub: 1
         })
       }
     });
@@ -312,8 +304,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     const knotTl = gsap.timeline({
       scrollTrigger: {
         trigger: '#filosofia',
-        // Começa quando a seção entra na viewport e termina quando o centro da seção
-        // encontra o centro da tela — a linha fica reta exatamente no meio da tela.
         start: 'top bottom',
         end: this.prefersReducedMotion ? 'top bottom' : 'center center',
         ...(this.prefersReducedMotion ? { toggleActions: 'play none none reverse' } : { scrub: 1 })
@@ -323,7 +313,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     knotTl.to({ val: 0 }, {
       val: 1,
       duration: this.prefersReducedMotion ? 0.3 : 1.5,
-      ease: 'none', // linear com o scroll para sincronizar perfeitamente o "reta no centro"
+      ease: 'none',
       onUpdate: function() {
         t = (this as any).targets()[0].val;
         draw();
