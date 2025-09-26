@@ -1,7 +1,6 @@
 <section 
   id="cta" 
   class="w-full h-screen flex items-center px-6"
-  [ngClass]="getSectionClasses()"
   [attr.data-testid]="testId">
   
   <div class="max-w-4xl mx-auto text-center w-full">
@@ -25,27 +24,20 @@
          [attr.data-testid]="'cta-buttons'">
       
       <!-- Primary CTA Button -->
-      <app-cta-button
-        [label]="primaryCta.label"
+      <a 
         [href]="primaryCta.href"
-        [variant]="primaryCta.variant || 'primary'"
-        [size]="primaryCta.size || 'lg'"
-        [customClass]="primaryButtonClass"
-        [testId]="'primary-cta-button'"
+        class="bg-athenity-gold text-athenity-blue-deep font-bold py-4 px-8 rounded-xl text-lg hover:opacity-90 transition transform hover:scale-[1.03] shadow-glow"
         (click)="onPrimaryCtaClick($event)">
-      </app-cta-button>
+        {{ primaryCta.label }}
+      </a>
 
       <!-- Secondary CTA Button (optional) -->
-      <app-cta-button
-        *ngIf="secondaryCta"
-        [label]="secondaryCta.label"
+      <a *ngIf="secondaryCta"
         [href]="secondaryCta.href"
-        [variant]="secondaryCta.variant || 'secondary'"
-        [size]="secondaryCta.size || 'lg'"
-        [customClass]="secondaryButtonClass"
-        [testId]="'secondary-cta-button'"
+        class="border border-athenity-green-circuit text-athenity-green-circuit font-bold py-4 px-8 rounded-xl text-lg hover:bg-athenity-green-circuit hover:text-athenity-blue-deep transition transform hover:scale-[1.03]"
         (click)="onSecondaryCtaClick($event)">
-      </app-cta-button>
+        {{ secondaryCta.label }}
+      </a>
     </div>
 
     <!-- Optional Additional Content -->

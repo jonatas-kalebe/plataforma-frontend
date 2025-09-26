@@ -34,24 +34,20 @@
 
     <!-- Call to Action -->
     <div id="hero-cta" class="mt-10" [attr.data-testid]="'hero-cta'">
-      <app-cta-button
-        [label]="ctaLabel"
+      <a 
         [href]="ctaHref"
-        variant="primary"
-        size="lg"
-        [testId]="'hero-cta-button'"
+        class="bg-athenity-gold text-athenity-blue-deep font-bold py-4 px-8 rounded-xl text-lg hover:opacity-90 transition transform hover:scale-[1.03] shadow-glow"
         (click)="onCtaClick($event)">
-      </app-cta-button>
+        {{ ctaLabel }}
+      </a>
     </div>
 
     <!-- Scroll Hint -->
-    <app-scroll-hint
-      [text]="scrollHintText"
-      position="bottom"
-      alignment="center"
-      [showArrow]="showScrollArrow"
-      [animate]="scrollHintAnimation"
-      [testId]="'hero-scroll-hint'">
-    </app-scroll-hint>
+    <div 
+      id="scroll-hint" 
+      class="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs uppercase tracking-widest text-athenity-text-body/70"
+      [attr.data-testid]="'hero-scroll-hint'">
+      {{ scrollHintText }}
+    </div>
   </div>
 </section>

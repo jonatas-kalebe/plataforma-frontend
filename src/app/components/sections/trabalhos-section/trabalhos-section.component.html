@@ -1,21 +1,15 @@
 <section 
   id="trabalhos" 
   class="w-full h-screen flex items-center px-6"
-  [ngClass]="getSectionClasses()"
   [attr.data-testid]="testId">
   
   <div class="pin-container max-w-7xl mx-auto w-full">
     
     <!-- Section Header -->
-    <app-section-header
-      [title]="sectionTitle"
-      [subtitle]="sectionSubtitle"
-      [size]="headerSize"
-      [alignment]="headerAlignment"
-      [showDivider]="showHeaderDivider"
-      [testId]="'trabalhos-header'">
-    </app-section-header>
-
+    <h3 class="text-3xl md:text-4xl font-extrabold text-center text-athenity-text-title font-heading">
+      {{ sectionTitle }}
+    </h3>
+    
     <!-- Work Card Ring Component -->
     <div class="trabalhos-showcase" [attr.data-testid]="'work-showcase'">
       <app-work-card-ring
@@ -27,15 +21,9 @@
 
     <!-- Interaction Hint -->
     <div class="mt-6 text-center">
-      <app-scroll-hint
-        [text]="hintText"
-        position="center"
-        alignment="center"
-        [showArrow]="false"
-        [animate]="hintAnimation"
-        [opacity]="hintOpacity"
-        [testId]="'trabalhos-hint'">
-      </app-scroll-hint>
+      <div class="text-sm text-athenity-text-body/70">
+        {{ hintText }}
+      </div>
     </div>
 
     <!-- Optional additional content -->

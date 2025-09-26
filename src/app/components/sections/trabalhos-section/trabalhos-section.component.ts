@@ -5,14 +5,13 @@
 
 import { Component, Input, Output, EventEmitter, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { SectionHeaderComponent, ScrollHintComponent } from '../../ui';
 import { WorkCardRingComponent } from '../../work-card-ring/work-card-ring.component';
 import { SECTION_IDS } from '../../../shared/constants';
 
 @Component({
   selector: 'app-trabalhos-section',
   standalone: true,
-  imports: [CommonModule, SectionHeaderComponent, ScrollHintComponent, WorkCardRingComponent],
+  imports: [CommonModule, WorkCardRingComponent],
   templateUrl: './trabalhos-section.component.html',
   styleUrls: ['./trabalhos-section.component.css']
 })

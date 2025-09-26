@@ -6,7 +6,6 @@
 import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ThreeParticleBackgroundComponent } from '../../three-particle-background/three-particle-background.component';
-import { CtaButtonComponent, ScrollHintComponent } from '../../ui';
 import { ScrollState } from '../../../services/scroll-orchestration.service';
 import { SECTION_IDS } from '../../../shared/constants';
 
@@ -15,9 +14,7 @@ import { SECTION_IDS } from '../../../shared/constants';
   standalone: true,
   imports: [
     CommonModule,
-    ThreeParticleBackgroundComponent,
-    CtaButtonComponent,
-    ScrollHintComponent
+    ThreeParticleBackgroundComponent
   ],
   templateUrl: './hero-section.component.html',
   styleUrls: ['./hero-section.component.css']
@@ -31,8 +28,6 @@ export class HeroSectionComponent implements AfterViewInit {
   @Input() ctaLabel: string = 'Explore Nosso Trabalho';
   @Input() ctaHref: string = '#servicos';
   @Input() scrollHintText: string = 'Scroll';
-  @Input() showScrollArrow: boolean = false;
-  @Input() scrollHintAnimation: 'none' | 'fade-in' | 'pulse' = 'fade-in';
   @Input() scrollState: ScrollState | null = null;
   @Input() testId: string = 'hero-section';
 
@@ -56,36 +51,5 @@ export class HeroSectionComponent implements AfterViewInit {
    */
   onCtaClick(event: Event): void {
     this.ctaClicked.emit(event);
-  }
-
-  /**
-   * Show hero content with animation
-   */
-  showContent(): void {
-    if (typeof document === 'undefined') return;
-
-    const title = document.getElementById('hero-title');
-    const subtitle = document.getElementById('hero-subtitle');
-    const cta = document.getElementById('hero-cta');
-
-    // Add visible classes for CSS animations
-    setTimeout(() => title?.classList.add('visible'), 100);
-    setTimeout(() => subtitle?.classList.add('visible'), 200);
-    setTimeout(() => cta?.classList.add('visible'), 300);
-  }
-
-  /**
-   * Hide hero content
-   */
-  hideContent(): void {
-    if (typeof document === 'undefined') return;
-
-    const title = document.getElementById('hero-title');
-    const subtitle = document.getElementById('hero-subtitle');
-    const cta = document.getElementById('hero-cta');
-
-    title?.classList.remove('visible');
-    subtitle?.classList.remove('visible');
-    cta?.classList.remove('visible');
   }
 }

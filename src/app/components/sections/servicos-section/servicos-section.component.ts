@@ -5,14 +5,13 @@
 
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { SectionHeaderComponent, ServiceCardComponent } from '../../ui';
 import { ServiceItem } from '../../../shared/types';
 import { SECTION_IDS } from '../../../shared/constants';
 
 @Component({
   selector: 'app-servicos-section',
   standalone: true,
-  imports: [CommonModule, SectionHeaderComponent, ServiceCardComponent],
+  imports: [CommonModule],
   templateUrl: './servicos-section.component.html',
   styleUrls: ['./servicos-section.component.css']
 })
