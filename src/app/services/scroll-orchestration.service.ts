@@ -37,6 +37,10 @@ export class ScrollOrchestrationService {
   private prefersReducedMotion = false;
   private lastScrollY = 0;
   private scrollDirection: 'up' | 'down' | 'none' = 'none';
+  
+  // Properties for magnetic snapping
+  private activeSectionTrigger: any = null;
+  private snapTimeoutId: number | null = null;
 
   private metricsSubject = new BehaviorSubject<ScrollMetrics>({
     globalProgress: 0,
@@ -67,7 +71,11 @@ export class ScrollOrchestrationService {
     }
 
     this.ngZone.runOutsideAngular(() => {
-      gsap.registerPlugin(ScrollTrigger);
+      // Use window versions for testing if available, otherwise use imports
+      const gsapInstance = (window as any).gsap || gsap;
+      const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
+      
+      gsapInstance.registerPlugin(ScrollTriggerInstance);
       this.lastScrollY = window.scrollY || 0;
       this.setupSections();
       this.isInitialized = true;
@@ -89,6 +97,9 @@ export class ScrollOrchestrationService {
   }
 
   private setupSections(): void {
+    const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
+    const gsapInstance = (window as any).gsap || gsap;
+    
     const sectionIds = ['#hero', '#filosofia', '#servicos', '#trabalhos', '#cta'];
     const sections: ScrollSection[] = [];
 
@@ -111,12 +122,25 @@ export class ScrollOrchestrationService {
         end: 'bottom top',
         onUpdate: (self: any) => {
           section.progress = self.progress;
+          // Update active section trigger progress if this is the active section
+          if (section.isActive && this.activeSectionTrigger?.vars?.id === section.id) {
+            this.activeSectionTrigger.progress = self.progress;
+            this.activeSectionTrigger.direction = self.direction || 1;
+          }
           this.updateMetrics();
         },
         onToggle: (self: any) => {
           section.isActive = self.isActive;
           if (self.isActive) {
             this.setActiveSection(index);
+            // Set this as the active section trigger for magnetic snapping
+            this.activeSectionTrigger = {
+              progress: self.progress,
+              direction: self.direction || 1,
+              vars: { id: section.id },
+              start: self.start,
+              end: self.end
+            };
           }
           this.updateMetrics();
         }
@@ -143,8 +167,57 @@ export class ScrollOrchestrationService {
         }
       };
 
-      const trigger = ScrollTrigger.create({ ...baseConfig, ...advancedConfig });
+      const trigger = ScrollTriggerInstance.create({ ...baseConfig, ...advancedConfig });
       this.scrollTriggers.push(trigger);
+
+      // Create special pinned trigger for trabalhos section
+      if (id === '#trabalhos') {
+        const pinTrigger = ScrollTriggerInstance.create({
+          id: 'trabalhos-pin',
+          trigger: '#trabalhos .pin-container',
+          pin: '#trabalhos .pin-container',
+          start: 'top top',
+          end: '+=100%'
+        });
+        this.scrollTriggers.push(pinTrigger);
+      }
+
+      // Create animation timelines for specific sections
+      if (id === '#hero') {
+        const heroTimeline = gsapInstance.timeline({
+          scrollTrigger: {
+            trigger: '#hero',
+            start: 'top top',
+            end: 'bottom top',
+            scrub: 1
+          }
+        });
+        // Store timeline for cleanup if needed
+      }
+
+      if (id === '#filosofia') {
+        const filosofiaTimeline = gsapInstance.timeline({
+          scrollTrigger: {
+            trigger: '#filosofia',
+            start: 'top center',
+            end: 'bottom top',
+            scrub: 1
+          }
+        });
+        // Store timeline for cleanup if needed
+      }
+
+      if (id === '#servicos') {
+        const servicosTimeline = gsapInstance.timeline({
+          scrollTrigger: {
+            trigger: '#servicos',
+            start: 'top bottom',
+            end: 'bottom top',
+            scrub: 1
+          }
+        });
+        // Store timeline for cleanup if needed
+      }
     });
 
     const currentMetrics = this.metricsSubject.value;
@@ -157,13 +230,16 @@ export class ScrollOrchestrationService {
   }
 
   private setupGlobalProgress(): void {
-    ScrollTrigger.create({
+    const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
+    
+    const globalTrigger = ScrollTriggerInstance.create({
+      id: 'global-progress',
       trigger: document.body,
       start: 'top top',
       end: 'bottom bottom',
-      onUpdate: (self) => {
+      onUpdate: (self: any) => {
         const currentScrollY = window.scrollY || 0;
-        const velocityRaw = (ScrollTrigger as any).getVelocity?.() || 0;
+        const velocityRaw = (ScrollTriggerInstance as any).getVelocity?.() || 0;
         const velocity = velocityRaw / 1000;
 
         if (currentScrollY > this.lastScrollY + 5) {
@@ -189,8 +265,87 @@ export class ScrollOrchestrationService {
           activeSection: currentMetrics.activeSection,
           direction: this.scrollDirection
         });
+
+        // Magnetic snapping logic
+        this.checkMagneticSnap();
       }
     });
+    
+    this.scrollTriggers.push(globalTrigger);
+  }
+
+  private checkMagneticSnap(): void {
+    if (!this.activeSectionTrigger) return;
+
+    const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
+    const velocity = ScrollTriggerInstance.getVelocity?.() || 0;
+    const progress = this.activeSectionTrigger.progress;
+    const direction = this.activeSectionTrigger.direction;
+
+    // Clear existing snap timeout
+    if (this.snapTimeoutId) {
+      clearTimeout(this.snapTimeoutId);
+      this.snapTimeoutId = null;
+    }
+
+    // Only snap when velocity is near zero (user stopped scrolling)
+    if (Math.abs(velocity) < 10) {
+      this.snapTimeoutId = window.setTimeout(() => {
+        this.performMagneticSnap();
+      }, 100);
+    }
+  }
+
+  private performMagneticSnap(): void {
+    if (!this.activeSectionTrigger) return;
+
+    const gsapInstance = (window as any).gsap || gsap;
+    const progress = this.activeSectionTrigger.progress;
+    const direction = this.activeSectionTrigger.direction;
+    const sectionId = this.activeSectionTrigger.vars?.id;
+
+    // Snap forward if progress > 85%
+    if (progress > 0.85 && direction === 1) {
+      const nextSectionElement = this.getNextSectionElement(sectionId);
+      if (nextSectionElement) {
+        gsapInstance.to(window, {
+          scrollTo: { y: nextSectionElement.offsetTop, autoKill: false },
+          ease: 'power2.inOut',
+          duration: 0.8
+        });
+      }
+    }
+    // Snap backward if progress < 15% 
+    else if (progress < 0.15 && direction === -1) {
+      const prevSectionElement = this.getPrevSectionElement(sectionId);
+      if (prevSectionElement) {
+        gsapInstance.to(window, {
+          scrollTo: { y: prevSectionElement.offsetTop, autoKill: false },
+          ease: 'power2.inOut',
+          duration: 0.8
+        });
+      }
+    }
+  }
+
+  private getNextSectionElement(currentSectionId: string): HTMLElement | null {
+    const sectionOrder = ['hero', 'filosofia', 'servicos', 'trabalhos', 'cta'];
+    const currentIndex = sectionOrder.indexOf(currentSectionId);
+    if (currentIndex >= 0 && currentIndex < sectionOrder.length - 1) {
+      const nextSectionId = sectionOrder[currentIndex + 1];
+      return document.querySelector(`#${nextSectionId}`) as HTMLElement;
+    }
+    return null;
+  }
+
+  private getPrevSectionElement(currentSectionId: string): HTMLElement | null {
+    const sectionOrder = ['hero', 'filosofia', 'servicos', 'trabalhos', 'cta'];
+    const currentIndex = sectionOrder.indexOf(currentSectionId);
+    if (currentIndex > 0) {
+      const prevSectionId = sectionOrder[currentIndex - 1];
+      return document.querySelector(`#${prevSectionId}`) as HTMLElement;
+    }
+    return null;
   }
 
   private setActiveSection(index: number): void {
@@ -214,13 +369,15 @@ export class ScrollOrchestrationService {
   }
 
   private updateAnimationSettings(): void {
-    ScrollTrigger.getAll().forEach(trigger => trigger.kill());
+    const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
+    ScrollTriggerInstance.getAll().forEach((trigger: any) => trigger.kill());
     this.scrollTriggers = [];
     this.setupSections();
   }
 
   getSection(id: string): ScrollSection | undefined {
-    return this.metricsSubject.value.sections.find(section => section.id === id);
+    const sections = this.metricsSubject.value.sections || [];
+    return sections.find(section => section.id === id);
   }
 
   getScrollState(): ScrollState {
@@ -230,9 +387,10 @@ export class ScrollOrchestrationService {
   scrollToSection(id: string, duration: number = 1): void {
     if (!isPlatformBrowser(this.platformId)) return;
 
+    const gsapInstance = (window as any).gsap || gsap;
     const element = document.querySelector(`#${id}`);
     if (element) {
-      gsap.to(window, {
+      gsapInstance.to(window, {
         duration: this.prefersReducedMotion ? 0.3 : duration,
         scrollTo: { y: element, offsetY: 0 },
         ease: this.prefersReducedMotion ? 'none' : 'power2.inOut'
@@ -242,10 +400,19 @@ export class ScrollOrchestrationService {
 
   destroy(): void {
     if (isPlatformBrowser(this.platformId)) {
+      const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
+      
+      // Clean up snap timeout
+      if (this.snapTimeoutId) {
+        clearTimeout(this.snapTimeoutId);
+        this.snapTimeoutId = null;
+      }
+      
       this.scrollTriggers.forEach(trigger => trigger.kill());
       this.scrollTriggers = [];
-      ScrollTrigger.killAll();
+      ScrollTriggerInstance.killAll();
       this.isInitialized = false;
+      this.activeSectionTrigger = null;
     }
   }
 }

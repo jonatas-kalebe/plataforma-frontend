@@ -2,12 +2,19 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { LandingComponent } from './landing.component';
 import { ScrollOrchestrationService } from '../../services/scroll-orchestration.service';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { BehaviorSubject } from 'rxjs';
 
 // Mock do serviço de orquestração de scroll
 const mockScrollOrchestrationService = {
   initialize: jasmine.createSpy('initialize'),
   destroy: jasmine.createSpy('destroy'),
-  scrollToSection: jasmine.createSpy('scrollToSection')
+  scrollToSection: jasmine.createSpy('scrollToSection'),
+  scrollState$: new BehaviorSubject({
+    globalProgress: 0,
+    velocity: 0,
+    activeSection: 0,
+    direction: 'none'
+  })
 };
 
 describe('LandingComponent', () => {
