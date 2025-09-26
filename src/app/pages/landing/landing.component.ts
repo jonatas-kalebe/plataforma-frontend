@@ -239,7 +239,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       }
     });
 
-    tl.from('#cta h3', {
+    tl.from('#cta h2', {
       opacity: 0,
       y: this.prefersReducedMotion ? 0 : 40,
       duration: this.prefersReducedMotion ? 0.3 : 0.8,

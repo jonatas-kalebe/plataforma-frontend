@@ -339,8 +339,8 @@ export class ScrollOrchestrationService {
     }
 
     // Only snap when velocity is low (user has stopped or is scrolling slowly)
-    if (Math.abs(currentVelocity) < 100) {
-      const delay = this.isMobile ? 250 : 150; // Slightly longer delay for better UX
+    if (Math.abs(currentVelocity) < 500) { // Increased threshold for more responsive snapping
+      const delay = this.isMobile ? 250 : 100; // Reduced delay for quicker response
       this.snapTimeoutId = window.setTimeout(() => {
         this.performMagneticSnap();
       }, delay);
