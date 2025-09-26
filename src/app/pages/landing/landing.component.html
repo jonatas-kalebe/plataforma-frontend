@@ -13,7 +13,7 @@
     <div id="hero-cta" class="mt-10">
       <a href="#servicos" class="bg-athenity-gold text-athenity-blue-deep font-bold py-4 px-8 rounded-xl text-lg hover:opacity-90 transition transform hover:scale-[1.03] shadow-glow">Explore Nosso Trabalho</a>
     </div>
-    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs uppercase tracking-widest text-athenity-text-body/70">Scroll</div>
+    <div id="scroll-hint" class="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs uppercase tracking-widest text-athenity-text-body/70 animate-bounce" data-testid="scroll-hint">Scroll</div>
   </div>
 </section>
 
@@ -50,10 +50,12 @@
 </section>
 
 <section id="trabalhos" class="w-full py-24 md:py-36 px-6 overflow-hidden">
-  <div class="max-w-7xl mx-auto">
-    <h3 class="text-3xl md:text-4xl font-extrabold text-center">Prova de Conceito</h3>
-    <app-work-card-ring></app-work-card-ring>
-    <div class="mt-6 text-center text-sm text-athenity-text-body/70">Arraste para girar</div>
+  <div class="pin-container">
+    <div class="max-w-7xl mx-auto">
+      <h3 class="text-3xl md:text-4xl font-extrabold text-center">Prova de Conceito</h3>
+      <app-work-card-ring></app-work-card-ring>
+      <div class="mt-6 text-center text-sm text-athenity-text-body/70">Arraste para girar</div>
+    </div>
   </div>
 </section>
 

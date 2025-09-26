@@ -1,6 +1,23 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { PLATFORM_ID } from '@angular/core';
 import { WorkCardRingComponent } from './work-card-ring.component';
+import { ScrollOrchestrationService } from '../../services/scroll-orchestration.service';
+import { BehaviorSubject } from 'rxjs';
+
+// Mock ScrollOrchestrationService
+const mockScrollOrchestrationService = {
+  scrollState$: new BehaviorSubject({
+    globalProgress: 0,
+    velocity: 0,
+    activeSection: 0,
+    direction: 'none'
+  }),
+  getSection: jasmine.createSpy('getSection').and.returnValue({
+    id: 'trabalhos',
+    progress: 0,
+    isActive: false
+  })
+};
 
 // Mock GSAP
 const mockGsap = {
@@ -40,7 +57,10 @@ describe('WorkCardRingComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [WorkCardRingComponent],
-      providers: [{ provide: PLATFORM_ID, useValue: 'browser' }]
+      providers: [
+        { provide: PLATFORM_ID, useValue: 'browser' },
+        { provide: ScrollOrchestrationService, useValue: mockScrollOrchestrationService }
+      ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(WorkCardRingComponent);

@@ -288,7 +288,8 @@ export class ScrollOrchestrationService {
   private checkMagneticSnap(): void {
     if (!this.activeSectionTrigger) return;
     
-    const velocity = (ScrollTrigger as any).getVelocity?.(window) || 0;
+    const scrollState = this.scrollStateSubject.value;
+    const velocity = scrollState.velocity || 0;
     const progress = this.activeSectionTrigger.progress;
     const direction = this.activeSectionTrigger.direction;
     
@@ -299,7 +300,7 @@ export class ScrollOrchestrationService {
     }
 
     // Only snap when velocity is near zero (user stopped scrolling)
-    if (Math.abs(velocity) < 10) {
+    if (Math.abs(velocity) < 0.01) {
       this.snapTimeoutId = window.setTimeout(() => {
         this.performMagneticSnap();
       }, 100);
