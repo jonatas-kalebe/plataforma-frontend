@@ -4,20 +4,21 @@ import { PLATFORM_ID } from '@angular/core';
 import { LoadingScreenComponent } from './loading-screen.component';
 
 // Mock GSAP
-const mockGsapTimeline = {
-  fromTo: jasmine.createSpy('fromTo').and.returnValue(mockGsapTimeline),
-  to: jasmine.createSpy('to').and.returnValue(mockGsapTimeline),
-  add: jasmine.createSpy('add').and.returnValue(mockGsapTimeline),
+const mockGsapTimeline: any = {
   play: jasmine.createSpy('play'),
   kill: jasmine.createSpy('kill'),
-  eventCallback: jasmine.createSpy('eventCallback').and.callFake((type, callback) => {
-    if (type === 'onComplete') {
-      (mockGsapTimeline as any)._onComplete = callback;
-    }
-    return mockGsapTimeline;
-  }),
   _onComplete: () => {} // Placeholder for the onComplete callback
 };
+
+mockGsapTimeline.fromTo = jasmine.createSpy('fromTo').and.returnValue(mockGsapTimeline);
+mockGsapTimeline.to = jasmine.createSpy('to').and.returnValue(mockGsapTimeline);
+mockGsapTimeline.add = jasmine.createSpy('add').and.returnValue(mockGsapTimeline);
+mockGsapTimeline.eventCallback = jasmine.createSpy('eventCallback').and.callFake((type, callback) => {
+  if (type === 'onComplete') {
+    mockGsapTimeline._onComplete = callback;
+  }
+  return mockGsapTimeline;
+});
 
 const mockGsap = {
   timeline: jasmine.createSpy('timeline').and.callFake((options: any) => {
