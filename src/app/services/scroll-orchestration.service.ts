@@ -297,7 +297,7 @@ export class ScrollOrchestrationService {
         
         this.activeSectionTrigger = {
           progress: sectionProgress,
-          direction: currentScrollY > this.lastScrollY ? 1 : -1,
+          direction: this.scrollDirection === 'down' ? 1 : (this.scrollDirection === 'up' ? -1 : 0),
           vars: { id: sectionId },
           start: sectionTop,
           end: sectionBottom
