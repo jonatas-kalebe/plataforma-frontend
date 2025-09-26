@@ -119,29 +119,29 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
           let yMultiplier, opacityMultiplier;
 
           if (progress <= 0.2) {
-            // Strong resistance for 0-20%: minimal movement
-            yMultiplier = progress * 0.3; // Very gentle movement
+            // Strong resistance for 0-20%: counter the scroll movement with positive transforms
+            yMultiplier = progress * 0.8; // Resistance that counteracts scroll
             opacityMultiplier = progress * 0.3; // Very gentle fade
           } else {
-            // Accelerate after 20%
-            const acceleratedProgress = 0.06 + (progress - 0.2) * 2.925; // Start from 0.06, accelerate
-            yMultiplier = acceleratedProgress;
-            opacityMultiplier = acceleratedProgress;
+            // Accelerate after 20% by reducing the counter-movement
+            const acceleratedProgress = 0.16 - (progress - 0.2) * 0.4; // Reduce resistance, then add movement
+            yMultiplier = Math.max(-1.0, acceleratedProgress); // Allow negative for acceleration
+            opacityMultiplier = (progress - 0.2) * 2.5 + 0.06; // Accelerate opacity change
           }
 
           console.log('Applying yMultiplier:', yMultiplier, 'for progress:', progress);
 
-          // Apply transforms
+          // Apply transforms - positive Y values to counteract downward scroll (create resistance)
           gsap.set('#hero-title', {
-            y: -50 * yMultiplier,
+            y: 50 * yMultiplier, // Positive Y to create upward resistance
             opacity: Math.max(1 - opacityMultiplier * 0.8, 0.2)
           });
           gsap.set('#hero-subtitle', {
-            y: -30 * yMultiplier,
+            y: 30 * yMultiplier,
             opacity: Math.max(1 - opacityMultiplier * 0.6, 0.4)
           });
           gsap.set('#hero-cta', {
-            y: -20 * yMultiplier,
+            y: 20 * yMultiplier,
             opacity: Math.max(1 - opacityMultiplier * 0.4, 0.6)
           });
         }
