@@ -37,9 +37,23 @@ const mockScrollOrchestrationService = {
 // Mock GSAP
 const mockGsap = {
   registerPlugin: jasmine.createSpy('registerPlugin'),
-  to: jasmine.createSpy('to'),
+  to: jasmine.createSpy('to').and.returnValue({}),
   set: jasmine.createSpy('set'),
   quickTo: jasmine.createSpy('quickTo').and.returnValue(jasmine.createSpy('quickToInstance')),
+  timeline: jasmine.createSpy('timeline').and.returnValue({
+    to: jasmine.createSpy('timelineTo'),
+    from: jasmine.createSpy('timelineFrom'),
+    set: jasmine.createSpy('timelineSet'),
+    kill: jasmine.createSpy('timelineKill')
+  }),
+  utils: {
+    toArray: jasmine.createSpy('toArray').and.callFake((selector: any) => {
+      if (typeof selector === 'string') {
+        return Array.from(document.querySelectorAll(selector));
+      }
+      return Array.isArray(selector) ? selector : [selector];
+    })
+  }
 };
 
 const mockDraggable = {
@@ -47,6 +61,15 @@ const mockDraggable = {
     addEventListener: jasmine.createSpy('addEventListener'),
     kill: jasmine.createSpy('kill')
   }])
+};
+
+// Mock ScrollTrigger
+const mockScrollTrigger = {
+  create: jasmine.createSpy('create').and.returnValue({
+    kill: jasmine.createSpy('kill')
+  }),
+  getAll: jasmine.createSpy('getAll').and.returnValue([]),
+  refresh: jasmine.createSpy('refresh')
 };
 
 // Mock requestAnimationFrame
@@ -67,6 +90,7 @@ describe('WorkCardRingComponent', () => {
   beforeEach(async () => {
     (window as any).gsap = mockGsap;
     (window as any).Draggable = mockDraggable;
+    (window as any).ScrollTrigger = mockScrollTrigger;
     spyOn(window, 'requestAnimationFrame').and.callFake(mockRaf);
     spyOn(window, 'cancelAnimationFrame').and.callFake(mockCancelRaf);
 
