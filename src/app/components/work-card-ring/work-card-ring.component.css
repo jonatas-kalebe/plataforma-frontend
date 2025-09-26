@@ -3,28 +3,41 @@
   display: grid;
   place-items: center;
   height: 420px;
+  width: 100%;
+  position: relative;
 }
 
 .ring {
   position: relative;
   transform-style: preserve-3d;
-  transition: transform 0.2s linear;
+  transition: none; /* Remove transition to avoid conflicts with custom drag */
   width: 320px;
   height: 320px;
   cursor: grab;
+  /* Ensure the ring maintains its 3D context */
+  transform-origin: 50% 50% 0;
+}
+
+.ring:active {
+  cursor: grabbing;
 }
 
 .work-card {
   --count: 8;
-  --radius: 420px;
+  --radius: 200px; /* Match the radius in component (200px) */
   position: absolute;
-  top: 0;
-  left: 0;
+  top: 50%;
+  left: 50%;
   width: 240px;
   height: 140px;
   transform-style: preserve-3d;
-
-  transform: rotateY(calc((360deg / var(--count)) * var(--i))) translateZ(var(--radius)) rotateY(-90deg);
+  margin-top: -70px; /* Half of height */
+  margin-left: -120px; /* Half of width */
+  
+  /* FIXED: Proper 3D ring positioning - cards face outward from center */
+  transform: 
+    rotateY(calc((360deg / var(--count)) * var(--i))) 
+    translateZ(var(--radius));
 }
 
 .work-card-inner {
@@ -33,9 +46,47 @@
   display: grid;
   place-items: center;
   background-color: #112240;
-  border: 1px solid #64FFDA;
+  border: 2px solid #64FFDA;
   color: #CCD6F6;
   border-radius: 1rem;
   font-size: 1.25rem;
   font-weight: 700;
+  transition: all 0.3s ease;
+  
+  /* Enhanced neon effect */
+  box-shadow: 
+    0 0 10px rgba(100, 255, 218, 0.3),
+    inset 0 0 10px rgba(100, 255, 218, 0.1);
+}
+
+.work-card-inner:hover {
+  border-color: #64FFDA;
+  box-shadow: 
+    0 0 20px rgba(100, 255, 218, 0.5),
+    inset 0 0 15px rgba(100, 255, 218, 0.2);
+  transform: scale(1.02);
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .ring-wrap {
+    height: 320px;
+  }
+  
+  .ring {
+    width: 260px;
+    height: 260px;
+  }
+  
+  .work-card {
+    --radius: 140px;
+    width: 200px;
+    height: 120px;
+    margin-top: -60px;
+    margin-left: -100px;
+  }
+  
+  .work-card-inner {
+    font-size: 1.1rem;
+  }
 }
