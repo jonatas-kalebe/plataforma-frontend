@@ -11,9 +11,7 @@ import {
 // Import section components
 import { HeroSectionComponent } from '../../components/sections/hero-section/hero-section.component';
 import { FilosofiaSectionComponent } from '../../components/sections/filosofia-section/filosofia-section.component';
-import { ServicosSectionComponent } from '../../components/sections/servicos-section/servicos-section.component';
-import { TrabalhosSectionComponent } from '../../components/sections/trabalhos-section/trabalhos-section.component';
-import { CtaSectionComponent } from '../../components/sections/cta-section/cta-section.component';
+
 import { ScrollOrchestrationService, ScrollState } from '../../services/scroll-orchestration.service';
 import { Subject, takeUntil } from 'rxjs';
 
@@ -28,32 +26,14 @@ gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 @Component({
   selector: 'app-landing',
   standalone: true,
-  imports: [CommonModule, WorkCardRingComponent, ThreeParticleBackgroundComponent, HeroSectionComponent, FilosofiaSectionComponent, ServicosSectionComponent, TrabalhosSectionComponent, CtaSectionComponent],
+  imports: [CommonModule, WorkCardRingComponent, ThreeParticleBackgroundComponent, HeroSectionComponent, FilosofiaSectionComponent],
   templateUrl: './landing.component.html',
   styleUrls: ['./landing.component.css']
 })
 export class LandingComponent implements AfterViewInit, OnDestroy {
-  // Configuration data
-  public servicesData = [
-    {
-      title: 'Aplicações Sob Medida',
-      description: 'Soluções web e mobile robustas e elegantes, moldadas pelo contexto do seu cliente.'
-    },
-    {
-      title: 'IA & Machine Learning',
-      description: 'Produtos inteligentes, dados acionáveis e automações que liberam valor real.'
-    },
-    {
-      title: 'Arquitetura em Nuvem',
-      description: 'Escalabilidade, observabilidade e segurança para crescer sem atrito.'
-    }
-  ];
-
   private readonly platformId = inject(PLATFORM_ID);
+  @ViewChild('knotCanvas', { static: true }) knotCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild(ThreeParticleBackgroundComponent) particleBackground!: ThreeParticleBackgroundComponent;
-
-  // Canvas reference for knot animation
-  private knotCanvas!: ElementRef<HTMLCanvasElement>;
 
   private zone = new NgZone({ enableLongStackTrace: false });
   private knotCtx!: CanvasRenderingContext2D | null;
@@ -87,24 +67,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     // The knot canvas animation is handled by the landing component
     // We need to pass this canvas to the knot animation method
     this.setupKnotCanvas(canvas);
-  }
-
-  onServiceClick(eventData: { service: any; index: number; event: Event }): void {
-    console.log('Service clicked:', eventData.service.title);
-    // Could navigate to service detail page or show modal
-  }
-
-  onWorkRingReady(ring: any): void {
-    console.log('Work ring ready:', ring);
-  }
-
-  onWorkCardSelection(card: any): void {
-    console.log('Work card selected:', card);
-  }
-
-  onPrimaryCtaClick(event: Event): void {
-    console.log('Primary CTA clicked');
-    // Email link is handled by href, but could add tracking here
   }
 
   private setupKnotCanvas(canvas: HTMLCanvasElement): void {
@@ -286,6 +248,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         start: 'top center',
         end: 'bottom center',
         ...(this.prefersReducedMotion ? { toggleActions: 'play none none reverse' } : {
+          // ALTERAÇÃO: remover pin aqui (pin é feito no serviço para evitar conflito)
           scrub: 1
         })
       }
