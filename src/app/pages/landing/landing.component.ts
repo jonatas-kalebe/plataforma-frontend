@@ -83,7 +83,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   }
 
   private initHeroTimeline(): void {
-    // Initial animation timeline for entrance
     const tl = gsap.timeline({
       defaults: { ease: this.prefersReducedMotion ? 'none' : 'power3.out', duration: this.prefersReducedMotion ? 0.3 : 1 }
     });
@@ -92,64 +91,23 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       .from('#hero-subtitle', { opacity: 0, y: this.prefersReducedMotion ? 0 : 40 }, '-=0.8')
       .from('#hero-cta', { opacity: 0, y: this.prefersReducedMotion ? 0 : 30 }, '-=0.6');
 
-    // Scroll-based parallax with resistance and acceleration phases
+    const heroScrollTl = gsap.timeline({
+      scrollTrigger: {
+        trigger: '#hero',
+        start: 'top top',
+        end: 'bottom top',
+        ...(this.prefersReducedMotion ? {} : { scrub: 1 })
+      }
+    });
+
     if (!this.prefersReducedMotion) {
-      const heroScrollTl = gsap.timeline({
-        scrollTrigger: {
-          trigger: '#hero',
-          start: 'top top',
-          end: 'bottom top',
-          scrub: 1,
-          onUpdate: (self) => {
-            const progress = self.progress;
-            this.updateHeroParallax(progress);
-          }
-        }
-      });
-      
-      this.timelines.push(heroScrollTl);
+      heroScrollTl
+        .to('#hero-title', { y: -50, opacity: 0.8, ease: 'none' })
+        .to('#hero-subtitle', { y: -30, opacity: 0.6, ease: 'none' }, 0)
+        .to('#hero-cta', { y: -20, opacity: 0.4, ease: 'none' }, 0);
     }
 
-    this.timelines.push(tl);
-  }
-
-  private updateHeroParallax(progress: number): void {
-    const heroTitle = document.querySelector('#hero-title') as HTMLElement;
-    const heroSubtitle = document.querySelector('#hero-subtitle') as HTMLElement;
-    const heroCta = document.querySelector('#hero-cta') as HTMLElement;
-    
-    if (!heroTitle || !heroSubtitle || !heroCta) return;
-
-    let yMovement: number;
-    let opacityValue: number;
-
-    if (progress <= 0.2) {
-      // 0-20% range: Gentle resistance - very limited movement  
-      const resistanceProgress = progress / 0.2; // 0 to 1 in first 20%
-      yMovement = -resistanceProgress * 15; // Max 15px upward movement (very gentle resistance)
-      opacityValue = 1 - (resistanceProgress * 0.1); // Very slight opacity drop to 0.9
-    } else {
-      // >20% range: Acceleration - larger movement
-      const accelerationProgress = (progress - 0.2) / 0.8; // 0 to 1 for remaining 80%
-      yMovement = -15 - (accelerationProgress * 85); // Start from 15px, accelerate to 100px total
-      opacityValue = 0.9 - (accelerationProgress * 0.7); // Continue fading to 0.2
-    }
-
-    // Apply transforms
-    gsap.set(heroTitle, { 
-      y: yMovement, 
-      opacity: Math.max(opacityValue, 0.1)
-    });
-    
-    gsap.set(heroSubtitle, { 
-      y: yMovement * 0.7, 
-      opacity: Math.max(opacityValue * 0.95, 0.1)
-    });
-    
-    gsap.set(heroCta, { 
-      y: yMovement * 0.5, 
-      opacity: Math.max(opacityValue * 0.9, 0.1)
-    });
+    this.timelines.push(tl, heroScrollTl);
   }
 
   private initFilosofiaTimeline(): void {

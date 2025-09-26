@@ -1,8 +1,7 @@
-import {AfterViewInit, Component, ElementRef, HostListener, Input, NgZone, OnDestroy, OnInit, PLATFORM_ID, inject} from '@angular/core';
+import {AfterViewInit, Component, ElementRef, HostListener, Input, NgZone, OnDestroy, PLATFORM_ID, inject} from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import * as THREE from 'three';
-import { ScrollOrchestrationService, ScrollState } from '../../services/scroll-orchestration.service';
-import { Subject, takeUntil } from 'rxjs';
+import { ScrollState } from '../../services/scroll-orchestration.service';
 
 interface Shockwave {
   pos: THREE.Vector2;
@@ -27,7 +26,7 @@ interface Shockwave {
     }
   `]
 })
-export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestroy, OnInit {
+export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestroy {
   private readonly platformId = inject(PLATFORM_ID);
   @Input() scrollState: ScrollState | null = null;
 
@@ -64,9 +63,6 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   private readonly desktopParticleCount = 120;
   private readonly gyroPositionGain = 0.02;
   private readonly gyroSpinGain = 0.012;
-  private destroy$ = new Subject<void>();
-  private scrollService = inject(ScrollOrchestrationService);
-  private spin = new THREE.Vector2(0, 0);
 
   constructor(private el: ElementRef, private ngZone: NgZone) {}
 
@@ -91,9 +87,6 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   ngOnDestroy(): void {
     if (!isPlatformBrowser(this.platformId)) return;
 
-    this.destroy$.next();
-    this.destroy$.complete();
-
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     window.removeEventListener('resize', this.onWindowResize);
     window.removeEventListener('click', this.tryEnableGyro as any);
@@ -102,39 +95,6 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     if (this.renderer) this.renderer.dispose();
     if (this.particles?.geometry) this.particles.geometry.dispose();
     if (this.particles?.material) (this.particles.material as THREE.Material).dispose();
-  }
-
-  private updateParticlesBehavior(metrics: any): void {
-    // Store the scroll metrics for use in updateParticles
-    this.scrollState = {
-      globalProgress: metrics.globalProgress || 0,
-      velocity: metrics.velocity || 0,
-      activeSection: metrics.activeSection || 0,
-      direction: 'none'
-    };
-  }
-
-  private updateParticles(): void {
-    if (!this.particles || !this.scrollState) return;
-    
-    // Increase rotation speed based on scroll velocity
-    const velocityModulator = Math.min(this.scrollState.velocity * 2, 1);
-    this.spin.y += velocityModulator * 0.01;
-    
-    // Change particle color based on global progress  
-    const material = this.particles.material as THREE.PointsMaterial;
-    const progress = this.scrollState.globalProgress || 0;
-    
-    // Interpolate between blue and teal based on progress
-    const startColor = new THREE.Color(0x2d5b8c); // Original blue
-    const endColor = new THREE.Color(0x4da6a6);   // Teal
-    material.color = startColor.lerp(endColor, progress);
-    
-    // Apply rotation to particles
-    if (this.particles) {
-      this.particles.rotation.x += this.spin.x * 0.01;
-      this.particles.rotation.y += this.spin.y * 0.01;
-    }
   }
 
   @HostListener('window:resize')
@@ -294,9 +254,6 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     if (useGyro) this.parallaxTarget.lerp(this.gyroParallaxTarget, 0.12);
     this.parallaxCurrent.lerp(this.parallaxTarget, 0.08);
 
-    // Update particles based on scroll state
-    this.updateParticles();
-
     const scrollVelocityModulator = this.scrollState ? Math.min(this.scrollState.velocity * 2, 1) : 0;
     const progressModulator = this.scrollState ? this.scrollState.globalProgress : 0;
 
@@ -390,13 +347,6 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   }
 
   ngOnInit() {
-    if (!isPlatformBrowser(this.platformId)) return;
-    
-    // Subscribe to scroll metrics for particle behavior
-    this.scrollService.metrics$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(metrics => {
-        this.updateParticlesBehavior(metrics);
-      });
+    //placeholder para implementacao futura
   }
 }
