@@ -37,7 +37,8 @@
   /* FIXED: Proper 3D ring positioning - cards face outward from center */
   transform: 
     rotateY(calc((360deg / var(--count)) * var(--i))) 
-    translateZ(var(--radius));
+    translateZ(var(--radius))
+    rotateY(180deg); /* Rotate 180deg to face outward */
 }
 
 .work-card-inner {

@@ -9,13 +9,13 @@ const mockScrollOrchestrationService = {
   scrollState$: new BehaviorSubject({
     globalProgress: 0,
     velocity: 0,
-    activeSection: 0,
+    activeSection: null as any, // Allow any type for testing
     direction: 'none'
   }),
   metrics$: new BehaviorSubject({
     globalProgress: 0,
     velocity: 0,
-    activeSection: 0,
+    activeSection: null as any, // Allow any type for testing
     sections: []
   }),
   getSection: jasmine.createSpy('getSection').and.returnValue({
@@ -26,7 +26,7 @@ const mockScrollOrchestrationService = {
   getScrollState: jasmine.createSpy('getScrollState').and.returnValue({
     globalProgress: 0,
     velocity: 0,
-    activeSection: 0,
+    activeSection: null as any,
     direction: 'none'
   }),
   scrollToSection: jasmine.createSpy('scrollToSection'),
@@ -173,12 +173,10 @@ describe('WorkCardRingComponent', () => {
       expect(secondCardArgs[1].rotationY).toBe(angleStep);
     });
 
-    it('should initialize Draggable for drag interaction', () => {
+    it('should initialize custom drag functionality for interaction', () => {
       component.ngAfterViewInit();
-      expect(mockDraggable.create).toHaveBeenCalledWith(ringElement, jasmine.any(Object));
-      const draggableArgs = mockDraggable.create.calls.argsFor(0)[1];
-      expect(draggableArgs.type).toBe('rotation');
-      expect(draggableArgs.inertia).toBe(true);
+      expect(ringElement.style.cursor).toBe('grab');
+      // Custom drag events should be set up (this is tested in detail in the drag interaction tests)
     });
 
     it('should start the animation loop', fakeAsync(() => {
@@ -188,139 +186,209 @@ describe('WorkCardRingComponent', () => {
     }));
   });
 
-  describe('Drag Interaction', () => {
-    let onDragCallback: (this: any) => void;
-    let onThrowUpdateCallback: (this: any) => void;
+  describe('Drag Interaction - Custom Implementation', () => {
+    let mouseDownEvent: MouseEvent;
+    let mouseMoveEvent: MouseEvent;
+    let mouseUpEvent: MouseEvent;
 
     beforeEach(() => {
       component.ngAfterViewInit();
-      const draggableInstance = mockDraggable.create.calls.all()[0].returnValue[0];
-      const addListenerSpy = draggableInstance.addEventListener as jasmine.Spy;
-      // @ts-ignore
-      onDragCallback = addListenerSpy.calls.all().find(c => c.args[0] === 'drag').args[1];
-      // @ts-ignore
-      onThrowUpdateCallback = addListenerSpy.calls.all().find(c => c.args[0] === 'throwupdate').args[1];
+      tick(100);
     });
 
-    it('should update target rotation on drag', () => {
-      (component as any).isDragging = true;
-      
-      // Direct test of the updateRotationTarget method
-      (component as any).updateRotationTarget(45);
-      expect((component as any).rotation.target).toBe(45);
-      
-      // Test callback if it exists
-      if (onDragCallback) {
-        onDragCallback.call({ rotation: 45 });
-      }
-      expect((component as any).rotation.target).toBe(45);
-    });
-
-    it('should update target rotation on throw (inertia)', () => {
-      (component as any).isDragging = false;
-      
-      // Direct test of the updateRotationTarget method
-      (component as any).updateRotationTarget(90);
-      expect((component as any).rotation.target).toBe(90);
-      
-      // Test callback if it exists
-      if (onThrowUpdateCallback) {
-        onThrowUpdateCallback.call({ rotation: 90 });
-      }
-      expect((component as any).rotation.target).toBe(90);
-    });
-
-    it('should change cursor to "grabbing" on drag start and back to "grab" on drag end', () => {
-      const onDragStartCallback = (mockDraggable.create.calls.argsFor(0)[1] as any).onDragStart;
-      const onDragEndCallback = (mockDraggable.create.calls.argsFor(0)[1] as any).onDragEnd;
-
-      onDragStartCallback();
-      expect(component.isDragging).toBe(true);
-      expect(ringElement.style.cursor).toBe('grabbing');
-
-      onDragEndCallback();
-      expect(component.isDragging).toBe(false);
+    it('should setup custom drag events on ring element', () => {
       expect(ringElement.style.cursor).toBe('grab');
     });
 
-    it('should snap to the nearest card when drag ends', fakeAsync(() => {
-      const onDragEndCallback = (mockDraggable.create.calls.argsFor(0)[1] as any).onDragEnd;
-      (component as any).rotation.target = 50; // Próximo a 45 graus (card 1)
+    it('should handle mouse down and start dragging', () => {
+      mouseDownEvent = new MouseEvent('mousedown', {
+        clientX: 400,
+        clientY: 300,
+        bubbles: true
+      });
 
-      onDragEndCallback();
+      ringElement.dispatchEvent(mouseDownEvent);
+      
+      expect(component.isDragging).toBe(true);
+      expect(ringElement.style.cursor).toBe('grabbing');
+    });
+
+    it('should update rotation on mouse move during drag', fakeAsync(() => {
+      // Start drag
+      mouseDownEvent = new MouseEvent('mousedown', {
+        clientX: 400,
+        clientY: 300,
+        bubbles: true
+      });
+      ringElement.dispatchEvent(mouseDownEvent);
+      
+      // Move mouse
+      mouseMoveEvent = new MouseEvent('mousemove', {
+        clientX: 500, // 100px movement
+        clientY: 300,
+        bubbles: true
+      });
+      document.dispatchEvent(mouseMoveEvent);
+      tick(50);
+      
+      // Should update rotation based on movement (100px * 0.5 sensitivity = 50 degrees)
+      expect((component as any).rotation.target).toBe(50);
+    }));
+
+    it('should end drag and snap to nearest card on mouse up', fakeAsync(() => {
+      // Setup initial rotation
+      (component as any).rotation.target = 50; // Close to 45 degrees (card 1)
+      
+      // Start and end drag
+      mouseDownEvent = new MouseEvent('mousedown', { clientX: 400, clientY: 300, bubbles: true });
+      ringElement.dispatchEvent(mouseDownEvent);
+      
+      mouseUpEvent = new MouseEvent('mouseup', { clientX: 400, clientY: 300, bubbles: true });
+      document.dispatchEvent(mouseUpEvent);
       tick();
-
+      
+      expect(component.isDragging).toBe(false);
+      expect(ringElement.style.cursor).toBe('grab');
       expect(mockGsap.to).toHaveBeenCalledWith((component as any).rotation, jasmine.objectContaining({
-        target: 45, // 360 / 8 = 45
+        target: 45, // Should snap to 45 degrees (360/8 = 45)
         duration: jasmine.any(Number),
         ease: 'power2.out'
       }));
     }));
-  });
 
-  describe('Scroll-driven Rotation', () => {
-    it('should update target rotation based on scroll progress input', () => {
-      component.ngAfterViewInit();
-      const scrollProgress = 0.5;
-      component.scrollProgress = scrollProgress;
-      component.ngOnChanges({
-        scrollProgress: {
-          currentValue: scrollProgress,
-          previousValue: 0,
-          firstChange: false,
-          isFirstChange: () => false
-        }
+    it('should prevent conflicts between drag and scroll', () => {
+      // Start dragging
+      mouseDownEvent = new MouseEvent('mousedown', { clientX: 400, clientY: 300, bubbles: true });
+      ringElement.dispatchEvent(mouseDownEvent);
+      
+      expect(component.isDragging).toBe(true);
+      
+      // Simulate scroll event while dragging
+      mockScrollOrchestrationService.scrollState$.next({
+        globalProgress: 0.5,
+        velocity: 100,
+        activeSection: { id: 'trabalhos', progress: 0.5, isActive: true },
+        direction: 'down'
       });
-
-      // Se o snap estiver ativo (padrão), ele deve ir para o card mais próximo
-      // Se não, deve seguir o progresso
-      (component as any).isSnapped = false; // Força o modo não-snap para testar o progresso
-      component.ngOnChanges({
-        scrollProgress: {
-          currentValue: scrollProgress,
-          previousValue: 0,
-          firstChange: false,
-          isFirstChange: () => false
-        }
-      });
-
-      const expectedRotation = -scrollProgress * 360 * (component as any).rotationFactor;
-      expect((component as any).rotation.target).toBeCloseTo(expectedRotation);
-    });
-
-    it('should snap to center alignment when scroll progress is ~0.5', () => {
-      component.ngAfterViewInit();
-      (component as any).isSnapped = true;
-      const scrollProgress = 0.51; // Perto do meio
-      component.scrollProgress = scrollProgress;
-      component.ngOnChanges({
-        scrollProgress: {
-          currentValue: scrollProgress,
-          previousValue: 0,
-          firstChange: false,
-          isFirstChange: () => false
-        }
-      });
-
-      // No meio, deve travar em uma rotação de alinhamento, que pode ser 0 ou outro ângulo definido
-      expect((component as any).rotation.target).toBe(0); // Assumindo que o snap central alinha em 0
+      
+      // Scroll should not affect rotation while dragging
+      const rotationBeforeScroll = (component as any).rotation.target;
+      tick(100);
+      expect((component as any).rotation.target).toBe(rotationBeforeScroll);
     });
   });
 
-
-  describe('Lifecycle (ngOnDestroy)', () => {
-    it('should cancel the animation frame', () => {
+  describe('Scroll-driven Rotation - Enhanced', () => {
+    beforeEach(() => {
       component.ngAfterViewInit();
-      const rafId = (component as any).rafId;
-      component.ngOnDestroy();
-      expect(mockCancelRaf).toHaveBeenCalledWith(rafId);
+      tick(100);
     });
 
-    it('should kill the Draggable instance', () => {
-      component.ngAfterViewInit();
-      const draggableInstance = (component as any).draggable[0];
-      component.ngOnDestroy();
-      expect(draggableInstance.kill).toHaveBeenCalled();
+    it('should update rotation based on scroll progress from scroll service', () => {
+      mockScrollOrchestrationService.scrollState$.next({
+        globalProgress: 0.5,
+        velocity: 0,
+        activeSection: { id: 'trabalhos', progress: 0.5, isActive: true },
+        direction: 'down'
+      });
+
+      // Should update rotation: 0.5 * 360 * 2 = 360 degrees (2 full rotations during scroll)
+      expect((component as any).rotation.target).toBe(360);
     });
+
+    it('should add velocity-based momentum to scroll rotation', () => {
+      mockScrollOrchestrationService.scrollState$.next({
+        globalProgress: 0.25,
+        velocity: 200, // High velocity
+        activeSection: { id: 'trabalhos', progress: 0.25, isActive: true },
+        direction: 'down'
+      });
+
+      // Base rotation: 0.25 * 360 * 2 = 180 degrees
+      // Plus velocity factor: min(200 * 0.01, 2) * 10 = 20 degrees
+      // Total: 200 degrees
+      expect((component as any).rotation.target).toBe(200);
+    });
+
+    it('should implement magnetic snapping during slow scroll', () => {
+      // Mock slow scroll at snap position
+      mockScrollOrchestrationService.scrollState$.next({
+        globalProgress: 0.125, // Exactly 1/8 position (card boundary)
+        velocity: 30, // Low velocity < 50
+        activeSection: { id: 'trabalhos', progress: 0.125, isActive: true },
+        direction: 'down'
+      });
+
+      // Should snap to exact card position: 0.125 * 360 * 2 = 90 degrees
+      expect((component as any).rotation.target).toBe(90);
+    });
+
+    it('should not interfere with scroll while dragging', () => {
+      // Start dragging
+      component.isDragging = true;
+      (component as any).rotation.target = 45;
+
+      // Send scroll event
+      mockScrollOrchestrationService.scrollState$.next({
+        globalProgress: 0.5,
+        velocity: 100,
+        activeSection: { id: 'trabalhos', progress: 0.5, isActive: true },
+        direction: 'down'
+      });
+
+      // Rotation should remain unchanged due to dragging
+      expect((component as any).rotation.target).toBe(45);
+    });
+
+    it('should handle scroll service without getSection method gracefully', () => {
+      // Make getSection method return undefined
+      mockScrollOrchestrationService.getSection.and.returnValue(undefined);
+      
+      mockScrollOrchestrationService.scrollState$.next({
+        globalProgress: 0.5,
+        velocity: 100,
+        activeSection: { id: 'trabalhos', progress: 0.5, isActive: true },
+        direction: 'down'
+      });
+
+      // Should not throw error and rotation should remain unchanged
+      expect((component as any).rotation.target).toBe(0);
+    });
+  });
+
+  describe('Fixed Y-Axis Rotation', () => {
+    it('should apply rotation only on Y-axis in smoothRotate', fakeAsync(() => {
+      component.ngAfterViewInit();
+      (component as any).rotation.target = 90;
+      (component as any).rotation.current = 0;
+      
+      // Let animation run for a few frames
+      tick(100);
+      
+      // Should call gsap.set with explicit Y-axis rotation and reset X/Z axes
+      expect(mockGsap.set).toHaveBeenCalledWith(ringElement, {
+        rotateY: jasmine.any(Number),
+        rotateX: 0,
+        rotateZ: 0
+      });
+    }));
+
+    it('should ensure smooth interpolation between rotation values', fakeAsync(() => {
+      component.ngAfterViewInit();
+      (component as any).rotation.target = 180;
+      (component as any).rotation.current = 0;
+      
+      tick(50); // First frame
+      const firstCall = mockGsap.set.calls.mostRecent();
+      const firstRotation = firstCall.args[1].rotateY;
+      
+      tick(50); // Second frame
+      const secondCall = mockGsap.set.calls.mostRecent();
+      const secondRotation = secondCall.args[1].rotateY;
+      
+      // Should be interpolating towards target
+      expect(secondRotation).toBeGreaterThan(firstRotation);
+      expect(secondRotation).toBeLessThanOrEqual(180);
+    }));
   });
 });

@@ -295,8 +295,26 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         const trabalhosSection = this.scrollService.getSection('trabalhos');
         if (trabalhosSection && !this.isDragging) {
           const progress = trabalhosSection.progress;
-          const scrollRotation = progress * 360;
-          this.rotation.target = scrollRotation;
+          
+          // Enhanced scroll-driven rotation with better dynamics
+          const scrollRotation = progress * 360 * 2; // 2 full rotations during pin
+          
+          // Add slight momentum based on scroll velocity
+          const scrollVelocity = state.velocity || 0;
+          const velocityFactor = Math.min(scrollVelocity * 0.01, 2); // Cap at 2x
+          
+          // Apply momentum to rotation
+          this.rotation.target = scrollRotation + (velocityFactor * 10);
+          
+          // Implement magnetic snapping during scroll
+          const cardAngle = 360 / 8; // 45 degrees per card
+          const nearestCardProgress = Math.round(progress * 8) / 8; // Snap to 8th positions
+          
+          // If scroll is slow, snap to nearest card
+          if (scrollVelocity < 50 && Math.abs(progress - nearestCardProgress) < 0.05) {
+            const snapRotation = nearestCardProgress * 360 * 2;
+            this.rotation.target = snapRotation;
+          }
         }
       });
   }
