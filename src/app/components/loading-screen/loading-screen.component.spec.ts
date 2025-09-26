@@ -5,21 +5,29 @@ import { LoadingScreenComponent } from './loading-screen.component';
 
 // Mock GSAP
 const mockGsapTimeline = {
-  fromTo: jasmine.createSpy('fromTo').and.returnValue(this),
-  to: jasmine.createSpy('to').and.returnValue(this),
-  add: jasmine.createSpy('add').and.returnValue(this),
+  fromTo: jasmine.createSpy('fromTo').and.returnValue(mockGsapTimeline),
+  to: jasmine.createSpy('to').and.returnValue(mockGsapTimeline),
+  add: jasmine.createSpy('add').and.returnValue(mockGsapTimeline),
   play: jasmine.createSpy('play'),
+  kill: jasmine.createSpy('kill'),
   eventCallback: jasmine.createSpy('eventCallback').and.callFake((type, callback) => {
     if (type === 'onComplete') {
       (mockGsapTimeline as any)._onComplete = callback;
     }
-    return this;
+    return mockGsapTimeline;
   }),
   _onComplete: () => {} // Placeholder for the onComplete callback
 };
 
 const mockGsap = {
-  timeline: jasmine.createSpy('timeline').and.returnValue(mockGsapTimeline)
+  timeline: jasmine.createSpy('timeline').and.callFake((options: any) => {
+    if (options && options.onComplete) {
+      (mockGsapTimeline as any)._onComplete = options.onComplete;
+    }
+    return mockGsapTimeline;
+  }),
+  set: jasmine.createSpy('set'),
+  killTweensOf: jasmine.createSpy('killTweensOf')
 };
 
 describe('LoadingScreenComponent', () => {
