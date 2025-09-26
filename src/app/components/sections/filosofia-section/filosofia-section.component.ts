@@ -11,79 +11,8 @@ import { SECTION_IDS } from '../../../shared/constants';
   selector: 'app-filosofia-section',
   standalone: true,
   imports: [CommonModule],
-  template: `
-    <section 
-      id="filosofia" 
-      class="relative w-full h-screen flex items-center px-6"
-      [attr.data-testid]="testId">
-      
-      <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center">
-        
-        <!-- Text Content -->
-        <div class="filosofia-content">
-          <h2 class="text-4xl md:text-5xl font-extrabold text-athenity-text-title font-heading">
-            {{ title }}
-          </h2>
-          <p class="mt-6 leading-relaxed text-athenity-text-body text-lg">
-            {{ description }}
-          </p>
-          
-          <!-- Optional additional content -->
-          <div *ngIf="showAdditionalContent" class="mt-8">
-            <ng-content select="[slot=additional-content]"></ng-content>
-          </div>
-        </div>
-
-        <!-- Canvas Animation -->
-        <div class="relative filosofia-animation">
-          <canvas 
-            #knotCanvas 
-            [width]="canvasWidth"
-            [height]="canvasHeight"
-            class="w-full h-[260px] md:h-[320px] rounded-xl bg-athenity-blue-card"
-            [attr.data-testid]="'knot-canvas'">
-          </canvas>
-          
-          <!-- Canvas overlay for additional effects -->
-          <div *ngIf="showCanvasOverlay" 
-               class="absolute inset-0 rounded-xl bg-gradient-to-tr from-transparent via-transparent to-athenity-green-circuit/10">
-          </div>
-        </div>
-      </div>
-    </section>
-  `,
-  styles: [`
-    .filosofia-content {
-      opacity: 0;
-      transform: translateX(-30px);
-      transition: all 0.8s ease;
-    }
-    
-    .filosofia-content.visible {
-      opacity: 1;
-      transform: translateX(0);
-    }
-    
-    .filosofia-animation {
-      opacity: 0;
-      transform: translateX(30px);
-      transition: all 0.8s ease 0.2s;
-    }
-    
-    .filosofia-animation.visible {
-      opacity: 1;
-      transform: translateX(0);
-    }
-    
-    #knotCanvas {
-      transition: all 0.3s ease;
-    }
-    
-    #knotCanvas:hover {
-      transform: scale(1.02);
-      box-shadow: 0 8px 32px rgba(100, 255, 218, 0.2);
-    }
-  `]
+  templateUrl: './filosofia-section.component.html',
+  styleUrls: ['./filosofia-section.component.css']
 })
 export class FilosofiaSectionComponent implements AfterViewInit, OnDestroy {
   // Configuration variables (customizable)

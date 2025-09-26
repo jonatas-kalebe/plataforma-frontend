@@ -13,81 +13,8 @@ import { SECTION_IDS } from '../../../shared/constants';
   selector: 'app-servicos-section',
   standalone: true,
   imports: [CommonModule, SectionHeaderComponent, ServiceCardComponent],
-  template: `
-    <section 
-      id="servicos" 
-      class="w-full h-screen flex items-center px-6"
-      [ngClass]="getSectionClasses()"
-      [attr.data-testid]="testId">
-      
-      <div class="max-w-7xl mx-auto w-full">
-        
-        <!-- Section Header -->
-        <app-section-header
-          [title]="sectionTitle"
-          [subtitle]="sectionSubtitle"
-          [size]="headerSize"
-          [alignment]="headerAlignment"
-          [showDivider]="showHeaderDivider"
-          [testId]="'servicos-header'">
-        </app-section-header>
-
-        <!-- Services Grid -->
-        <div class="servicos-grid grid gap-8" [ngClass]="getGridClasses()">
-          <app-service-card
-            *ngFor="let service of services; let i = index; trackBy: trackByService"
-            [service]="service"
-            [customClass]="getCardClass(i)"
-            [hoverEnabled]="enableCardHover"
-            [animationDelay]="getCardAnimationDelay(i)"
-            [testId]="'service-card-' + i"
-            (click)="onServiceClick(service, i, $event)">
-          </app-service-card>
-        </div>
-
-        <!-- Optional additional content -->
-        <div *ngIf="showAdditionalContent" class="mt-12 text-center">
-          <ng-content select="[slot=additional-content]"></ng-content>
-        </div>
-      </div>
-    </section>
-  `,
-  styles: [`
-    #servicos {
-      background: linear-gradient(135deg, var(--athenity-blue-deep) 0%, rgba(17, 34, 64, 0.95) 100%);
-    }
-    
-    .servicos-grid {
-      opacity: 0;
-      transform: translateY(30px);
-      transition: all 0.8s ease;
-    }
-    
-    .servicos-grid.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    
-    .service-card {
-      opacity: 0;
-      transform: translateY(20px);
-      transition: all 0.6s ease;
-    }
-    
-    .service-card.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    
-    /* Grid responsive variations */
-    .grid-compact {
-      gap: 1rem;
-    }
-    
-    .grid-spacious {
-      gap: 2rem;
-    }
-  `]
+  templateUrl: './servicos-section.component.html',
+  styleUrls: ['./servicos-section.component.css']
 })
 export class ServicosSectionComponent {
   // Configuration variables (customizable)

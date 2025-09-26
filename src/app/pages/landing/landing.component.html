@@ -1,40 +1,66 @@
 
-<!-- Hero Section -->
-<app-hero-section
-  [scrollState]="scrollState"
-  [testId]="'hero-section'"
-  (ctaClicked)="handleHeroCta($event)"
-  (sectionReady)="onHeroSectionReady($event)">
-</app-hero-section>
+<section id="hero" class="relative h-screen w-full overflow-hidden select-none">
+  <app-three-particle-background [scrollState]="scrollState"></app-three-particle-background>
 
-<!-- Filosofia Section -->
-<app-filosofia-section
-  [testId]="'filosofia-section'"
-  (sectionReady)="onFilosofiaSectionReady($event)"
-  (canvasReady)="onKnotCanvasReady($event)"
-  (animationComplete)="onFilosofiaAnimationComplete()">
-</app-filosofia-section>
+  <div #heroBg class="absolute inset-0 -z-10"></div>
+  <div class="h-full w-full flex flex-col items-center justify-center text-center px-6">
+    <h1 id="hero-title" class="text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter">
+      Nós Desenvolvemos <span class="text-athenity-gold">Momentos</span>.
+    </h1>
+    <p id="hero-subtitle" class="mt-6 text-lg md:text-xl max-w-2xl text-athenity-text-body">
+      Não criamos sites. Criamos experiências onde o seu cliente é o protagonista.
+    </p>
+    <div id="hero-cta" class="mt-10">
+      <a href="#servicos" class="bg-athenity-gold text-athenity-blue-deep font-bold py-4 px-8 rounded-xl text-lg hover:opacity-90 transition transform hover:scale-[1.03] shadow-glow">Explore Nosso Trabalho</a>
+    </div>
+    <div id="scroll-hint" class="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs uppercase tracking-widest text-athenity-text-body/70">Scroll</div>
+  </div>
+</section>
 
-<!-- Serviços Section -->
-<app-servicos-section
-  [services]="servicesData"
-  [testId]="'servicos-section'"
-  (serviceClicked)="handleServiceClick($event)"
-  (sectionReady)="onServicosSectionReady()">
-</app-servicos-section>
+<section id="filosofia" class="relative w-full h-screen flex items-center px-6">
+  <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center">
+    <div>
+      <h2 class="text-4xl md:text-5xl font-extrabold">Da Complexidade à Clareza.</h2>
+      <p class="mt-6 leading-relaxed">Transformamos sistemas caóticos em experiências nítidas. Arquitetura, design e engenharia convergem para mover pessoas e negócios.</p>
+    </div>
+    <div class="relative">
+      <canvas #knotCanvas class="w-full h-[260px] md:h-[320px] rounded-xl bg-athenity-blue-card"></canvas>
+    </div>
+  </div>
+</section>
 
-<!-- Trabalhos Section -->
-<app-trabalhos-section
-  [testId]="'trabalhos-section'"
-  (ringReady)="onWorkRingReady($event)"
-  (cardSelected)="handleWorkCardSelection($event)"
-  (sectionReady)="onTrabalhosSectionReady($event)">
-</app-trabalhos-section>
+<section id="servicos" class="w-full h-screen flex items-center px-6 bg-athenity-blue-deep">
+  <div class="max-w-7xl mx-auto">
+    <h3 class="text-3xl md:text-4xl font-extrabold text-center">Nosso Arsenal</h3>
+    <div class="mt-14 grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div class="service-card bg-athenity-blue-card p-8 rounded-2xl transition-transform hover:-translate-y-2 hover:shadow-glow border border-transparent hover:border-athenity-green-circuit/60">
+        <h4 class="text-2xl text-athenity-green-circuit">Aplicações Sob Medida</h4>
+        <p class="mt-4">Soluções web e mobile robustas e elegantes, moldadas pelo contexto do seu cliente.</p>
+      </div>
+      <div class="service-card bg-athenity-blue-card p-8 rounded-2xl transition-transform hover:-translate-y-2 hover:shadow-glow border border-transparent hover:border-athenity-green-circuit/60">
+        <h4 class="text-2xl text-athenity-green-circuit">IA & Machine Learning</h4>
+        <p class="mt-4">Produtos inteligentes, dados acionáveis e automações que liberam valor real.</p>
+      </div>
+      <div class="service-card bg-athenity-blue-card p-8 rounded-2xl transition-transform hover:-translate-y-2 hover:shadow-glow border border-transparent hover:border-athenity-green-circuit/60">
+        <h4 class="text-2xl text-athenity-green-circuit">Arquitetura em Nuvem</h4>
+        <p class="mt-4">Escalabilidade, observabilidade e segurança para crescer sem atrito.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
-<!-- CTA Section -->
-<app-cta-section
-  [primaryCta]="primaryCtaConfig"
-  [testId]="'cta-section'"
-  (primaryCtaClicked)="handlePrimaryCta($event)"
-  (sectionReady)="onCtaSectionReady()">
-</app-cta-section>
+<!-- ALTERAÇÃO: remover overflow-hidden para evitar conflito com pin -->
+<section id="trabalhos" class="w-full h-screen flex items-center px-6">
+  <div class="pin-container max-w-7xl mx-auto">
+    <h3 class="text-3xl md:text-4xl font-extrabold text-center">Prova de Conceito</h3>
+    <app-work-card-ring></app-work-card-ring>
+    <div class="mt-6 text-center text-sm text-athenity-text-body/70">Arraste para girar</div>
+  </div>
+</section>
+
+<section id="cta" class="w-full h-screen flex items-center px-6">
+  <div class="max-4xl mx-auto text-center">
+    <h2 class="text-4xl md:text-5xl font-extrabold">Vamos Construir o Futuro</h2>
+    <a href="mailto:athenity@gmail.com" class="mt-10 inline-block bg-athenity-gold text-athenity-blue-deep px-8 py-4 rounded-xl font-bold hover:opacity-90 transition transform hover:scale-[1.03] shadow-glow">Fale Conosco</a>
+  </div>
+</section>

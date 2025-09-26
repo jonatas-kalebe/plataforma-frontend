@@ -1,0 +1,37 @@
+<section 
+  id="servicos" 
+  class="w-full h-screen flex items-center px-6"
+  [ngClass]="getSectionClasses()"
+  [attr.data-testid]="testId">
+  
+  <div class="max-w-7xl mx-auto w-full">
+    
+    <!-- Section Header -->
+    <app-section-header
+      [title]="sectionTitle"
+      [subtitle]="sectionSubtitle"
+      [size]="headerSize"
+      [alignment]="headerAlignment"
+      [showDivider]="showHeaderDivider"
+      [testId]="'servicos-header'">
+    </app-section-header>
+
+    <!-- Services Grid -->
+    <div class="servicos-grid grid gap-8" [ngClass]="getGridClasses()">
+      <app-service-card
+        *ngFor="let service of services; let i = index; trackBy: trackByService"
+        [service]="service"
+        [customClass]="getCardClass(i)"
+        [hoverEnabled]="enableCardHover"
+        [animationDelay]="getCardAnimationDelay(i)"
+        [testId]="'service-card-' + i"
+        (click)="onServiceClick(service, i, $event)">
+      </app-service-card>
+    </div>
+
+    <!-- Optional additional content -->
+    <div *ngIf="showAdditionalContent" class="mt-12 text-center">
+      <ng-content select="[slot=additional-content]"></ng-content>
+    </div>
+  </div>
+</section>

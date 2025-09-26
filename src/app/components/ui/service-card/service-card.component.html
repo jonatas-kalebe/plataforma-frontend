@@ -1,0 +1,19 @@
+<div 
+  class="service-card bg-athenity-blue-card p-8 rounded-2xl transition-transform border border-transparent"
+  [class]="customClass"
+  [ngClass]="getCardClasses()"
+  [attr.data-testid]="testId">
+  
+  <h4 class="text-2xl text-athenity-green-circuit font-heading font-bold">
+    {{ service.title }}
+  </h4>
+  
+  <p class="mt-4 text-athenity-text-body leading-relaxed">
+    {{ service.description }}
+  </p>
+  
+  <!-- Optional icon slot -->
+  <div *ngIf="service.icon" class="mt-6">
+    <i [class]="service.icon" class="text-3xl text-athenity-green-circuit"></i>
+  </div>
+</div>

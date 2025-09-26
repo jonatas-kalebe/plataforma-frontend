@@ -1,0 +1,39 @@
+<section 
+  id="filosofia" 
+  class="relative w-full h-screen flex items-center px-6"
+  [attr.data-testid]="testId">
+  
+  <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center">
+    
+    <!-- Text Content -->
+    <div class="filosofia-content">
+      <h2 class="text-4xl md:text-5xl font-extrabold text-athenity-text-title font-heading">
+        {{ title }}
+      </h2>
+      <p class="mt-6 leading-relaxed text-athenity-text-body text-lg">
+        {{ description }}
+      </p>
+      
+      <!-- Optional additional content -->
+      <div *ngIf="showAdditionalContent" class="mt-8">
+        <ng-content select="[slot=additional-content]"></ng-content>
+      </div>
+    </div>
+
+    <!-- Canvas Animation -->
+    <div class="relative filosofia-animation">
+      <canvas 
+        #knotCanvas 
+        [width]="canvasWidth"
+        [height]="canvasHeight"
+        class="w-full h-[260px] md:h-[320px] rounded-xl bg-athenity-blue-card"
+        [attr.data-testid]="'knot-canvas'">
+      </canvas>
+      
+      <!-- Canvas overlay for additional effects -->
+      <div *ngIf="showCanvasOverlay" 
+           class="absolute inset-0 rounded-xl bg-gradient-to-tr from-transparent via-transparent to-athenity-green-circuit/10">
+      </div>
+    </div>
+  </div>
+</section>

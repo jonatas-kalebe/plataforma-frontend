@@ -1,0 +1,46 @@
+<section 
+  id="trabalhos" 
+  class="w-full h-screen flex items-center px-6"
+  [ngClass]="getSectionClasses()"
+  [attr.data-testid]="testId">
+  
+  <div class="pin-container max-w-7xl mx-auto w-full">
+    
+    <!-- Section Header -->
+    <app-section-header
+      [title]="sectionTitle"
+      [subtitle]="sectionSubtitle"
+      [size]="headerSize"
+      [alignment]="headerAlignment"
+      [showDivider]="showHeaderDivider"
+      [testId]="'trabalhos-header'">
+    </app-section-header>
+
+    <!-- Work Card Ring Component -->
+    <div class="trabalhos-showcase" [attr.data-testid]="'work-showcase'">
+      <app-work-card-ring
+        #workCardRing
+        (ringReady)="onRingReady($event)"
+        (cardSelected)="onCardSelected($event)">
+      </app-work-card-ring>
+    </div>
+
+    <!-- Interaction Hint -->
+    <div class="mt-6 text-center">
+      <app-scroll-hint
+        [text]="hintText"
+        position="center"
+        alignment="center"
+        [showArrow]="false"
+        [animate]="hintAnimation"
+        [opacity]="hintOpacity"
+        [testId]="'trabalhos-hint'">
+      </app-scroll-hint>
+    </div>
+
+    <!-- Optional additional content -->
+    <div *ngIf="showAdditionalContent" class="mt-8 text-center">
+      <ng-content select="[slot=additional-content]"></ng-content>
+    </div>
+  </div>
+</section>
