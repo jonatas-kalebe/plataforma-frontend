@@ -2,6 +2,7 @@ import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, ViewChild, PLA
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
 import { WorkCardRingComponent } from '../../components/work-card-ring/work-card-ring.component';
 import {
   ThreeParticleBackgroundComponent
@@ -9,7 +10,13 @@ import {
 import { ScrollOrchestrationService, ScrollState } from '../../services/scroll-orchestration.service';
 import { Subject, takeUntil } from 'rxjs';
 
-gsap.registerPlugin(ScrollTrigger);
+// Expose GSAP globally for the scroll service
+if (typeof window !== 'undefined') {
+  (window as any).gsap = gsap;
+  (window as any).ScrollTrigger = ScrollTrigger;
+}
+
+gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
 @Component({
   selector: 'app-landing',
@@ -29,6 +36,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   private knotId = 0;
   private destroy$ = new Subject<void>();
   private timelines: gsap.core.Timeline[] = [];
+  private scrollTriggers: ScrollTrigger[] = [];
   private prefersReducedMotion = false;
 
   public scrollState: ScrollState | null = null;
@@ -40,14 +48,18 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
     this.zone.runOutsideAngular(() => {
       this.checkReducedMotion();
-      gsap.registerPlugin(ScrollTrigger);
-
-      this.scrollService.initialize();
+      // GSAP is already registered globally, just make sure the service can access it
+      
+      // Temporarily disable scroll service to debug hero behavior
+      // this.scrollService.initialize();
 
       this.scrollService.scrollState$
         .pipe(takeUntil(this.destroy$))
         .subscribe(state => {
-          this.scrollState = state;
+          // Use setTimeout to avoid ExpressionChangedAfterItHasBeenCheckedError
+          setTimeout(() => {
+            this.scrollState = state;
+          });
         });
 
       this.initScrollytellingTimelines();
@@ -63,6 +75,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
     cancelAnimationFrame(this.knotId);
     this.timelines.forEach(tl => tl.kill());
+    this.scrollTriggers.forEach(st => st.kill());
     ScrollTrigger.getAll().forEach(st => st.kill());
     this.scrollService.destroy();
   }
@@ -83,6 +96,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   }
 
   private initHeroTimeline(): void {
+    // Initial entrance animation (non-scroll based)
     const tl = gsap.timeline({
       defaults: { ease: this.prefersReducedMotion ? 'none' : 'power3.out', duration: this.prefersReducedMotion ? 0.3 : 1 }
     });
@@ -91,23 +105,50 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       .from('#hero-subtitle', { opacity: 0, y: this.prefersReducedMotion ? 0 : 40 }, '-=0.8')
       .from('#hero-cta', { opacity: 0, y: this.prefersReducedMotion ? 0 : 30 }, '-=0.6');
 
-    const heroScrollTl = gsap.timeline({
-      scrollTrigger: {
+    this.timelines.push(tl);
+
+    // Custom scroll-based animation with elastic resistance
+    if (!this.prefersReducedMotion) {
+      const heroScrollTrigger = ScrollTrigger.create({
         trigger: '#hero',
         start: 'top top',
         end: 'bottom top',
-        ...(this.prefersReducedMotion ? {} : { scrub: 1 })
-      }
-    });
-
-    if (!this.prefersReducedMotion) {
-      heroScrollTl
-        .to('#hero-title', { y: -50, opacity: 0.8, ease: 'none' })
-        .to('#hero-subtitle', { y: -30, opacity: 0.6, ease: 'none' }, 0)
-        .to('#hero-cta', { y: -20, opacity: 0.4, ease: 'none' }, 0);
+        onUpdate: self => {
+          const progress = self.progress;
+          console.log('Hero ScrollTrigger progress:', progress, 'scroll:', window.scrollY);
+          let yMultiplier, opacityMultiplier;
+          
+          if (progress <= 0.2) {
+            // Strong resistance for 0-20%: minimal movement
+            yMultiplier = progress * 0.3; // Very gentle movement
+            opacityMultiplier = progress * 0.3; // Very gentle fade
+          } else {
+            // Accelerate after 20%
+            const acceleratedProgress = 0.06 + (progress - 0.2) * 2.925; // Start from 0.06, accelerate
+            yMultiplier = acceleratedProgress;
+            opacityMultiplier = acceleratedProgress;
+          }
+          
+          console.log('Applying yMultiplier:', yMultiplier, 'for progress:', progress);
+          
+          // Apply transforms
+          gsap.set('#hero-title', { 
+            y: -50 * yMultiplier, 
+            opacity: Math.max(1 - opacityMultiplier * 0.8, 0.2)
+          });
+          gsap.set('#hero-subtitle', { 
+            y: -30 * yMultiplier, 
+            opacity: Math.max(1 - opacityMultiplier * 0.6, 0.4) 
+          });
+          gsap.set('#hero-cta', { 
+            y: -20 * yMultiplier, 
+            opacity: Math.max(1 - opacityMultiplier * 0.4, 0.6) 
+          });
+        }
+      });
+      
+      this.scrollTriggers.push(heroScrollTrigger);
     }
-
-    this.timelines.push(tl, heroScrollTl);
   }
 
   private initFilosofiaTimeline(): void {

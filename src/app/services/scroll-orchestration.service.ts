@@ -3,6 +3,7 @@ import { isPlatformBrowser } from '@angular/common';
 import { BehaviorSubject, Observable } from 'rxjs';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
 
 export interface ScrollSection {
   id: string;
@@ -37,6 +38,7 @@ export class ScrollOrchestrationService {
   private prefersReducedMotion = false;
   private lastScrollY = 0;
   private scrollDirection: 'up' | 'down' | 'none' = 'none';
+  private isMobile = false;
   
   // Properties for magnetic snapping
   private activeSectionTrigger: any = null;
@@ -62,6 +64,7 @@ export class ScrollOrchestrationService {
   constructor() {
     if (isPlatformBrowser(this.platformId)) {
       this.checkReducedMotion();
+      this.detectMobile();
     }
   }
 
@@ -75,11 +78,17 @@ export class ScrollOrchestrationService {
       const gsapInstance = (window as any).gsap || gsap;
       const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
       
-      gsapInstance.registerPlugin(ScrollTriggerInstance);
+      gsapInstance.registerPlugin(ScrollTriggerInstance, ScrollToPlugin);
       this.lastScrollY = window.scrollY || 0;
       this.setupSections();
       this.isInitialized = true;
     });
+  }
+
+  private detectMobile(): void {
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
+      this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
   }
 
   private checkReducedMotion(): void {
@@ -170,17 +179,7 @@ export class ScrollOrchestrationService {
       const trigger = ScrollTriggerInstance.create({ ...baseConfig, ...advancedConfig });
       this.scrollTriggers.push(trigger);
 
-      // Create special pinned trigger for trabalhos section
-      if (id === '#trabalhos') {
-        const pinTrigger = ScrollTriggerInstance.create({
-          id: 'trabalhos-pin',
-          trigger: '#trabalhos .pin-container',
-          pin: '#trabalhos .pin-container',
-          start: 'top top',
-          end: '+=100%'
-        });
-        this.scrollTriggers.push(pinTrigger);
-      }
+      // Note: Pin behavior for trabalhos will be handled by the work-card-ring component
 
       // Create animation timelines for specific sections
       if (id === '#hero') {
@@ -239,7 +238,7 @@ export class ScrollOrchestrationService {
       end: 'bottom bottom',
       onUpdate: (self: any) => {
         const currentScrollY = window.scrollY || 0;
-        const velocityRaw = (ScrollTriggerInstance as any).getVelocity?.() || 0;
+        const velocityRaw = Math.abs(currentScrollY - this.lastScrollY);
         const velocity = velocityRaw / 1000;
 
         if (currentScrollY > this.lastScrollY + 5) {
@@ -249,6 +248,8 @@ export class ScrollOrchestrationService {
         } else {
           this.scrollDirection = 'none';
         }
+        
+        // Update lastScrollY after velocity calculation
         this.lastScrollY = currentScrollY;
 
         const currentMetrics = this.metricsSubject.value;
@@ -278,7 +279,9 @@ export class ScrollOrchestrationService {
     if (!this.activeSectionTrigger) return;
 
     const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
-    const velocity = ScrollTriggerInstance.getVelocity?.() || 0;
+    
+    // Get velocity using the proper ScrollTrigger method
+    const velocity = Math.abs(this.lastScrollY - (window.scrollY || 0));
     const progress = this.activeSectionTrigger.progress;
     const direction = this.activeSectionTrigger.direction;
 
@@ -289,10 +292,11 @@ export class ScrollOrchestrationService {
     }
 
     // Only snap when velocity is near zero (user stopped scrolling)
-    if (Math.abs(velocity) < 10) {
+    if (velocity < 5) { // Lower threshold since we're using position delta
+      const delay = this.isMobile ? 150 : 100; // Longer delay for mobile
       this.snapTimeoutId = window.setTimeout(() => {
         this.performMagneticSnap();
-      }, 100);
+      }, delay);
     }
   }
 
@@ -390,11 +394,13 @@ export class ScrollOrchestrationService {
     const gsapInstance = (window as any).gsap || gsap;
     const element = document.querySelector(`#${id}`);
     if (element) {
-      gsapInstance.to(window, {
+      const scrollToConfig = {
         duration: this.prefersReducedMotion ? 0.3 : duration,
-        scrollTo: { y: element, offsetY: 0 },
-        ease: this.prefersReducedMotion ? 'none' : 'power2.inOut'
-      });
+        ease: this.prefersReducedMotion ? 'none' : 'power2.inOut',
+        scrollTo: { y: element, offsetY: 0, autoKill: false }
+      };
+      
+      gsapInstance.to(window, scrollToConfig);
     }
   }
 

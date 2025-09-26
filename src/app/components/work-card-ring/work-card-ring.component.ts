@@ -2,10 +2,12 @@ import { Component, ElementRef, NgZone, ViewChild, AfterViewInit, OnDestroy, PLA
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
 import { ScrollOrchestrationService, ScrollState } from '../../services/scroll-orchestration.service';
 import { Subject, takeUntil } from 'rxjs';
 
-gsap.registerPlugin(ScrollTrigger);
+// Ensure GSAP plugins are registered
+gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
 @Component({
   selector: 'app-work-card-ring',
