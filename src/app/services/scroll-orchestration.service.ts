@@ -37,6 +37,10 @@ export class ScrollOrchestrationService {
   private prefersReducedMotion = false;
   private lastScrollY = 0;
   private scrollDirection: 'up' | 'down' | 'none' = 'none';
+  
+  // Properties for magnetic snapping
+  private activeSectionTrigger: any = null;
+  private snapTimeoutId: number | null = null;
 
   private metricsSubject = new BehaviorSubject<ScrollMetrics>({
     globalProgress: 0,
@@ -118,12 +122,25 @@ export class ScrollOrchestrationService {
         end: 'bottom top',
         onUpdate: (self: any) => {
           section.progress = self.progress;
+          // Update active section trigger progress if this is the active section
+          if (section.isActive && this.activeSectionTrigger?.vars?.id === section.id) {
+            this.activeSectionTrigger.progress = self.progress;
+            this.activeSectionTrigger.direction = self.direction || 1;
+          }
           this.updateMetrics();
         },
         onToggle: (self: any) => {
           section.isActive = self.isActive;
           if (self.isActive) {
             this.setActiveSection(index);
+            // Set this as the active section trigger for magnetic snapping
+            this.activeSectionTrigger = {
+              progress: self.progress,
+              direction: self.direction || 1,
+              vars: { id: section.id },
+              start: self.start,
+              end: self.end
+            };
           }
           this.updateMetrics();
         }
@@ -248,10 +265,87 @@ export class ScrollOrchestrationService {
           activeSection: currentMetrics.activeSection,
           direction: this.scrollDirection
         });
+
+        // Magnetic snapping logic
+        this.checkMagneticSnap();
       }
     });
     
     this.scrollTriggers.push(globalTrigger);
+  }
+
+  private checkMagneticSnap(): void {
+    if (!this.activeSectionTrigger) return;
+
+    const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
+    const velocity = ScrollTriggerInstance.getVelocity?.() || 0;
+    const progress = this.activeSectionTrigger.progress;
+    const direction = this.activeSectionTrigger.direction;
+
+    // Clear existing snap timeout
+    if (this.snapTimeoutId) {
+      clearTimeout(this.snapTimeoutId);
+      this.snapTimeoutId = null;
+    }
+
+    // Only snap when velocity is near zero (user stopped scrolling)
+    if (Math.abs(velocity) < 10) {
+      this.snapTimeoutId = window.setTimeout(() => {
+        this.performMagneticSnap();
+      }, 100);
+    }
+  }
+
+  private performMagneticSnap(): void {
+    if (!this.activeSectionTrigger) return;
+
+    const gsapInstance = (window as any).gsap || gsap;
+    const progress = this.activeSectionTrigger.progress;
+    const direction = this.activeSectionTrigger.direction;
+    const sectionId = this.activeSectionTrigger.vars?.id;
+
+    // Snap forward if progress > 85%
+    if (progress > 0.85 && direction === 1) {
+      const nextSectionElement = this.getNextSectionElement(sectionId);
+      if (nextSectionElement) {
+        gsapInstance.to(window, {
+          scrollTo: { y: nextSectionElement.offsetTop, autoKill: false },
+          ease: 'power2.inOut',
+          duration: 0.8
+        });
+      }
+    }
+    // Snap backward if progress < 15% 
+    else if (progress < 0.15 && direction === -1) {
+      const prevSectionElement = this.getPrevSectionElement(sectionId);
+      if (prevSectionElement) {
+        gsapInstance.to(window, {
+          scrollTo: { y: prevSectionElement.offsetTop, autoKill: false },
+          ease: 'power2.inOut',
+          duration: 0.8
+        });
+      }
+    }
+  }
+
+  private getNextSectionElement(currentSectionId: string): HTMLElement | null {
+    const sectionOrder = ['hero', 'filosofia', 'servicos', 'trabalhos', 'cta'];
+    const currentIndex = sectionOrder.indexOf(currentSectionId);
+    if (currentIndex >= 0 && currentIndex < sectionOrder.length - 1) {
+      const nextSectionId = sectionOrder[currentIndex + 1];
+      return document.querySelector(`#${nextSectionId}`) as HTMLElement;
+    }
+    return null;
+  }
+
+  private getPrevSectionElement(currentSectionId: string): HTMLElement | null {
+    const sectionOrder = ['hero', 'filosofia', 'servicos', 'trabalhos', 'cta'];
+    const currentIndex = sectionOrder.indexOf(currentSectionId);
+    if (currentIndex > 0) {
+      const prevSectionId = sectionOrder[currentIndex - 1];
+      return document.querySelector(`#${prevSectionId}`) as HTMLElement;
+    }
+    return null;
   }
 
   private setActiveSection(index: number): void {
@@ -307,10 +401,18 @@ export class ScrollOrchestrationService {
   destroy(): void {
     if (isPlatformBrowser(this.platformId)) {
       const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
+      
+      // Clean up snap timeout
+      if (this.snapTimeoutId) {
+        clearTimeout(this.snapTimeoutId);
+        this.snapTimeoutId = null;
+      }
+      
       this.scrollTriggers.forEach(trigger => trigger.kill());
       this.scrollTriggers = [];
       ScrollTriggerInstance.killAll();
       this.isInitialized = false;
+      this.activeSectionTrigger = null;
     }
   }
 }
