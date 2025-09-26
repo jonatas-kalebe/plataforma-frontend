@@ -141,6 +141,9 @@ describe('WorkCardRingComponent', () => {
 
   describe('Initialization (ngAfterViewInit)', () => {
     it('should not initialize on server', () => {
+      // Reset call counts before this specific test
+      mockGsap.set.calls.reset();
+      
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
         imports: [WorkCardRingComponent],
