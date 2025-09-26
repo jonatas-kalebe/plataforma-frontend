@@ -267,6 +267,9 @@ export class ScrollOrchestrationService {
           direction: this.scrollDirection
         });
 
+        // Update active section trigger based on current scroll position
+        this.updateActiveSectionTrigger(currentScrollY);
+
         // Magnetic snapping logic
         this.checkMagneticSnap();
       }
@@ -275,15 +278,45 @@ export class ScrollOrchestrationService {
     this.scrollTriggers.push(globalTrigger);
   }
 
+  private updateActiveSectionTrigger(currentScrollY: number): void {
+    const sectionOrder = ['hero', 'filosofia', 'servicos', 'trabalhos', 'cta'];
+    
+    // Find which section contains the current scroll position
+    for (const sectionId of sectionOrder) {
+      const element = document.querySelector(`#${sectionId}`) as HTMLElement;
+      if (!element) continue;
+      
+      const sectionTop = element.offsetTop;
+      const sectionHeight = element.offsetHeight;
+      const sectionBottom = sectionTop + sectionHeight;
+      
+      // Check if scroll position is within this section
+      if (currentScrollY >= sectionTop && currentScrollY < sectionBottom) {
+        // Calculate accurate progress within this section
+        const sectionProgress = (currentScrollY - sectionTop) / sectionHeight;
+        
+        this.activeSectionTrigger = {
+          progress: sectionProgress,
+          direction: currentScrollY > this.lastScrollY ? 1 : -1,
+          vars: { id: sectionId },
+          start: sectionTop,
+          end: sectionBottom
+        };
+        
+        console.log(`Active section: ${sectionId}, progress: ${sectionProgress.toFixed(3)}, direction: ${this.activeSectionTrigger.direction}`);
+        break;
+      }
+    }
+  }
+
   private checkMagneticSnap(): void {
     if (!this.activeSectionTrigger) return;
 
-    const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
-    
-    // Get velocity using the proper ScrollTrigger method
-    const velocity = Math.abs(this.lastScrollY - (window.scrollY || 0));
-    const progress = this.activeSectionTrigger.progress;
-    const direction = this.activeSectionTrigger.direction;
+    // Calculate velocity properly
+    const currentScrollY = window.scrollY || 0;
+    const velocity = Math.abs(currentScrollY - this.lastScrollY);
+    const progress = this.activeSectionTrigger.progress || 0;
+    const direction = currentScrollY > this.lastScrollY ? 1 : -1;
 
     // Clear existing snap timeout
     if (this.snapTimeoutId) {
@@ -292,8 +325,8 @@ export class ScrollOrchestrationService {
     }
 
     // Only snap when velocity is near zero (user stopped scrolling)
-    if (velocity < 5) { // Lower threshold since we're using position delta
-      const delay = this.isMobile ? 150 : 100; // Longer delay for mobile
+    if (velocity < 2) { // Very low threshold for stopped scrolling
+      const delay = this.isMobile ? 150 : 100;
       this.snapTimeoutId = window.setTimeout(() => {
         this.performMagneticSnap();
       }, delay);
@@ -304,14 +337,18 @@ export class ScrollOrchestrationService {
     if (!this.activeSectionTrigger) return;
 
     const gsapInstance = (window as any).gsap || gsap;
-    const progress = this.activeSectionTrigger.progress;
-    const direction = this.activeSectionTrigger.direction;
+    const progress = this.activeSectionTrigger.progress || 0;
+    const currentScrollY = window.scrollY || 0;
+    const direction = currentScrollY > this.lastScrollY ? 1 : -1;
     const sectionId = this.activeSectionTrigger.vars?.id;
 
-    // Snap forward if progress > 85%
+    console.log('Performing magnetic snap check:', { progress, direction, sectionId });
+
+    // Snap forward if progress > 85% and scrolling down
     if (progress > 0.85 && direction === 1) {
       const nextSectionElement = this.getNextSectionElement(sectionId);
       if (nextSectionElement) {
+        console.log('Snapping to next section:', nextSectionElement.id);
         gsapInstance.to(window, {
           scrollTo: { y: nextSectionElement.offsetTop, autoKill: false },
           ease: 'power2.inOut',
@@ -319,10 +356,11 @@ export class ScrollOrchestrationService {
         });
       }
     }
-    // Snap backward if progress < 15% 
+    // Snap backward if progress < 15% and scrolling up
     else if (progress < 0.15 && direction === -1) {
       const prevSectionElement = this.getPrevSectionElement(sectionId);
       if (prevSectionElement) {
+        console.log('Snapping to previous section:', prevSectionElement.id);
         gsapInstance.to(window, {
           scrollTo: { y: prevSectionElement.offsetTop, autoKill: false },
           ease: 'power2.inOut',
