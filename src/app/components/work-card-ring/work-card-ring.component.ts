@@ -49,7 +49,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   ) {}
 
   ngAfterViewInit(): void {
-    if (!isPlatformBrowser(this.platformId) || this.isInitialized) return;
+    if (!isPlatformBrowser(this.platformId)) return;
+    if (this.isInitialized) return;
     
     this.zone.runOutsideAngular(() => {
       this.checkReducedMotion();

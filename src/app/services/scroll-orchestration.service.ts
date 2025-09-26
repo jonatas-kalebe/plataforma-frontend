@@ -226,6 +226,7 @@ export class ScrollOrchestrationService {
 
   private setupGlobalProgress(): void {
     const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
+    let lastUpdateTime = performance.now();
 
     const globalTrigger = ScrollTriggerInstance.create({
       id: 'global-progress',
@@ -233,9 +234,15 @@ export class ScrollOrchestrationService {
       start: 'top top',
       end: 'bottom bottom',
       onUpdate: (self: any) => {
+        const currentTime = performance.now();
         const currentScrollY = window.scrollY || 0;
-        const velocityRaw = Math.abs(currentScrollY - this.lastScrollY);
-        const velocity = velocityRaw / 1000;
+        const deltaTime = Math.max(currentTime - lastUpdateTime, 1); // Prevent division by zero
+        const deltaScroll = Math.abs(currentScrollY - this.lastScrollY);
+        
+        // Calculate velocity in pixels per second
+        const velocityRaw = (deltaScroll / deltaTime) * 1000;
+        // Apply smoothing to avoid jittery values
+        const smoothedVelocity = velocityRaw * 0.3 + (this.metricsSubject.value.velocity || 0) * 0.7;
 
         if (currentScrollY > this.lastScrollY + 5) {
           this.scrollDirection = 'down';
@@ -246,18 +253,19 @@ export class ScrollOrchestrationService {
         }
 
         this.lastScrollY = currentScrollY;
+        lastUpdateTime = currentTime;
 
         const currentMetrics = this.metricsSubject.value;
 
         this.metricsSubject.next({
           ...currentMetrics,
           globalProgress: self.progress,
-          velocity: Math.abs(velocity)
+          velocity: Math.abs(smoothedVelocity)
         });
 
         this.scrollStateSubject.next({
           globalProgress: self.progress,
-          velocity: Math.abs(velocity),
+          velocity: Math.abs(smoothedVelocity),
           activeSection: currentMetrics.activeSection,
           direction: this.scrollDirection
         });
@@ -322,15 +330,17 @@ export class ScrollOrchestrationService {
 
     const progress = this.activeSectionTrigger.progress || 0;
     const direction = this.activeSectionTrigger.direction || 0;
-    const velocity = ScrollTriggerInstance.getVelocity ? ScrollTriggerInstance.getVelocity() : 0;
+    // Use our own velocity tracking since ScrollTrigger.getVelocity() doesn't exist
+    const currentVelocity = this.scrollStateSubject.value.velocity * 1000; // Convert to pixels per second
 
     if (this.snapTimeoutId) {
       clearTimeout(this.snapTimeoutId);
       this.snapTimeoutId = null;
     }
 
-    if (Math.abs(velocity) < 50) {
-      const delay = this.isMobile ? 150 : 100;
+    // Only snap when velocity is low (user has stopped or is scrolling slowly)
+    if (Math.abs(currentVelocity) < 100) {
+      const delay = this.isMobile ? 250 : 150; // Slightly longer delay for better UX
       this.snapTimeoutId = window.setTimeout(() => {
         this.performMagneticSnap();
       }, delay);
