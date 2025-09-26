@@ -30,6 +30,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private destroy$ = new Subject<void>();
   private prefersReducedMotion = false;
   private draggable: any = null;
+  private dragCleanup: (() => void) | null = null;
   @Input() scrollProgress: number | undefined;
   
   // Structure expected by tests
@@ -67,9 +68,17 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     
     this.destroy$.next();
     this.destroy$.complete();
+    
+    // Clean up custom drag events
+    if (this.dragCleanup) {
+      this.dragCleanup();
+    }
+    
+    // Clean up GSAP draggable if it exists (for backward compatibility)
     if (this.draggable) {
       this.draggable[0].kill();
     }
+    
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
     }
@@ -110,53 +119,157 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private setupDraggable(): void {
     if (!this.ring?.nativeElement) return;
 
-    const DraggableInstance = (window as any).Draggable || Draggable;
     const ringEl = this.ring.nativeElement;
-    const component = this; // Store reference to component
     
     // Set initial cursor
     ringEl.style.cursor = 'grab';
 
-    this.draggable = DraggableInstance.create(ringEl, {
-      type: 'rotation',
-      inertia: true,
-      onDragStart: () => {
-        this.isDragging = true;
-        ringEl.style.cursor = 'grabbing';
-      },
-      onDrag: function(this: any) {
-        // Update rotation target based on drag - 'this' is the Draggable instance
-        component.updateRotationTarget(this.rotation);
-      },
-      onThrowUpdate: function(this: any) {
-        // Update rotation target during inertia - 'this' is the Draggable instance
-        component.updateRotationTarget(this.rotation);
-      },
-      onDragEnd: () => {
-        this.isDragging = false;
-        ringEl.style.cursor = 'grab';
+    // Custom drag implementation to ensure Y-axis only rotation
+    this.setupCustomDrag();
+  }
+
+  private setupCustomDrag(): void {
+    const ringEl = this.ring.nativeElement;
+    let startX = 0;
+    let startRotation = 0;
+    let isPointerDown = false;
+    let velocity = 0;
+    let lastTime = 0;
+    let lastX = 0;
+    let animationId: number | null = null;
+    
+    const sensitivity = 0.5; // Adjust drag sensitivity
+    const inertiaDecay = 0.95; // Momentum decay factor
+
+    const handlePointerStart = (event: PointerEvent | MouseEvent | TouchEvent) => {
+      isPointerDown = true;
+      this.isDragging = true;
+      ringEl.style.cursor = 'grabbing';
+      
+      // Get the X coordinate from different event types
+      const clientX = 'clientX' in event ? event.clientX : 
+                     ('touches' in event && event.touches.length > 0) ? event.touches[0].clientX : 0;
+      
+      startX = clientX;
+      lastX = clientX;
+      startRotation = this.rotation.target;
+      velocity = 0;
+      lastTime = performance.now();
+      
+      // Stop any ongoing inertia animation
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+      
+      // Only preventDefault for mouse events to avoid passive listener warnings
+      if (event.type === 'mousedown') {
+        event.preventDefault();
+      }
+    };
+
+    const handlePointerMove = (event: PointerEvent | MouseEvent | TouchEvent) => {
+      if (!isPointerDown) return;
+      
+      const clientX = 'clientX' in event ? event.clientX : 
+                     ('touches' in event && event.touches.length > 0) ? event.touches[0].clientX : 0;
+      
+      const deltaX = clientX - startX;
+      const currentTime = performance.now();
+      const deltaTime = Math.max(currentTime - lastTime, 1);
+      
+      // Calculate velocity for momentum
+      velocity = ((clientX - lastX) / deltaTime) * 1000 * sensitivity;
+      lastX = clientX;
+      lastTime = currentTime;
+      
+      // Update rotation - ONLY on Y-axis
+      const newRotation = startRotation + (deltaX * sensitivity);
+      this.rotation.target = newRotation;
+      
+      // Only preventDefault for mouse events
+      if (event.type === 'mousemove') {
+        event.preventDefault();
+      }
+    };
+
+    const handlePointerEnd = (event: PointerEvent | MouseEvent | TouchEvent) => {
+      if (!isPointerDown) return;
+      
+      isPointerDown = false;
+      this.isDragging = false;
+      ringEl.style.cursor = 'grab';
+      
+      // Add haptic feedback for mobile (if supported)
+      if ('vibrate' in navigator && Math.abs(velocity) > 50) {
+        navigator.vibrate(10); // Short vibration for snapping
+      }
+      
+      // Apply momentum/inertia effect with improved physics
+      if (Math.abs(velocity) > 10) {
+        const startInertiaTime = performance.now();
+        const startInertiaRotation = this.rotation.target;
+        const initialVelocity = velocity;
+        
+        const inertiaAnimation = () => {
+          const elapsed = performance.now() - startInertiaTime;
+          const progress = Math.min(elapsed / 1000, 1); // 1 second max
+          
+          // Apply exponential decay to velocity with better curve
+          velocity *= inertiaDecay;
+          
+          // Add slight easing curve for more natural feeling
+          const easedVelocity = velocity * (1 - progress * 0.3);
+          
+          if (Math.abs(easedVelocity) > 1 && progress < 1) {
+            this.rotation.target += easedVelocity * 0.016; // 60fps frame time
+            animationId = requestAnimationFrame(inertiaAnimation);
+          } else {
+            // Snap to nearest card when inertia stops
+            this.snapToNearestCard();
+            // Small haptic feedback for snap completion
+            if ('vibrate' in navigator && Math.abs(initialVelocity) > 100) {
+              navigator.vibrate(5);
+            }
+            animationId = null;
+          }
+        };
+        
+        animationId = requestAnimationFrame(inertiaAnimation);
+      } else {
+        // Snap immediately if no significant velocity
         this.snapToNearestCard();
       }
-    });
-
-    // Add event listeners for the drag events (for test compatibility)
-    if (this.draggable && this.draggable[0]) {
-      this.draggable[0].addEventListener('drag', function(this: any) {
-        component.updateRotationTarget(this.rotation);
-      });
       
-      this.draggable[0].addEventListener('throwupdate', function(this: any) {
-        component.updateRotationTarget(this.rotation);
-      });
-    }
-  }
+      // Only preventDefault for mouse events
+      if (event.type === 'mouseup') {
+        event.preventDefault();
+      }
+    };
 
-  private updateRotationTarget(rotation: number): void {
-    this.rotation.target = rotation;
-  }
+    // Mouse events
+    ringEl.addEventListener('mousedown', handlePointerStart);
+    document.addEventListener('mousemove', handlePointerMove);
+    document.addEventListener('mouseup', handlePointerEnd);
 
-  private setupNativeDragEvents(): void {
-    // This method is now removed as we're using GSAP Draggable
+    // Touch events for mobile - make passive to avoid preventDefault warnings
+    ringEl.addEventListener('touchstart', handlePointerStart, { passive: true });
+    document.addEventListener('touchmove', handlePointerMove, { passive: true });
+    document.addEventListener('touchend', handlePointerEnd, { passive: true });
+
+    // Cleanup function (store for later use in ngOnDestroy)
+    this.dragCleanup = () => {
+      ringEl.removeEventListener('mousedown', handlePointerStart);
+      document.removeEventListener('mousemove', handlePointerMove);
+      document.removeEventListener('mouseup', handlePointerEnd);
+      ringEl.removeEventListener('touchstart', handlePointerStart);
+      document.removeEventListener('touchmove', handlePointerMove);
+      document.removeEventListener('touchend', handlePointerEnd);
+      
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+    };
   }
 
   private snapToNearestCard(): void {
@@ -195,10 +308,43 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         const trabalhosSection = this.scrollService.getSection('trabalhos');
         if (trabalhosSection && !this.isDragging) {
           const progress = trabalhosSection.progress;
-          const scrollRotation = progress * 360;
-          this.rotation.target = scrollRotation;
+          
+          // Enhanced scroll-driven rotation with better dynamics
+          const scrollRotation = progress * 360 * 2; // 2 full rotations during pin
+          
+          // Add slight momentum based on scroll velocity
+          const scrollVelocity = state.velocity || 0;
+          const velocityFactor = Math.min(scrollVelocity * 0.01, 2); // Cap at 2x
+          
+          // Apply momentum to rotation
+          this.rotation.target = scrollRotation + (velocityFactor * 10);
+          
+          // Dynamic radius based on velocity (as requested in requirements)
+          this.updateRadiusBasedOnVelocity(scrollVelocity);
+          
+          // Implement magnetic snapping during scroll
+          const cardAngle = 360 / 8; // 45 degrees per card
+          const nearestCardProgress = Math.round(progress * 8) / 8; // Snap to 8th positions
+          
+          // If scroll is slow, snap to nearest card
+          if (scrollVelocity < 50 && Math.abs(progress - nearestCardProgress) < 0.05) {
+            const snapRotation = nearestCardProgress * 360 * 2;
+            this.rotation.target = snapRotation;
+          }
         }
       });
+  }
+
+  private updateRadiusBasedOnVelocity(velocity: number): void {
+    // Slightly increase radius based on velocity (subtle effect)
+    const baseRadius = 200;
+    const velocityMultiplier = Math.min(velocity * 0.001, 0.2); // Cap at 20% increase
+    const dynamicRadius = baseRadius * (1 + velocityMultiplier);
+    
+    // Update CSS custom property for radius
+    if (this.ring?.nativeElement) {
+      this.ring.nativeElement.style.setProperty('--dynamic-radius', `${dynamicRadius}px`);
+    }
   }
 
   private initAnimation(): void {
@@ -225,7 +371,12 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.rotation.current = lerp(this.rotation.current, this.rotation.target, lerpFactor);
     
     if (this.ring?.nativeElement && Math.abs(this.rotation.current - this.rotation.target) > 0.1) {
-      gsapInstance.set(this.ring.nativeElement, { rotationY: this.rotation.current });
+      // CRITICAL FIX: Always apply rotation ONLY on Y-axis using explicit rotateY transform
+      gsapInstance.set(this.ring.nativeElement, { 
+        rotateY: this.rotation.current,
+        rotateX: 0,
+        rotateZ: 0
+      });
     }
     
     this.rafId = requestAnimationFrame(() => this.smoothRotate());

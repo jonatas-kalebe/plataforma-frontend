@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { PLATFORM_ID } from '@angular/core';
-import { ScrollOrchestrationService } from '../src/app/services/scroll-orchestration.service';
+import { ScrollOrchestrationService } from './scroll-orchestration.service';
 
 describe('ScrollOrchestrationService Behavior', () => {
   let created: any[] = [];
