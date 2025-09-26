@@ -36,7 +36,6 @@ import { SECTION_IDS } from '../../../shared/constants';
         <div class="trabalhos-showcase" [attr.data-testid]="'work-showcase'">
           <app-work-card-ring
             #workCardRing
-            [customClass]="workRingClass"
             (ringReady)="onRingReady($event)"
             (cardSelected)="onCardSelected($event)">
           </app-work-card-ring>

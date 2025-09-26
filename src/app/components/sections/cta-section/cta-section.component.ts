@@ -5,14 +5,14 @@
 
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { SectionHeaderComponent, CtaButtonComponent } from '../../ui';
+import { CtaButtonComponent } from '../../ui';
 import { CallToAction, ButtonVariant, Size } from '../../../shared/types';
 import { SECTION_IDS } from '../../../shared/constants';
 
 @Component({
   selector: 'app-cta-section',
   standalone: true,
-  imports: [CommonModule, SectionHeaderComponent, CtaButtonComponent],
+  imports: [CommonModule, CtaButtonComponent],
   template: `
     <section 
       id="cta" 

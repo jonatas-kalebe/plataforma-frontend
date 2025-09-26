@@ -5,13 +5,12 @@
 
 import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { SectionHeaderComponent } from '../../ui';
 import { SECTION_IDS } from '../../../shared/constants';
 
 @Component({
   selector: 'app-filosofia-section',
   standalone: true,
-  imports: [CommonModule, SectionHeaderComponent],
+  imports: [CommonModule],
   template: `
     <section 
       id="filosofia" 

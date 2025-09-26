@@ -6,7 +6,7 @@
 import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ThreeParticleBackgroundComponent } from '../../three-particle-background/three-particle-background.component';
-import { SectionHeaderComponent, CtaButtonComponent, ScrollHintComponent } from '../../ui';
+import { CtaButtonComponent, ScrollHintComponent } from '../../ui';
 import { ScrollState } from '../../../services/scroll-orchestration.service';
 import { SECTION_IDS } from '../../../shared/constants';
 
@@ -16,7 +16,6 @@ import { SECTION_IDS } from '../../../shared/constants';
   imports: [
     CommonModule,
     ThreeParticleBackgroundComponent,
-    SectionHeaderComponent,
     CtaButtonComponent,
     ScrollHintComponent
   ],

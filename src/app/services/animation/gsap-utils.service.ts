@@ -24,6 +24,16 @@ export interface GsapConfig {
   repeat?: number;
   yoyo?: boolean;
   immediateRender?: boolean;
+  // Animation properties
+  x?: number;
+  y?: number;
+  scale?: number;
+  opacity?: number;
+  rotation?: number;
+  rotationX?: number;
+  rotationY?: number;
+  boxShadow?: string;
+  [key: string]: any;
 }
 
 export interface ScrollTriggerOptions {
@@ -38,6 +48,7 @@ export interface ScrollTriggerOptions {
   onLeave?: () => void;
   onEnterBack?: () => void;
   onLeaveBack?: () => void;
+  onUpdate?: (self: any) => void;
 }
 
 @Injectable({
@@ -260,7 +271,8 @@ export class GsapUtilsService {
    * Get current scroll position
    */
   getScrollPosition(): number {
-    return ScrollTrigger.isTouch === 1 ? ScrollTrigger.scrollerProxy(window)?.scrollTop() || 0 : window.pageYOffset;
+    if (typeof window === 'undefined') return 0;
+    return window.pageYOffset || 0;
   }
 
   /**
