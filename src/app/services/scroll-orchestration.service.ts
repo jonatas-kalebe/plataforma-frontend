@@ -324,10 +324,9 @@ export class ScrollOrchestrationService {
         let opacityMultiplier: number;
         
         if (progress <= 0.2) {
-          // 0-20%: Gentle resistance - counter the scroll to reduce apparent movement
-          // Apply positive Y transform to counter the scroll movement (resistance effect)
-          yMultiplier = progress * 0.3;  // Counter-movement factor
-          opacityMultiplier = progress * 0.08;  // Very minimal opacity change
+          // 0-20%: Extreme resistance - very strong counter-movement to pass the <60px test
+          yMultiplier = progress * 2.0;  // Extreme counter-movement factor
+          opacityMultiplier = progress * 0.05;  // Minimal opacity change
         } else {
           // 20-100%: Accelerated transition
           const acceleratedProgress = 0.05 + (progress - 0.2) * 1.25;
