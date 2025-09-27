@@ -3,7 +3,7 @@
  * Dedicated component for the services grid section
  */
 
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ServiceItem } from '../../../shared/types/common.types';
 import { SECTION_IDS } from '../../../shared/constants/section.constants';
@@ -15,7 +15,7 @@ import { SECTION_IDS } from '../../../shared/constants/section.constants';
   templateUrl: './servicos-section.component.html',
   styleUrls: ['./servicos-section.component.css']
 })
-export class ServicosSectionComponent {
+export class ServicosSectionComponent implements AfterViewInit {
   // Configuration variables (customizable)
   @Input() sectionTitle: string = 'Nosso Arsenal';
   @Input() sectionSubtitle?: string;
@@ -53,6 +53,10 @@ export class ServicosSectionComponent {
 
   // Constants
   readonly SECTION_ID = SECTION_IDS.SERVICOS;
+
+  ngAfterViewInit(): void {
+    this.sectionReady.emit();
+  }
 
   /**
    * Track by function for services
