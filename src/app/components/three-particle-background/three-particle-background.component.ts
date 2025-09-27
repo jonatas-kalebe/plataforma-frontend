@@ -287,13 +287,13 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     posAttr.setUsage && posAttr.setUsage(ThreeInstance.StreamDrawUsage);
     geometry.setAttribute('position', posAttr);
     const material = new ThreeInstance.PointsMaterial({
-      size: 1.2,
+      size: this.isMobile ? 2.0 : 3.0, // Increase size for better visibility
       map: this.createParticleTexture(),
       transparent: true,
-      opacity: 0.6,
-      blending: ThreeInstance.NormalBlending,
+      opacity: 0.8, // Increase opacity
+      blending: ThreeInstance.AdditiveBlending, // Use additive blending for glow effect
       depthWrite: false,
-      color: 0x2d5b8c
+      color: 0x64FFDA // Bright cyan color for better visibility
     });
     this.particles = new ThreeInstance.Points(geometry, material);
     this.particles.frustumCulled = false;
