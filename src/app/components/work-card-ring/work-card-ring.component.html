@@ -1,8 +1,13 @@
-<div class="ring-wrap">
-  <div #ring class="ring ring-container">
-    <div #card class="work-card" *ngFor="let item of items; index as idx" [style.--i]="idx">
+<div class="ring-wrap" [style.perspective.px]="perspective">
+  <div #ring class="ring">
+    <div
+      #card
+      class="work-card"
+      *ngFor="let item of items; let i = index"
+      [style.--i]="i"
+    >
       <div class="work-card-inner">
-        {{ item.title }}
+        {{ item?.title ?? (item | json) }}
       </div>
     </div>
   </div>

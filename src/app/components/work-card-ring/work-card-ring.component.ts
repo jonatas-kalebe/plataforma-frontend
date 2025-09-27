@@ -1,387 +1,391 @@
-import { Component, ElementRef, NgZone, ViewChild, ViewChildren, AfterViewInit, OnDestroy, PLATFORM_ID, inject, Input, QueryList, OnChanges, SimpleChanges } from '@angular/core';
+import {
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  EventEmitter,
+  Inject,
+  Input,
+  NgZone,
+  OnChanges,
+  OnDestroy,
+  Output,
+  PLATFORM_ID,
+  QueryList,
+  SimpleChanges,
+  ViewChild,
+  ViewChildren,
+} from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
-import { Draggable } from 'gsap/Draggable';
-import { ScrollOrchestrationService, ScrollState } from '../../services/scroll-orchestration.service';
-import { Subject, takeUntil } from 'rxjs';
 
-// Ensure GSAP plugins are registered
-gsap.registerPlugin(ScrollTrigger, ScrollToPlugin, Draggable);
+type Item = any;
+type OrientationMode = 'outward' | 'inward' | 'camera';
 
 @Component({
   selector: 'app-work-card-ring',
   standalone: true,
   imports: [CommonModule],
   templateUrl: './work-card-ring.component.html',
-  styleUrls: ['./work-card-ring.component.css']
+  styleUrls: ['./work-card-ring.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChanges {
-  private readonly platformId = inject(PLATFORM_ID);
-  @ViewChild('ring', { static: true }) ring!: ElementRef<HTMLDivElement>;
-  @ViewChildren('card') cards!: QueryList<ElementRef<HTMLDivElement>>;
+  @ViewChild('ring', { static: true }) ringRef!: ElementRef<HTMLDivElement>;
+  @ViewChildren('card') cardRefs!: QueryList<ElementRef<HTMLDivElement>>;
 
-  items = Array.from({ length: 8 }).map((_, i) => ({ i, title: `Projeto ${i + 1}` }));
+  // Dados
+  @Input() items: Item[] = Array.from({ length: 8 }, (_, i) => ({ title: `Projeto ${i + 1}` }));
 
-  isDragging = false;
-  private radius = 200;
+  // Aparência
+  @Input() ringViewport = 320; // px - tamanho fixo do container .ring (não muda com o raio)
+  @Input() baseRadius = 200;   // px - raio mínimo
+  @Input() cardWidth = 240;    // px
+  @Input() cardHeight = 140;   // px
+  @Input() perspective = 1200; // px
+
+  // Interação
+  @Input() dragSensitivity = 0.35; // deg/px
+  @Input() wheelSpeed = 0.2;       // deg por deltaY
+  @Input() friction = 2.8;         // 1/s
+  @Input() inertiaEnabled = true;
+
+  // Snap
+  @Input() snapEnabled = true;
+  @Input() snapVelocityThreshold = 15; // deg/s
+  @Input() snapStrength = 45;          // deg/s²
+
+  // Scroll externo
+  @Input() interceptWheel = true;
+  @Input() scrollProgress: number | undefined; // 0..1
+  @Input() scrollRotations = 2;
+
+  // Elástico do raio
+  @Input() radiusElasticity = 0.25;   // 0..1
+  @Input() radiusVelInfluence = 720;  // deg/s
+  @Input() springStiffness = 120;     // 1/s²
+  @Input() springDamping = 22;        // 1/s
+
+  // Orientação dos cards
+  @Input() orientation: OrientationMode = 'outward';
+
+  // Espaçamento automático entre cards
+  @Input() autoRadiusSpacing = true;
+  @Input() minGapPx = 24;
+
+  // Eventos
+  @Output() activeIndexChange = new EventEmitter<number>();
+
+  // Estado interno
+  private isBrowser = false;
+  private reducedMotion = false;
+
+  private rotationDeg = 0;
+  private angularVelocity = 0;
+  private desiredRotationDeg: number | null = null;
+
+  private dynamicRadius = this.baseRadius;
+  private baseRadiusEffective = this.baseRadius;
+  private radiusVelocity = 0;
+  private lastRadiusApplied = -1;
+
+  private dragging = false;
+  private pointerId: number | null = null;
+  private lastPointerX = 0;
+  private lastMoveTS = 0;
+
   private rafId: number | null = null;
-  private destroy$ = new Subject<void>();
-  private prefersReducedMotion = false;
-  private draggable: any = null;
-  private dragCleanup: (() => void) | null = null;
-  @Input() scrollProgress: number | undefined;
-  
-  // Structure expected by tests
-  private rotation = {
-    current: 0,
-    target: 0
-  };
-  
-  // Properties for scroll-driven rotation
-  private rotationFactor = 1;
-  private isSnapped = true;
-  private isInitialized = false;
+  private prevTS = 0;
+
+  private ringEl!: HTMLDivElement;
+  private cardEls: HTMLDivElement[] = [];
 
   constructor(
     private zone: NgZone,
-    private scrollService: ScrollOrchestrationService
-  ) {}
-
-  ngAfterViewInit(): void {
-    if (!isPlatformBrowser(this.platformId)) return;
-    if (this.isInitialized) return;
-    
-    this.zone.runOutsideAngular(() => {
-      this.checkReducedMotion();
-      this.initializeCards();
-      this.setupDraggable();
-      this.setupScrollIntegration();
-      this.startAnimationLoop();
-      this.isInitialized = true;
-    });
+    private hostRef: ElementRef<HTMLElement>,
+    @Inject(PLATFORM_ID) platformId: Object
+  ) {
+    this.isBrowser = isPlatformBrowser(platformId);
   }
 
-  ngOnDestroy(): void {
-    if (!isPlatformBrowser(this.platformId)) return;
-    
-    this.destroy$.next();
-    this.destroy$.complete();
-    
-    // Clean up custom drag events
-    if (this.dragCleanup) {
-      this.dragCleanup();
-    }
-    
-    // Clean up GSAP draggable if it exists (for backward compatibility)
-    if (this.draggable) {
-      this.draggable[0].kill();
-    }
-    
-    if (this.rafId !== null) {
-      cancelAnimationFrame(this.rafId);
-    }
+  ngAfterViewInit(): void {
+    if (!this.isBrowser) return;
+
+    this.ringEl = this.ringRef.nativeElement;
+    this.cardEls = this.cardRefs.toArray().map(r => r.nativeElement);
+
+    this.setupReducedMotion();
+    this.setupDOM();
+    this.applyOrientationFlipVariable();
+    this.recomputeBaseRadiusEffective();      // calcula raio de repouso com gap
+    this.dynamicRadius = this.baseRadiusEffective;
+    this.layoutCards(true);
+    this.attachEvents();
+
+    this.zone.runOutsideAngular(() => {
+      this.prevTS = performance.now();
+      this.tick(this.prevTS);
+    });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['scrollProgress'] && this.scrollProgress !== undefined) {
-      // If not snapped, follow scroll progress
-      if (!this.isSnapped && !this.isDragging) {
-        const expectedRotation = -this.scrollProgress * 360 * this.rotationFactor;
-        this.rotation.target = expectedRotation;
-      }
-    }
-  }
+    if (!this.isBrowser) return;
 
-  private initializeCards(): void {
-    // Handle both real QueryList and test mock
-    const cardElements = this.cards?.toArray ? this.cards.toArray() : (this.cards as any)?._results || [];
-    
-    if (!cardElements.length) {
-      return;
-    }
-    
-    // Use window.gsap if available (for tests), otherwise use imported gsap
-    const gsapInstance = (window as any).gsap || gsap;
-    const angleStep = 360 / cardElements.length;
-    
-    cardElements.forEach((card: any, index: number) => {
-      const angle = index * angleStep;
-      const element = card.nativeElement || card;
-      gsapInstance.set(element, {
-        rotateY: angle,
-        rotateX: 0,
-        rotateZ: 0,
-        transformOrigin: `50% 50% ${-this.radius}px`
-      });
-    });
-  }
-
-  private setupDraggable(): void {
-    if (!this.ring?.nativeElement) return;
-
-    const ringEl = this.ring.nativeElement;
-    
-    // Set initial cursor
-    ringEl.style.cursor = 'grab';
-
-    // Custom drag implementation to ensure Y-axis only rotation
-    this.setupCustomDrag();
-  }
-
-  private setupCustomDrag(): void {
-    const ringEl = this.ring.nativeElement;
-    let startX = 0;
-    let startRotation = 0;
-    let isPointerDown = false;
-    let velocity = 0;
-    let lastTime = 0;
-    let lastX = 0;
-    let animationId: number | null = null;
-    
-    const sensitivity = 0.5; // Adjust drag sensitivity
-    const inertiaDecay = 0.95; // Momentum decay factor
-
-    const handlePointerStart = (event: PointerEvent | MouseEvent | TouchEvent) => {
-      isPointerDown = true;
-      this.isDragging = true;
-      ringEl.style.cursor = 'grabbing';
-      
-      // Get the X coordinate from different event types
-      const clientX = 'clientX' in event ? event.clientX : 
-                     ('touches' in event && event.touches.length > 0) ? event.touches[0].clientX : 0;
-      
-      startX = clientX;
-      lastX = clientX;
-      startRotation = this.rotation.target;
-      velocity = 0;
-      lastTime = performance.now();
-      
-      // Stop any ongoing inertia animation
-      if (animationId) {
-        cancelAnimationFrame(animationId);
-        animationId = null;
-      }
-      
-      // Only preventDefault for mouse events to avoid passive listener warnings
-      if (event.type === 'mousedown') {
-        event.preventDefault();
-      }
-    };
-
-    const handlePointerMove = (event: PointerEvent | MouseEvent | TouchEvent) => {
-      if (!isPointerDown) return;
-      
-      const clientX = 'clientX' in event ? event.clientX : 
-                     ('touches' in event && event.touches.length > 0) ? event.touches[0].clientX : 0;
-      
-      const deltaX = clientX - startX;
-      const currentTime = performance.now();
-      const deltaTime = Math.max(currentTime - lastTime, 1);
-      
-      // Calculate velocity for momentum
-      velocity = ((clientX - lastX) / deltaTime) * 1000 * sensitivity;
-      lastX = clientX;
-      lastTime = currentTime;
-      
-      // Update rotation - ONLY on Y-axis
-      const newRotation = startRotation + (deltaX * sensitivity);
-      this.rotation.target = newRotation;
-      
-      // Only preventDefault for mouse events
-      if (event.type === 'mousemove') {
-        event.preventDefault();
-      }
-    };
-
-    const handlePointerEnd = (event: PointerEvent | MouseEvent | TouchEvent) => {
-      if (!isPointerDown) return;
-      
-      isPointerDown = false;
-      this.isDragging = false;
-      ringEl.style.cursor = 'grab';
-      
-      // Add haptic feedback for mobile (if supported)
-      if ('vibrate' in navigator && Math.abs(velocity) > 50) {
-        navigator.vibrate(10); // Short vibration for snapping
-      }
-      
-      // Apply momentum/inertia effect with improved physics
-      if (Math.abs(velocity) > 10) {
-        const startInertiaTime = performance.now();
-        const startInertiaRotation = this.rotation.target;
-        const initialVelocity = velocity;
-        
-        const inertiaAnimation = () => {
-          const elapsed = performance.now() - startInertiaTime;
-          const progress = Math.min(elapsed / 1000, 1); // 1 second max
-          
-          // Apply exponential decay to velocity with better curve
-          velocity *= inertiaDecay;
-          
-          // Add slight easing curve for more natural feeling
-          const easedVelocity = velocity * (1 - progress * 0.3);
-          
-          if (Math.abs(easedVelocity) > 1 && progress < 1) {
-            this.rotation.target += easedVelocity * 0.016; // 60fps frame time
-            animationId = requestAnimationFrame(inertiaAnimation);
-          } else {
-            // Snap to nearest card when inertia stops
-            this.snapToNearestCard();
-            // Small haptic feedback for snap completion
-            if ('vibrate' in navigator && Math.abs(initialVelocity) > 100) {
-              navigator.vibrate(5);
-            }
-            animationId = null;
-          }
-        };
-        
-        animationId = requestAnimationFrame(inertiaAnimation);
-      } else {
-        // Snap immediately if no significant velocity
-        this.snapToNearestCard();
-      }
-      
-      // Only preventDefault for mouse events
-      if (event.type === 'mouseup') {
-        event.preventDefault();
-      }
-    };
-
-    // Mouse events
-    ringEl.addEventListener('mousedown', handlePointerStart);
-    document.addEventListener('mousemove', handlePointerMove);
-    document.addEventListener('mouseup', handlePointerEnd);
-
-    // Touch events for mobile - make passive to avoid preventDefault warnings
-    ringEl.addEventListener('touchstart', handlePointerStart, { passive: true });
-    document.addEventListener('touchmove', handlePointerMove, { passive: true });
-    document.addEventListener('touchend', handlePointerEnd, { passive: true });
-
-    // Cleanup function (store for later use in ngOnDestroy)
-    this.dragCleanup = () => {
-      ringEl.removeEventListener('mousedown', handlePointerStart);
-      document.removeEventListener('mousemove', handlePointerMove);
-      document.removeEventListener('mouseup', handlePointerEnd);
-      ringEl.removeEventListener('touchstart', handlePointerStart);
-      document.removeEventListener('touchmove', handlePointerMove);
-      document.removeEventListener('touchend', handlePointerEnd);
-      
-      if (animationId) {
-        cancelAnimationFrame(animationId);
-      }
-    };
-  }
-
-  private snapToNearestCard(): void {
-    const gsapInstance = (window as any).gsap || gsap;
-    const cardAngle = 360 / 8; // 8 cards
-    const nearestCardRotation = Math.round(this.rotation.target / cardAngle) * cardAngle;
-    
-    // For tests, animate the rotation object directly
-    gsapInstance.to(this.rotation, {
-      target: nearestCardRotation,
-      duration: this.prefersReducedMotion ? 0.1 : 0.3,
-      ease: this.prefersReducedMotion ? 'none' : 'power2.out'
-    });
-  }
-
-  private startAnimationLoop(): void {
-    this.smoothRotate();
-  }
-
-  private checkReducedMotion(): void {
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-      this.prefersReducedMotion = mediaQuery.matches;
-    }
-  }
-
-  private setupScrollIntegration(): void {
-    this.scrollService.scrollState$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(state => {
-        // Defensive check for getSection method availability
-        if (typeof this.scrollService.getSection !== 'function') {
-          return;
-        }
-        
-        const trabalhosSection = this.scrollService.getSection('trabalhos');
-        if (trabalhosSection && !this.isDragging) {
-          const progress = trabalhosSection.progress;
-          
-          // Enhanced scroll-driven rotation with better dynamics
-          const scrollRotation = progress * 360 * 2; // 2 full rotations during pin
-          
-          // Add slight momentum based on scroll velocity
-          const scrollVelocity = state.velocity || 0;
-          const velocityFactor = Math.min(scrollVelocity * 0.01, 2); // Cap at 2x
-          
-          // Apply momentum to rotation
-          this.rotation.target = scrollRotation + (velocityFactor * 10);
-          
-          // Dynamic radius based on velocity (as requested in requirements)
-          this.updateRadiusBasedOnVelocity(scrollVelocity);
-          
-          // Implement magnetic snapping during scroll
-          const cardAngle = 360 / 8; // 45 degrees per card
-          const nearestCardProgress = Math.round(progress * 8) / 8; // Snap to 8th positions
-          
-          // If scroll is slow, snap to nearest card
-          if (scrollVelocity < 50 && Math.abs(progress - nearestCardProgress) < 0.05) {
-            const snapRotation = nearestCardProgress * 360 * 2;
-            this.rotation.target = snapRotation;
-          }
-        }
-      });
-  }
-
-  private updateRadiusBasedOnVelocity(velocity: number): void {
-    // Slightly increase radius based on velocity (subtle effect)
-    const baseRadius = 200;
-    const velocityMultiplier = Math.min(velocity * 0.001, 0.2); // Cap at 20% increase
-    const dynamicRadius = baseRadius * (1 + velocityMultiplier);
-    
-    // Update CSS custom property for radius
-    if (this.ring?.nativeElement) {
-      this.ring.nativeElement.style.setProperty('--dynamic-radius', `${dynamicRadius}px`);
-    }
-  }
-
-  private initAnimation(): void {
-    gsap.from(this.ring.nativeElement, {
-      scrollTrigger: {
-        trigger: this.ring.nativeElement,
-        start: 'top 80%',
-        toggleActions: 'play none none reverse'
-      },
-      rotateY: this.prefersReducedMotion ? 0 : -60,
-      opacity: 0,
-      duration: this.prefersReducedMotion ? 0.3 : 1.2,
-      ease: this.prefersReducedMotion ? 'none' : 'power3.out'
-    });
-  }
-
-  private smoothRotate = (): void => {
-    if (!isPlatformBrowser(this.platformId)) return;
-    
-    const gsapInstance = (window as any).gsap || gsap;
-    const lerp = (start: number, end: number, factor: number) => start + (end - start) * factor;
-    const lerpFactor = this.prefersReducedMotion ? 1 : 0.1;
-    
-    this.rotation.current = lerp(this.rotation.current, this.rotation.target, lerpFactor);
-    
-    // Apply rotation when there's any difference, for test compatibility
-    if (this.ring?.nativeElement && Math.abs(this.rotation.current - this.rotation.target) > 0.01) {
-      // CRITICAL FIX: Always apply rotation ONLY on Y-axis using explicit rotateY transform
-      gsapInstance.set(this.ring.nativeElement, { 
-        rotateY: this.rotation.current,
-        rotateX: 0,
-        rotateZ: 0
+    if (changes['items'] || changes['cardWidth'] || changes['baseRadius'] ||
+      changes['minGapPx'] || changes['autoRadiusSpacing']) {
+      queueMicrotask(() => {
+        this.cardEls = this.cardRefs.toArray().map(r => r.nativeElement);
+        this.recomputeBaseRadiusEffective();
+        this.lastRadiusApplied = -1;
+        this.layoutCards(true);
+        this.emitActiveIndex();
       });
     }
-    
-    this.rafId = requestAnimationFrame(() => this.smoothRotate());
+
+    if (changes['ringViewport']) {
+      this.hostRef.nativeElement.style.setProperty('--ring-viewport', `${this.ringViewport}px`);
+    }
+
+    if (changes['orientation'] && this.ringEl) {
+      this.applyOrientationFlipVariable();
+      this.layoutCards(true);
+    }
+
+    if (changes['scrollProgress'] && this.scrollProgress != null && !this.dragging) {
+      const target = -this.scrollProgress * 360 * this.scrollRotations;
+      this.desiredRotationDeg = target;
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (!this.isBrowser) return;
+    this.detachEvents();
+    if (this.rafId != null) cancelAnimationFrame(this.rafId);
+  }
+
+  get count(): number { return Math.max(1, this.items?.length ?? 0); }
+  get stepDeg(): number { return 360 / this.count; }
+
+  // Pointer
+  onPointerDown = (ev: PointerEvent) => {
+    this.dragging = true;
+    this.pointerId = ev.pointerId;
+    this.lastPointerX = ev.clientX;
+    this.lastMoveTS = ev.timeStamp || performance.now();
+    this.ringEl.setPointerCapture(ev.pointerId);
+    this.ringEl.style.cursor = 'grabbing';
+    this.desiredRotationDeg = null;
   };
+  onPointerMove = (ev: PointerEvent) => {
+    if (!this.dragging || ev.pointerId !== this.pointerId) return;
+    const now = ev.timeStamp || performance.now();
+    const dx = ev.clientX - this.lastPointerX;
+    const dt = Math.max(1, now - this.lastMoveTS) / 1000;
+    this.lastPointerX = ev.clientX;
+    this.lastMoveTS = now;
+
+    const deltaDeg = dx * this.dragSensitivity;
+    this.rotationDeg += deltaDeg;
+    this.angularVelocity = deltaDeg / dt;
+  };
+  onPointerUp = (ev: PointerEvent) => {
+    if (ev.pointerId !== this.pointerId) return;
+    this.dragging = false;
+    this.pointerId = null;
+    this.ringEl.releasePointerCapture(ev.pointerId);
+    this.ringEl.style.cursor = 'grab';
+  };
+
+  // Wheel
+  private wheelHandler = (ev: WheelEvent) => {
+    if (this.interceptWheel) ev.preventDefault();
+    const delta = ev.deltaY || ev.detail || 0;
+    const deltaDeg = delta * this.wheelSpeed;
+    this.rotationDeg += deltaDeg;
+    this.angularVelocity += deltaDeg * 60; // impulso
+    this.desiredRotationDeg = null;
+  };
+
+  // DOM
+  private setupDOM() {
+    this.hostRef.nativeElement.style.setProperty('--perspective', `${this.perspective}px`);
+    this.hostRef.nativeElement.style.setProperty('--ring-viewport', `${this.ringViewport}px`);
+    this.hostRef.nativeElement.style.setProperty('--card-w', `${this.cardWidth}px`);
+    this.hostRef.nativeElement.style.setProperty('--card-h', `${this.cardHeight}px`);
+    this.ringEl.style.touchAction = 'none';
+    this.ringEl.style.cursor = 'grab';
+  }
+
+  private applyOrientationFlipVariable() {
+    const flip = this.orientation === 'outward' ? '180deg' : '0deg';
+    this.ringEl.style.setProperty('--inner-flip', flip);
+  }
+
+  // Raio que garante gap mínimo entre cards (sem mexer no tamanho do .ring)
+  private recomputeBaseRadiusEffective() {
+    const stepRad = (2 * Math.PI) / Math.max(1, this.count);
+    let spacingRadius = 0;
+
+    if (this.autoRadiusSpacing && this.count > 1) {
+      const requiredChord = this.cardWidth + this.minGapPx;
+      const denom = 2 * Math.sin(stepRad / 2);
+      spacingRadius = denom > 0 ? requiredChord / denom : 0;
+    }
+
+    this.baseRadiusEffective = Math.max(this.baseRadius, spacingRadius || 0);
+  }
+
+  private layoutCards(forceAll = false) {
+    const radius = this.dynamicRadius;
+    const step = this.stepDeg;
+
+    if (!forceAll && Math.abs(radius - this.lastRadiusApplied) < 0.1) return;
+
+    for (let i = 0; i < this.cardEls.length; i++) {
+      const angle = i * step;
+      const el = this.cardEls[i];
+
+      let t = '';
+      switch (this.orientation) {
+        case 'camera':
+          t = `rotateY(${angle}deg) translateZ(${radius}px) rotateY(${-angle}deg)`;
+          break;
+        case 'inward':
+          t = `rotateY(${angle}deg) translateZ(${radius}px)`;
+          break;
+        case 'outward':
+        default:
+          t = `rotateY(${angle}deg) translateZ(${radius}px) rotateY(180deg)`;
+          break;
+      }
+
+      el.style.transform = t;
+      el.style.width = `${this.cardWidth}px`;
+      el.style.height = `${this.cardHeight}px`;
+    }
+
+    this.lastRadiusApplied = radius;
+  }
+
+  private attachEvents() {
+    this.ringEl.addEventListener('pointerdown', this.onPointerDown, { passive: true });
+    this.ringEl.addEventListener('pointermove', this.onPointerMove, { passive: true });
+    this.ringEl.addEventListener('pointerup', this.onPointerUp, { passive: true });
+    this.ringEl.addEventListener('pointercancel', this.onPointerUp, { passive: true });
+    this.ringEl.addEventListener('pointerleave', this.onPointerUp, { passive: true });
+    this.ringEl.addEventListener('wheel', this.wheelHandler, { passive: !this.interceptWheel });
+  }
+  private detachEvents() {
+    this.ringEl.removeEventListener('pointerdown', this.onPointerDown);
+    this.ringEl.removeEventListener('pointermove', this.onPointerMove);
+    this.ringEl.removeEventListener('pointerup', this.onPointerUp);
+    this.ringEl.removeEventListener('pointercancel', this.onPointerUp);
+    this.ringEl.removeEventListener('pointerleave', this.onPointerUp);
+    this.ringEl.removeEventListener('wheel', this.wheelHandler);
+  }
+
+  private setupReducedMotion() {
+    if (!window || !window.matchMedia) return;
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    this.reducedMotion = mq.matches;
+    mq.addEventListener?.('change', (e) => (this.reducedMotion = e.matches));
+  }
+
+  // Física
+  private tick = (now: number) => {
+    const dt = Math.min(0.05, (now - (this.prevTS || now)) / 1000);
+    this.prevTS = now;
+
+    if (this.desiredRotationDeg != null && !this.dragging) {
+      const blend = this.reducedMotion ? 1 : Math.min(1, dt * 12);
+      this.rotationDeg = this.rotationDeg + (this.desiredRotationDeg - this.rotationDeg) * blend;
+      this.angularVelocity = 0;
+    } else {
+      this.rotationDeg += this.angularVelocity * dt;
+
+      if (this.inertiaEnabled && !this.dragging) {
+        const decay = Math.exp(-this.friction * dt);
+        this.angularVelocity *= decay;
+        if (Math.abs(this.angularVelocity) < 0.01) this.angularVelocity = 0;
+      } else if (!this.inertiaEnabled && !this.dragging) {
+        this.angularVelocity = 0;
+      }
+
+      if (this.snapEnabled && !this.dragging && Math.abs(this.angularVelocity) < this.snapVelocityThreshold) {
+        const snapTarget = this.nearestSnapAngle(this.rotationDeg);
+        const diff = this.shortestAngleDist(this.rotationDeg, snapTarget);
+        const accel = this.snapStrength * Math.sign(diff) * Math.min(1, Math.abs(diff) / this.stepDeg);
+        const damp = 6;
+        this.angularVelocity += (accel - damp * this.angularVelocity) * dt;
+
+        if (Math.abs(diff) < 0.02 && Math.abs(this.angularVelocity) < 0.05) {
+          this.rotationDeg = snapTarget;
+          this.angularVelocity = 0;
+        }
+      }
+    }
+
+    // Raio elástico baseado no raio de repouso (com espaçamento)
+    const velAbs = Math.abs(this.angularVelocity);
+    const maxAdd = this.baseRadiusEffective * (this.reducedMotion ? 0 : this.radiusElasticity);
+    const radiusTarget = this.baseRadiusEffective + Math.min(1, velAbs / this.radiusVelInfluence) * maxAdd;
+
+    // Mola
+    const k = this.springStiffness;
+    const c = this.springDamping;
+    const x = this.dynamicRadius;
+    const v = this.radiusVelocity;
+    const a = -k * (x - radiusTarget) - c * v;
+    this.radiusVelocity = v + a * dt;
+    this.dynamicRadius = x + this.radiusVelocity * dt;
+
+    this.applyRingTransform();
+    this.layoutCards(false);
+
+    this.maybeEmitIndex();
+
+    this.rafId = requestAnimationFrame(this.tick);
+  };
+
+  private applyRingTransform() {
+    this.ringEl.style.transform = `translateZ(0) rotateY(${this.rotationDeg}deg)`;
+  }
+
+  private nearestSnapAngle(currentDeg: number): number {
+    const step = this.stepDeg;
+    const normalized = this.normalizeDeg(-currentDeg);
+    const idx = Math.round(normalized / step);
+    return -idx * step;
+  }
+  private normalizeDeg(deg: number): number {
+    let d = deg % 360;
+    if (d < 0) d += 360;
+    return d;
+  }
+  private shortestAngleDist(a: number, b: number): number {
+    let diff = (b - a) % 360;
+    if (diff < -180) diff += 360;
+    if (diff > 180) diff -= 360;
+    return diff;
+  }
+
+  private computeActiveIndex(): number {
+    const step = this.stepDeg;
+    const normalized = this.normalizeDeg(-this.rotationDeg);
+    let idx = Math.round(normalized / step) % this.count;
+    if (idx < 0) idx += this.count;
+    return idx;
+  }
+
+  private lastEmittedIndex = -1;
+  private maybeEmitIndex() {
+    const idx = this.computeActiveIndex();
+    if (idx !== this.lastEmittedIndex) {
+      this.lastEmittedIndex = idx;
+      this.activeIndexChange.emit(idx);
+    }
+  }
+  private emitActiveIndex() {
+    this.lastEmittedIndex = -1;
+    this.maybeEmitIndex();
+  }
 }
