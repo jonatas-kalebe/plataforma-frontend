@@ -157,7 +157,10 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   }
 
   private initHeroTimeline(): void {
-    // Initial entrance animation only (not scroll-linked)
+    // TEMPORARILY DISABLED: Initial entrance animation to test scroll resistance
+    // The entrance animation might be interfering with scroll-linked resistance animations
+    console.log('Hero entrance animation temporarily disabled for testing');
+    /*
     const tl = gsap.timeline({
       defaults: {ease: this.prefersReducedMotion ? 'none' : 'power3.out', duration: this.prefersReducedMotion ? 0.3 : 1}
     });
@@ -167,6 +170,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       .from('#hero-cta', { y: this.prefersReducedMotion ? 0 : 30}, '-=0.6');
 
     this.timelines.push(tl);
+    */
 
     // Scroll-linked animations are now handled by ScrollOrchestrationService
     // Remove the conflicting ScrollTrigger that was here before

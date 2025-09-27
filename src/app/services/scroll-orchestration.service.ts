@@ -321,15 +321,18 @@ export class ScrollOrchestrationService {
       onUpdate: (self: any) => {
         const progress = self.progress;
         
+        // DEBUG: Log the resistance calculation
+        console.log(`Hero scroll progress: ${(progress * 100).toFixed(1)}%, scrollY: ${window.scrollY}`);
+        
         // Apply resistance logic: gentle resistance for 0-20%, then acceleration
         let yMultiplier: number;
         let opacityMultiplier: number;
         
         if (progress <= 0.2) {
-          // 0-20%: Gentle resistance - reduced movement to stay under 60px
-          // Target: <60px total movement for resistance phase
-          yMultiplier = progress * 1.2;  // Reduced multiplier for gentler resistance
-          opacityMultiplier = progress * 0.08;  // Subtle opacity change
+          // 0-20%: Gentle resistance - target max ~50px movement to stay well under 60px
+          // Max calculation: 28 * 1.2 (max multiplier at 20%) = ~33.6px
+          yMultiplier = progress * 1.0;  // Reduced multiplier for gentler resistance
+          opacityMultiplier = progress * 0.06;  // Subtle opacity change
         } else {
           // 20-100%: Accelerated transition
           const acceleratedProgress = 0.08 + (progress - 0.2) * 1.15;
@@ -340,13 +343,16 @@ export class ScrollOrchestrationService {
         // Apply transformations with resistance/acceleration logic
         // In resistance phase: use positive Y to counter scroll (create resistance effect)
         // In acceleration phase: use negative Y to enhance scroll movement
-        // Key fix: Reduced base movement amounts to ensure <60px in resistance phase
-        const resistanceY = progress <= 0.2 ? 35 * yMultiplier : -45 * yMultiplier; // Reduced from 50 to 35
-        const resistanceY2 = progress <= 0.2 ? 25 * yMultiplier : -35 * yMultiplier; // Reduced from 30 to 25
-        const resistanceY3 = progress <= 0.2 ? 15 * yMultiplier : -25 * yMultiplier; // Reduced from 20 to 15
+        // Key fix: Further reduced base movement amounts to ensure <60px in resistance phase
+        const resistanceY = progress <= 0.2 ? 28 * yMultiplier : -45 * yMultiplier; // Reduced from 35 to 28
+        const resistanceY2 = progress <= 0.2 ? 20 * yMultiplier : -35 * yMultiplier; // Reduced from 25 to 20
+        const resistanceY3 = progress <= 0.2 ? 12 * yMultiplier : -25 * yMultiplier; // Reduced from 15 to 12
+        
+        // DEBUG: Log the actual resistance values
+        console.log(`Resistance calc: yMult=${yMultiplier.toFixed(2)}, resistanceY=${resistanceY.toFixed(1)}px`);
         
         gsapInstance.set('#hero-title', {
-          y: resistanceY,  // Should max at ~42px in resistance phase (35 * 1.2)
+          y: resistanceY,  // Should max at ~28px * 0.2 = ~5.6px at 20% progress
           opacity: Math.max(1 - opacityMultiplier * 0.6, 0.4)
         });
         
@@ -381,9 +387,6 @@ export class ScrollOrchestrationService {
     this.scrollTriggers.push(heroScrollTrigger);
   }
 
-  private lastScrollTime = 0;
-  private scrollStoppedCheckInterval: number | null = null;
-  
   private setupGlobalProgress(): void {
     const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
     let lastUpdateTime = performance.now();
