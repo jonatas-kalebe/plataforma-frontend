@@ -3,7 +3,7 @@
  * Dedicated component for the call-to-action section
  */
 
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SECTION_IDS } from '../../../shared/constants/section.constants';
 
@@ -14,7 +14,7 @@ import { SECTION_IDS } from '../../../shared/constants/section.constants';
   templateUrl: './cta-section.component.html',
   styleUrls: ['./cta-section.component.css']
 })
-export class CtaSectionComponent {
+export class CtaSectionComponent implements AfterViewInit {
   // Configuration variables (customizable)
   @Input() title: string = 'Vamos Construir o Futuro';
   @Input() subtitle?: string;
@@ -36,6 +36,10 @@ export class CtaSectionComponent {
 
   // Constants
   readonly SECTION_ID = SECTION_IDS.CTA;
+
+  ngAfterViewInit(): void {
+    this.sectionReady.emit();
+  }
 
   /**
    * Handle primary CTA click

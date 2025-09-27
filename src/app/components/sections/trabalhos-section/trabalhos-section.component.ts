@@ -3,7 +3,7 @@
  * Dedicated component for the work showcase section
  */
 
-import { Component, Input, Output, EventEmitter, ViewChild, ElementRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { WorkCardRingComponent } from '../../work-card-ring/work-card-ring.component';
 import { SECTION_IDS } from '../../../shared/constants/section.constants';
@@ -15,7 +15,7 @@ import { SECTION_IDS } from '../../../shared/constants/section.constants';
   templateUrl: './trabalhos-section.component.html',
   styleUrls: ['./trabalhos-section.component.css']
 })
-export class TrabalhosSectionComponent {
+export class TrabalhosSectionComponent implements AfterViewInit {
   // Configuration variables (customizable)
   @Input() sectionTitle: string = 'Prova de Conceito';
   @Input() sectionSubtitle?: string;
@@ -38,6 +38,11 @@ export class TrabalhosSectionComponent {
 
   // ViewChild references
   @ViewChild('workCardRing') workCardRing!: WorkCardRingComponent;
+  @ViewChild('sectionElement') sectionElement!: ElementRef;
+
+  ngAfterViewInit(): void {
+    this.sectionReady.emit(this.sectionElement);
+  }
 
   // Constants
   readonly SECTION_ID = SECTION_IDS.TRABALHOS;
