@@ -79,9 +79,6 @@
     transition: color var(--duration-normal) ease;
   }
 
-  a:hover {
-    @apply text-athenity-green-circuit;
-  }
 
   /* Focus styles for accessibility */
   button:focus-visible,

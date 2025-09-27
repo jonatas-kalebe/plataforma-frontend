@@ -2,7 +2,7 @@
 }
 
 #hero-title {
-  opacity: 0;
+
   transform: translateY(30px);
   transition: all 0.8s ease;
 }
@@ -13,7 +13,7 @@
 }
 
 #hero-subtitle {
-  opacity: 0;
+
   transform: translateY(20px);
   transition: all 0.8s ease 0.2s;
 }
@@ -24,7 +24,7 @@
 }
 
 #hero-cta {
-  opacity: 0;
+
   transform: translateY(20px);
   transition: all 0.8s ease 0.4s;
 }
