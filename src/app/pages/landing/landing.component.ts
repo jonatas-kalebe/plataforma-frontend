@@ -95,6 +95,8 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   }
 
   private setupKnotCanvas(canvas: HTMLCanvasElement): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     // Extract knot animation logic for use with component canvas
     this.knotCanvas = new ElementRef(canvas);
     this.initKnot();
@@ -310,6 +312,9 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   }
 
   private initKnot(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    if (!this.knotCanvas?.nativeElement) return;
+    
     this.knotCtx = this.knotCanvas.nativeElement.getContext('2d');
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
