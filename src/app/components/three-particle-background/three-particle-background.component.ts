@@ -129,9 +129,7 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   // Handle scroll changes for particle effects
   private handleScrollChange(metrics: any): void {
-    if (!this.particles) return;
-
-    // Store scroll velocity and state for test access
+    // Store scroll velocity and state for test access (always set, regardless of particles)
     this.scrollVelocity = metrics.velocity;
     this.scrollState = {
       globalProgress: metrics.globalProgress,
@@ -139,6 +137,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       activeSection: metrics.activeSection,
       direction: 'none' // Default direction
     };
+
+    if (!this.particles) return;
 
     // Update particle rotation speed based on velocity
     const velocityFactor = Math.min(metrics.velocity / 1000, 1);
