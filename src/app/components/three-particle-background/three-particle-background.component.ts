@@ -447,13 +447,13 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     const positions = new Float32Array(particleCount * 3);
     this.particleVelocities = new Float32Array(particleCount * 3);
     
-    // Create particles in a more visible area and with better distribution
+    // Position particles much closer to center and closer to camera for guaranteed visibility
     for (let i = 0; i < particleCount; i++) {
       const i3 = i * 3;
-      // Position particles much closer to center and closer to camera for better visibility
-      positions[i3] = (Math.random() - 0.5) * 40;     // X: -20 to 20 (smaller spread)
-      positions[i3 + 1] = (Math.random() - 0.5) * 30;  // Y: -15 to 15 (smaller spread)
-      positions[i3 + 2] = (Math.random() - 0.5) * 20 + 10;  // Z: 0 to 20 (much closer to camera)
+      // Place particles in a very tight, clearly visible area
+      positions[i3] = (Math.random() - 0.5) * 20;     // X: -10 to 10
+      positions[i3 + 1] = (Math.random() - 0.5) * 20;  // Y: -10 to 10  
+      positions[i3 + 2] = (Math.random() - 0.5) * 10 + 20;  // Z: 15 to 25 (very close to camera)
     }
     
     this.originalPositions = new Float32Array(positions);
@@ -461,46 +461,30 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     posAttr.setUsage && posAttr.setUsage(ThreeInstance.StreamDrawUsage);
     geometry.setAttribute('position', posAttr);
     
-    // Create particle texture
-    const particleTexture = this.createParticleTexture();
-    
-    // Create material with or without texture - simplified approach for better compatibility
-    const materialConfig: any = {
-      size: this.isMobile ? 8.0 : 12.0, // Much larger particles for visibility
-      transparent: true,
-      opacity: 1.0, // Full opacity
-      depthWrite: false,
-      color: 0x64FFDA, // Bright cyan color
-      sizeAttenuation: false, // Don't let size decrease with distance - keep particles large
-      // Remove blending temporarily to test basic visibility
-      // blending: ThreeInstance.AdditiveBlending,
-    };
-    
-    // Only add texture if it was created successfully
-    if (particleTexture) {
-      materialConfig.map = particleTexture;
-    }
-    
-    const material = new ThreeInstance.PointsMaterial(materialConfig);
+    // Create the simplest possible material that will definitely render
+    const material = new ThreeInstance.PointsMaterial({
+      size: 15, // Very large particles
+      color: 0x00FF00, // Bright green - impossible to miss
+      transparent: false, // No transparency issues
+      sizeAttenuation: false, // Constant size
+      // No texture, no blending - just simple solid color
+    });
     
     this.particles = new ThreeInstance.Points(geometry, material);
     this.particles.frustumCulled = false;
     this.scene.add(this.particles);
     
-    console.log(`Created ${particleCount} particles with enhanced visibility`);
-    console.log('Particle system details:', {
-      particleCount,
-      materialSize: materialConfig.size,
-      materialColor: materialConfig.color.toString(16),
-      particlePosition: this.particles.position,
-      cameraPosition: this.camera.position,
-      cameraZ: this.camera.position.z
+    console.log(`Created ${particleCount} BRIGHT GREEN particles at size 15 - should be impossible to miss!`);
+    console.log('Particle positions sample:', {
+      firstParticle: [positions[0], positions[1], positions[2]],
+      cameraZ: this.camera.position.z,
+      particleZRange: '15-25'
     });
     
-    // Render a single frame to ensure particles are visible
-    if (this.prefersReducedMotion && this.renderer) {
+    // Force render a frame immediately to test visibility
+    if (this.renderer && this.scene && this.camera) {
       this.renderer.render(this.scene, this.camera);
-      console.log('Rendered single frame for reduced motion');
+      console.log('Force rendered frame - particles should now be visible');
     }
   }
 
