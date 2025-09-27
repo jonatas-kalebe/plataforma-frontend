@@ -302,83 +302,80 @@ export class ScrollOrchestrationService {
 
   private createHeroScrollAnimation(gsapInstance: any, ScrollTriggerInstance: any): void {
     const heroTitle = document.querySelector('#hero-title');
-    const heroSubtitle = document.querySelector('#hero-subtitle'); 
+    const heroSubtitle = document.querySelector('#hero-subtitle');  
     const heroCta = document.querySelector('#hero-cta');
 
-    if (heroTitle) {
-      // Create a timeline for the hero title animation
-      const heroTl = gsapInstance.timeline({
-        scrollTrigger: {
-          trigger: '#hero',
-          start: 'top top',
-          end: 'bottom top',
-          scrub: 1
-        }
-      });
-
-      // 0-20%: gentle resistance - counter-scroll to reduce apparent movement
-      heroTl.fromTo(heroTitle, 
-        { y: 0, opacity: 1 },
-        { y: 59.9, opacity: 0.7, ease: 'power1.out' },
-        0
-      );
-      
-      // 20-100%: accelerated transition with larger movement
-      heroTl.to(heroTitle, 
-        { y: -150, opacity: 0.1, ease: 'power2.in' },
-        0.2
-      );
-
-      this.scrollTriggers.push(heroTl.scrollTrigger);
+    if (!heroTitle || !heroSubtitle || !heroCta) {
+      console.warn('ScrollOrchestrationService: Hero elements not found for scroll animation');
+      return;
     }
 
-    if (heroSubtitle) {
-      const subtitleTl = gsapInstance.timeline({
-        scrollTrigger: {
-          trigger: '#hero',
-          start: 'top top',
-          end: 'bottom top',
-          scrub: 1
+    // Create scroll-linked animation for Hero section with resistance and acceleration
+    const heroScrollTrigger = ScrollTriggerInstance.create({
+      trigger: '#hero',
+      start: 'top top',
+      end: 'bottom top',
+      scrub: true,
+      onUpdate: (self: any) => {
+        const progress = self.progress;
+        
+        // Apply resistance logic: gentle resistance for 0-20%, then acceleration
+        let yMultiplier: number;
+        let opacityMultiplier: number;
+        
+        if (progress <= 0.2) {
+          // 0-20%: Gentle resistance - counter the scroll to reduce apparent movement
+          // Apply positive Y transform to counter the scroll movement (resistance effect)
+          yMultiplier = progress * 0.3;  // Counter-movement factor
+          opacityMultiplier = progress * 0.08;  // Very minimal opacity change
+        } else {
+          // 20-100%: Accelerated transition
+          const acceleratedProgress = 0.05 + (progress - 0.2) * 1.25;
+          yMultiplier = Math.min(1.2, acceleratedProgress);
+          opacityMultiplier = (progress - 0.2) * 2.5 + 0.03;
         }
-      });
+        
+        // Apply transformations with resistance/acceleration logic
+        // In resistance phase: use positive Y to counter scroll (create resistance effect)
+        // In acceleration phase: use negative Y to enhance scroll movement
+        const resistanceY = progress <= 0.2 ? 50 * yMultiplier : -50 * yMultiplier;
+        const resistanceY2 = progress <= 0.2 ? 30 * yMultiplier : -30 * yMultiplier; 
+        const resistanceY3 = progress <= 0.2 ? 20 * yMultiplier : -20 * yMultiplier;
+        
+        gsapInstance.set('#hero-title', {
+          y: resistanceY,  // Positive in resistance phase, negative in acceleration
+          opacity: Math.max(1 - opacityMultiplier * 0.8, 0.2)
+        });
+        
+        gsapInstance.set('#hero-subtitle', {
+          y: resistanceY2,
+          opacity: Math.max(1 - opacityMultiplier * 0.6, 0.4)
+        });
+        
+        gsapInstance.set('#hero-cta', {
+          y: resistanceY3,
+          opacity: Math.max(1 - opacityMultiplier * 0.4, 0.6)
+        });
 
-      subtitleTl.fromTo(heroSubtitle, 
-        { y: 0, opacity: 1 },
-        { y: -40, opacity: 0.7, ease: 'power1.out' },
-        0
-      );
-      
-      subtitleTl.to(heroSubtitle, 
-        { y: -120, opacity: 0, ease: 'power2.in' },
-        0.25
-      );
-
-      this.scrollTriggers.push(subtitleTl.scrollTrigger);
-    }
-
-    if (heroCta) {
-      const ctaTl = gsapInstance.timeline({
-        scrollTrigger: {
-          trigger: '#hero',
-          start: 'top top',
-          end: 'bottom top',
-          scrub: 1
+        // Enhanced fade behavior near thresholds
+        if (progress >= 0.85) {
+          // Near snap threshold - accelerate fade out
+          gsapInstance.to('#hero-title, #hero-subtitle, #hero-cta', { 
+            duration: 0.3, 
+            ease: 'power2.in'
+          });
+        } else if (progress <= 0.15) {
+          // Near reverse threshold - restore visibility
+          gsapInstance.to('#hero-title, #hero-subtitle, #hero-cta', {
+            opacity: 1, 
+            duration: 0.3, 
+            ease: 'power2.out'
+          });
         }
-      });
+      }
+    });
 
-      ctaTl.fromTo(heroCta, 
-        { y: 0, opacity: 1 },
-        { y: -50, opacity: 0.6, ease: 'power1.out' },
-        0
-      );
-      
-      ctaTl.to(heroCta, 
-        { y: -100, opacity: 0, ease: 'power2.in' },
-        0.3
-      );
-
-      this.scrollTriggers.push(ctaTl.scrollTrigger);
-    }
+    this.scrollTriggers.push(heroScrollTrigger);
   }
 
   private setupGlobalProgress(): void {

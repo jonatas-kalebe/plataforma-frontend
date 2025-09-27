@@ -155,6 +155,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   }
 
   private initHeroTimeline(): void {
+    // Initial entrance animation only (not scroll-linked)
     const tl = gsap.timeline({
       defaults: {ease: this.prefersReducedMotion ? 'none' : 'power3.out', duration: this.prefersReducedMotion ? 0.3 : 1}
     });
@@ -165,44 +166,8 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
     this.timelines.push(tl);
 
-    if (!this.prefersReducedMotion) {
-      const heroScrollTrigger = ScrollTrigger.create({
-        trigger: '#hero',
-        start: 'top top',
-        end: 'bottom top',
-        scrub: 1,
-        onUpdate: self => {
-          const progress = self.progress;
-          let yMultiplier, opacityMultiplier;
-          if (progress <= 0.2) {
-            yMultiplier = progress * 0.5;
-            opacityMultiplier = progress * 0.2;
-          } else {
-            const acceleratedProgress = 0.1 + (progress - 0.2) * 1.2;
-            yMultiplier = Math.min(1.0, acceleratedProgress);
-            opacityMultiplier = (progress - 0.2) * 2.0 + 0.04;
-          }
-          gsap.set('#hero-title', {
-            y: 50 * yMultiplier,
-            opacity: Math.max(1 - opacityMultiplier * 0.8, 0.2)
-          });
-          gsap.set('#hero-subtitle', {
-            y: 30 * yMultiplier,
-            opacity: Math.max(1 - opacityMultiplier * 0.6, 0.4)
-          });
-          gsap.set('#hero-cta', {
-            y: 20 * yMultiplier,
-            opacity: Math.max(1 - opacityMultiplier * 0.4, 0.6)
-          });
-          if (progress >= 0.85) {
-            gsap.to('#hero-title, #hero-subtitle, #hero-cta', { duration: 0.3, ease: 'power2.in'});
-          } else if (progress <= 0.15) {
-            gsap.to('#hero-title, #hero-subtitle, #hero-cta', {opacity: 1, duration: 0.3, ease: 'power2.out'});
-          }
-        }
-      });
-      this.scrollTriggers.push(heroScrollTrigger);
-    }
+    // Scroll-linked animations are now handled by ScrollOrchestrationService
+    // Remove the conflicting ScrollTrigger that was here before
   }
 
   private initFilosofiaTimeline(): void {

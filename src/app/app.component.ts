@@ -12,7 +12,7 @@ import {LoadingScreenComponent} from './components/loading-screen/loading-screen
   styleUrls: ['./app.component.css']
 })
 export class AppComponent {
-  showOverlay = signal(true);
+  showOverlay = signal(false); // Temporarily disabled for testing
 
   onOverlayDone(): void {
     this.showOverlay.set(false);
