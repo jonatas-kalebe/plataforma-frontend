@@ -85,39 +85,89 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   ngAfterViewInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
 
-    this.ngZone.runOutsideAngular(() => {
-      const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-      if (mediaQuery.matches) this.prefersReducedMotion = true;
-      
-      try {
-        this.initThree();
-        if (this.renderer) {
-          this.createParticles();
-          this.lastTime = performance.now();
-          if (!this.prefersReducedMotion) {
-            window.addEventListener('click', this.tryEnableGyro, { once: true, passive: true });
-            window.addEventListener('orientationchange', this.onScreenOrientationChange, { passive: true });
-            this.onScreenOrientationChange();
-            this.animate();
+    // Prevent multiple initialization
+    if (this.renderer || this.el.nativeElement.children.length > 0) return;
+
+    // Defer initialization to ensure hydration is complete and avoid SSR conflicts
+    setTimeout(() => {
+      this.ngZone.runOutsideAngular(() => {
+        const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        if (mediaQuery.matches) this.prefersReducedMotion = true;
+        
+        try {
+          this.initThree();
+          
+          // If renderer was created successfully, create particles and start animation
+          if (this.renderer) {
+            this.createParticles();
+            this.lastTime = performance.now();
+            if (!this.prefersReducedMotion) {
+              window.addEventListener('click', this.tryEnableGyro, { once: true, passive: true });
+              window.addEventListener('orientationchange', this.onScreenOrientationChange, { passive: true });
+              this.onScreenOrientationChange();
+              this.animate();
+            } else {
+              // Render a single frame for reduced motion users
+              this.renderer.render(this.scene, this.camera);
+            }
+          }
+          // If no renderer, we're using CSS fallback which doesn't need further setup
+        } catch (error) {
+          console.error('Failed to initialize particle background:', error);
+          // Ensure we have some fallback even if everything fails
+          if (!this.el.nativeElement.children.length) {
+            this.createCSSParticleFallback(this.el.nativeElement);
           }
         }
-      } catch (error) {
-        console.error('Failed to initialize particle background:', error);
-      }
-    });
+      });
+    }, 100); // Small delay to ensure hydration is complete
   }
 
   ngOnDestroy(): void {
     if (!isPlatformBrowser(this.platformId)) return;
 
-    if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = 0;
+    }
+    
+    // Clean up event listeners
     window.removeEventListener('resize', this.onWindowResize);
     window.removeEventListener('click', this.tryEnableGyro as any);
     window.removeEventListener('orientationchange', this.onScreenOrientationChange);
-    if (this.gyroEnabled) window.removeEventListener('deviceorientation', this.handleOrientation);
-    if (this.renderer) this.renderer.dispose();
-    if (this.particles?.geometry) this.particles.geometry.dispose();
-    if (this.particles?.material) (this.particles.material as THREE.Material).dispose();
+    if (this.gyroEnabled) {
+      window.removeEventListener('deviceorientation', this.handleOrientation);
+    }
+    
+    // Dispose of Three.js resources
+    if (this.renderer) {
+      // Remove canvas from DOM
+      const canvas = this.renderer.domElement;
+      if (canvas && canvas.parentNode) {
+        canvas.parentNode.removeChild(canvas);
+      }
+      
+      // Dispose of renderer
+      this.renderer.dispose();
+      this.renderer = null as any;
+    }
+    
+    if (this.particles?.geometry) {
+      this.particles.geometry.dispose();
+    }
+    
+    if (this.particles?.material) {
+      if (Array.isArray(this.particles.material)) {
+        this.particles.material.forEach(material => material.dispose());
+      } else {
+        (this.particles.material as THREE.Material).dispose();
+      }
+    }
+    
+    if (this.scene) {
+      this.scene.clear();
+      this.scene = null as any;
+    }
   }
 
   // Method expected by tests for particle shape formation
@@ -231,41 +281,133 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   }
 
   private initThree(): void {
+    console.log('Initializing Three.js particle system...');
+    
     // Use window.THREE if available (for tests), otherwise use imported THREE
     const ThreeInstance = (window as any).THREE || THREE;
 
     const host = this.el.nativeElement;
     this.isMobile = ('ontouchstart' in window) || (navigator as any).maxTouchPoints > 0;
+    
+    // Clear any existing content from the host element
+    while (host.firstChild) {
+      host.removeChild(host.firstChild);
+    }
+    
     this.scene = new ThreeInstance.Scene();
     this.camera = new ThreeInstance.PerspectiveCamera(75, host.clientWidth / host.clientHeight, 0.1, 200);
     this.camera.position.z = 60;
     
+    let rendererCreated = false;
+    
     try {
-      this.renderer = new ThreeInstance.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-    } catch (error) {
-      console.warn('WebGL not available, falling back to canvas renderer:', error);
-      // Fallback to canvas renderer if WebGL fails
+      // First attempt: WebGL Renderer
+      this.renderer = new ThreeInstance.WebGLRenderer({ 
+        antialias: true, 
+        alpha: true, 
+        powerPreference: 'high-performance',
+        preserveDrawingBuffer: false,
+        failIfMajorPerformanceCaveat: false
+      });
+      rendererCreated = true;
+      console.log('WebGL renderer created successfully');
+    } catch (webglError) {
+      console.warn('WebGL renderer failed:', webglError);
+      
+      // Second attempt: Canvas Renderer (if available)
       try {
-        this.renderer = new ThreeInstance.CanvasRenderer();
+        if (ThreeInstance.CanvasRenderer) {
+          this.renderer = new ThreeInstance.CanvasRenderer();
+          rendererCreated = true;
+          console.log('Canvas renderer created successfully');
+        } else {
+          console.warn('CanvasRenderer not available in this version of Three.js');
+        }
       } catch (canvasError) {
-        console.error('Both WebGL and Canvas renderers failed:', canvasError);
-        // Create a simple fallback element
-        const fallback = document.createElement('div');
-        fallback.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(45deg, rgba(45, 91, 140, 0.1), rgba(140, 45, 91, 0.1)); pointer-events: none;';
-        host.appendChild(fallback);
-        return;
+        console.warn('Canvas renderer failed:', canvasError);
       }
     }
 
-    this.renderer.setSize(host.clientWidth, host.clientHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.isMobile ? 1.5 : 1.75));
-
-    // Only call setClearColor if it exists (may be missing in tests)
-    if (typeof this.renderer.setClearColor === 'function') {
-      this.renderer.setClearColor(0x000000, 0);
+    // If both renderers failed, create a CSS fallback
+    if (!rendererCreated || !this.renderer) {
+      console.log('All renderers failed, creating CSS fallback');
+      this.createCSSParticleFallback(host);
+      return;
     }
 
-    host.appendChild(this.renderer.domElement);
+    // Configure the renderer
+    try {
+      this.renderer.setSize(host.clientWidth, host.clientHeight);
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.isMobile ? 1.5 : 1.75));
+
+      // Only call setClearColor if it exists
+      if (typeof this.renderer.setClearColor === 'function') {
+        this.renderer.setClearColor(0x000000, 0);
+      }
+
+      // Add the renderer's DOM element to the host
+      if (this.renderer.domElement) {
+        host.appendChild(this.renderer.domElement);
+        console.log('Renderer DOM element added to host - particles should be visible');
+      }
+    } catch (setupError) {
+      console.error('Renderer setup failed:', setupError);
+      this.createCSSParticleFallback(host);
+    }
+  }
+
+  private createCSSParticleFallback(host: HTMLElement): void {
+    console.log('Creating CSS particle fallback');
+    
+    // Create a container for CSS particles
+    const fallbackContainer = document.createElement('div');
+    fallbackContainer.style.cssText = `
+      position: absolute; 
+      top: 0; 
+      left: 0; 
+      width: 100%; 
+      height: 100%; 
+      pointer-events: none;
+      overflow: hidden;
+    `;
+    
+    // Create CSS particles
+    const particleCount = this.isMobile ? 30 : 50;
+    for (let i = 0; i < particleCount; i++) {
+      const particle = document.createElement('div');
+      particle.style.cssText = `
+        position: absolute;
+        width: 2px;
+        height: 2px;
+        background: rgba(100, 255, 218, 0.6);
+        border-radius: 50%;
+        box-shadow: 0 0 6px rgba(100, 255, 218, 0.4);
+        left: ${Math.random() * 100}%;
+        top: ${Math.random() * 100}%;
+        animation: float ${3 + Math.random() * 4}s ease-in-out infinite alternate;
+        animation-delay: ${Math.random() * 2}s;
+      `;
+      fallbackContainer.appendChild(particle);
+    }
+    
+    // Add CSS animation keyframes
+    if (!document.getElementById('particle-fallback-styles')) {
+      const styleSheet = document.createElement('style');
+      styleSheet.id = 'particle-fallback-styles';
+      styleSheet.textContent = `
+        @keyframes float {
+          0% { transform: translate(0, 0) scale(0.5); opacity: 0.3; }
+          50% { transform: translate(${this.isMobile ? '10px' : '20px'}, ${this.isMobile ? '-10px' : '-30px'}) scale(1); opacity: 0.8; }
+          100% { transform: translate(${this.isMobile ? '-5px' : '-10px'}, ${this.isMobile ? '5px' : '10px'}) scale(0.7); opacity: 0.4; }
+        }
+      `;
+      document.head.appendChild(styleSheet);
+    }
+    
+    host.appendChild(fallbackContainer);
+    
+    // Mark that we're using fallback
+    this.renderer = null as any;
   }
 
   private createParticles(): void {
@@ -276,29 +418,42 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     const geometry = new ThreeInstance.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     this.particleVelocities = new Float32Array(particleCount * 3);
+    
+    // Create particles in a more visible area and with better distribution
     for (let i = 0; i < particleCount; i++) {
       const i3 = i * 3;
-      positions[i3] = (Math.random() - 0.5) * 150;
-      positions[i3 + 1] = (Math.random() - 0.5) * 100;
-      positions[i3 + 2] = (Math.random() - 0.5) * 150;
+      // Spread particles more evenly in view
+      positions[i3] = (Math.random() - 0.5) * 100;     // X: -50 to 50
+      positions[i3 + 1] = (Math.random() - 0.5) * 60;  // Y: -30 to 30
+      positions[i3 + 2] = (Math.random() - 0.5) * 60;  // Z: -30 to 30 (closer to camera)
     }
+    
     this.originalPositions = new Float32Array(positions);
     const posAttr = new ThreeInstance.Float32BufferAttribute(positions, 3);
     posAttr.setUsage && posAttr.setUsage(ThreeInstance.StreamDrawUsage);
     geometry.setAttribute('position', posAttr);
+    
     const material = new ThreeInstance.PointsMaterial({
-      size: this.isMobile ? 2.0 : 3.0, // Increase size for better visibility
+      size: this.isMobile ? 4.0 : 6.0, // Increased size for better visibility
       map: this.createParticleTexture(),
       transparent: true,
-      opacity: 0.8, // Increase opacity
-      blending: ThreeInstance.AdditiveBlending, // Use additive blending for glow effect
+      opacity: 1.0, // Full opacity
+      blending: ThreeInstance.AdditiveBlending,
       depthWrite: false,
-      color: 0x64FFDA // Bright cyan color for better visibility
+      color: 0x64FFDA, // Bright cyan color
+      sizeAttenuation: true // Size decreases with distance
     });
+    
     this.particles = new ThreeInstance.Points(geometry, material);
     this.particles.frustumCulled = false;
     this.scene.add(this.particles);
-    if (this.prefersReducedMotion) this.renderer.render(this.scene, this.camera);
+    
+    console.log(`Created ${particleCount} particles with enhanced visibility`);
+    
+    // Render a single frame to ensure particles are visible
+    if (this.prefersReducedMotion && this.renderer) {
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 
   private createParticleTexture(): any {
