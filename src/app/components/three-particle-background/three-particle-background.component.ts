@@ -88,14 +88,21 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.ngZone.runOutsideAngular(() => {
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
       if (mediaQuery.matches) this.prefersReducedMotion = true;
-      this.initThree();
-      this.createParticles();
-      this.lastTime = performance.now();
-      if (!this.prefersReducedMotion) {
-        window.addEventListener('click', this.tryEnableGyro, { once: true, passive: true });
-        window.addEventListener('orientationchange', this.onScreenOrientationChange, { passive: true });
-        this.onScreenOrientationChange();
-        this.animate();
+      
+      try {
+        this.initThree();
+        if (this.renderer) {
+          this.createParticles();
+          this.lastTime = performance.now();
+          if (!this.prefersReducedMotion) {
+            window.addEventListener('click', this.tryEnableGyro, { once: true, passive: true });
+            window.addEventListener('orientationchange', this.onScreenOrientationChange, { passive: true });
+            this.onScreenOrientationChange();
+            this.animate();
+          }
+        }
+      } catch (error) {
+        console.error('Failed to initialize particle background:', error);
       }
     });
   }
@@ -232,7 +239,24 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.scene = new ThreeInstance.Scene();
     this.camera = new ThreeInstance.PerspectiveCamera(75, host.clientWidth / host.clientHeight, 0.1, 200);
     this.camera.position.z = 60;
-    this.renderer = new ThreeInstance.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    
+    try {
+      this.renderer = new ThreeInstance.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    } catch (error) {
+      console.warn('WebGL not available, falling back to canvas renderer:', error);
+      // Fallback to canvas renderer if WebGL fails
+      try {
+        this.renderer = new ThreeInstance.CanvasRenderer();
+      } catch (canvasError) {
+        console.error('Both WebGL and Canvas renderers failed:', canvasError);
+        // Create a simple fallback element
+        const fallback = document.createElement('div');
+        fallback.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(45deg, rgba(45, 91, 140, 0.1), rgba(140, 45, 91, 0.1)); pointer-events: none;';
+        host.appendChild(fallback);
+        return;
+      }
+    }
+
     this.renderer.setSize(host.clientWidth, host.clientHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.isMobile ? 1.5 : 1.75));
 
@@ -388,10 +412,14 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       this.accumulator -= this.dtFixed;
       sub++;
     }
-    this.renderer.render(this.scene, this.camera);
+    if (this.renderer && this.scene && this.camera) {
+      this.renderer.render(this.scene, this.camera);
+    }
   };
 
   private stepPhysics(dt: number, timeNow: number) {
+    if (!this.particles || !this.particles.geometry) return;
+    
     const positions = this.particles.geometry.getAttribute('position').array as Float32Array;
     const v = this.particleVelocities;
     const MAX_SENSIBLE_VELOCITY = 0.04;
