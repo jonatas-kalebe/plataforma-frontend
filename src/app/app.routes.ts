@@ -9,6 +9,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'shell',
+    loadComponent: () =>
+      import('./pages/landing/landing.component').then(
+        (c) => c.LandingComponent
+      ),
+    title: 'Athenity - Inovação em Software',
+  },
+  {
     path: '**',
     redirectTo: '',
     pathMatch: 'full',
