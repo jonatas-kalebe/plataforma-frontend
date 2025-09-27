@@ -1,6 +1,7 @@
 import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ThreeParticleBackgroundComponent } from '../../three-particle-background/three-particle-background.component';
+import { SECTION_IDS } from '../../../shared/constants/section.constants';
 
 @Component({
   selector: 'app-hero-section',
@@ -12,6 +13,9 @@ import { ThreeParticleBackgroundComponent } from '../../three-particle-backgroun
 export class HeroSectionComponent implements AfterViewInit {
   // Configuration variables (customizable - at top of file)
   @Input() scrollState: any = null;
+  @Input() titlePrefix: string = 'Nós Desenvolvemos ';
+  @Input() titleHighlight: string = 'Momentos';
+  @Input() titleSuffix: string = '.';
   
   // Event outputs
   @Output() ctaClicked = new EventEmitter<Event>();
@@ -21,7 +25,17 @@ export class HeroSectionComponent implements AfterViewInit {
   @ViewChild('heroBg') heroBg!: ElementRef;
   @ViewChild(ThreeParticleBackgroundComponent) particleBackground!: ThreeParticleBackgroundComponent;
   
+  // Constants
+  readonly SECTION_ID = SECTION_IDS.HERO;
+  
   ngAfterViewInit(): void {
     this.sectionReady.emit(this.heroBg);
+  }
+
+  /**
+   * Handle CTA click
+   */
+  onCtaClick(event: Event): void {
+    this.ctaClicked.emit(event);
   }
 }
