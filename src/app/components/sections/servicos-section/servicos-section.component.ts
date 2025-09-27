@@ -3,7 +3,7 @@
  * Dedicated component for the services grid section
  */
 
-import { Component, Input, Output, EventEmitter, AfterViewInit } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ServiceItem } from '../../../shared/types/common.types';
 import { SECTION_IDS } from '../../../shared/constants/section.constants';
@@ -49,13 +49,16 @@ export class ServicosSectionComponent implements AfterViewInit {
 
   // Outputs
   @Output() serviceClicked = new EventEmitter<{ service: ServiceItem; index: number; event: Event }>();
-  @Output() sectionReady = new EventEmitter<void>();
+  @Output() sectionReady = new EventEmitter<ElementRef>();
+
+  // ViewChild references
+  @ViewChild('sectionElement') sectionElement!: ElementRef;
 
   // Constants
   readonly SECTION_ID = SECTION_IDS.SERVICOS;
 
   ngAfterViewInit(): void {
-    this.sectionReady.emit();
+    this.sectionReady.emit(this.sectionElement);
   }
 
   /**

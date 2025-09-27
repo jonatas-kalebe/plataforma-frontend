@@ -3,7 +3,7 @@
  * Dedicated component for the call-to-action section
  */
 
-import { Component, Input, Output, EventEmitter, AfterViewInit } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SECTION_IDS } from '../../../shared/constants/section.constants';
 
@@ -32,13 +32,16 @@ export class CtaSectionComponent implements AfterViewInit {
   // Outputs
   @Output() primaryCtaClicked = new EventEmitter<Event>();
   @Output() secondaryCtaClicked = new EventEmitter<Event>();
-  @Output() sectionReady = new EventEmitter<void>();
+  @Output() sectionReady = new EventEmitter<ElementRef>();
+
+  // ViewChild references
+  @ViewChild('sectionElement') sectionElement!: ElementRef;
 
   // Constants
   readonly SECTION_ID = SECTION_IDS.CTA;
 
   ngAfterViewInit(): void {
-    this.sectionReady.emit();
+    this.sectionReady.emit(this.sectionElement);
   }
 
   /**
