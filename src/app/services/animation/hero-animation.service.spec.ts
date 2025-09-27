@@ -8,6 +8,7 @@ describe('HeroAnimationService', () => {
   let service: HeroAnimationService;
   let gsapUtils: jasmine.SpyObj<GsapUtilsService>;
   let motionService: jasmine.SpyObj<MotionPreferenceService>;
+  let mockTimeline: any;
 
   beforeEach(() => {
     const gsapSpy = jasmine.createSpyObj('GsapUtilsService', [
@@ -20,9 +21,10 @@ describe('HeroAnimationService', () => {
       'isReady'
     ]);
     const motionSpy = jasmine.createSpyObj('MotionPreferenceService', [
-      'getAnimationDuration',
-      'currentPreference'
-    ]);
+      'getAnimationDuration'
+    ], {
+      currentPreference: false
+    });
 
     TestBed.configureTestingModule({
       providers: [
@@ -37,7 +39,7 @@ describe('HeroAnimationService', () => {
     motionService = TestBed.inject(MotionPreferenceService) as jasmine.SpyObj<MotionPreferenceService>;
     
     // Setup mocks
-    const mockTimeline = {
+    mockTimeline = {
       to: jasmine.createSpy('to').and.returnValue({}),
       progress: jasmine.createSpy('progress').and.returnValue(0),
       play: jasmine.createSpy('play'),
@@ -53,10 +55,8 @@ describe('HeroAnimationService', () => {
     gsapUtils.set.and.returnValue({} as any);
     gsapUtils.animateTo.and.returnValue({} as any);
     gsapUtils.staggerAnimation.and.returnValue({} as any);
-    gsapUtils.isReady = true;
     
     motionService.getAnimationDuration.and.returnValue(0.3);
-    motionService.currentPreference = false;
   });
 
   it('should be created', () => {
@@ -86,7 +86,7 @@ describe('HeroAnimationService', () => {
   });
 
   it('should skip parallax when motion is reduced', () => {
-    motionService.currentPreference = true;
+    (motionService as any).currentPreference = true;
     const mockElementRef = new ElementRef(document.createElement('div'));
     
     service.initializeHeroAnimations(mockElementRef, { parallaxEnabled: true });
@@ -150,7 +150,7 @@ describe('HeroAnimationService', () => {
   });
 
   it('should skip floating animation for reduced motion', () => {
-    motionService.currentPreference = true;
+    (motionService as any).currentPreference = true;
     const target = document.createElement('div');
     
     service.createFloatingAnimation(target);
@@ -203,7 +203,7 @@ describe('HeroAnimationService', () => {
     
     service.setProgress(0.5);
     
-    expect(gsapUtils.createTimeline().progress).toHaveBeenCalledWith(0.5);
+    expect(mockTimeline.progress).toHaveBeenCalledWith(0.5);
   });
 
   it('should check if animation is playing', () => {

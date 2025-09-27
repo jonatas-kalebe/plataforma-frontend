@@ -37,6 +37,13 @@ export class MotionPreferenceService {
   }
 
   /**
+   * Set current reduced motion preference (for testing)
+   */
+  set currentPreference(value: boolean) {
+    this.prefersReducedMotion$.next(value);
+  }
+
+  /**
    * Initialize motion preference detection
    */
   private initializeMotionPreference(): void {

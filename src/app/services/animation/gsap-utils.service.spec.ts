@@ -9,9 +9,10 @@ describe('GsapUtilsService', () => {
   beforeEach(() => {
     const motionSpy = jasmine.createSpyObj('MotionPreferenceService', [
       'getAnimationDuration',
-      'getGsapConfig',
-      'currentPreference'
-    ]);
+      'getGsapConfig'
+    ], {
+      currentPreference: false
+    });
 
     TestBed.configureTestingModule({
       providers: [
@@ -26,7 +27,6 @@ describe('GsapUtilsService', () => {
     // Setup default mock returns
     motionService.getAnimationDuration.and.returnValue(0.3);
     motionService.getGsapConfig.and.returnValue({ duration: 0.3, ease: 'power2.out' });
-    motionService.currentPreference = false;
   });
 
   it('should be created', () => {

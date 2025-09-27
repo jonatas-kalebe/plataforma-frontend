@@ -283,6 +283,13 @@ export class GsapUtilsService {
   }
 
   /**
+   * Set initialization state (for testing)
+   */
+  set isReady(value: boolean) {
+    this.isInitialized = value;
+  }
+
+  /**
    * Get GSAP instance
    */
   get gsap(): typeof gsap {

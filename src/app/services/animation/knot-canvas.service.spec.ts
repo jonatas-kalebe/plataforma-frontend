@@ -7,6 +7,7 @@ describe('KnotCanvasService', () => {
   let service: KnotCanvasService;
   let gsapUtils: jasmine.SpyObj<GsapUtilsService>;
   let motionService: jasmine.SpyObj<MotionPreferenceService>;
+  let mockTimeline: any;
 
   beforeEach(() => {
     const gsapSpy = jasmine.createSpyObj('GsapUtilsService', [
@@ -14,9 +15,10 @@ describe('KnotCanvasService', () => {
       'createScrollTrigger'
     ]);
     const motionSpy = jasmine.createSpyObj('MotionPreferenceService', [
-      'getAnimationDuration',
-      'currentPreference'
-    ]);
+      'getAnimationDuration'
+    ], {
+      currentPreference: false
+    });
 
     TestBed.configureTestingModule({
       providers: [
@@ -31,7 +33,7 @@ describe('KnotCanvasService', () => {
     motionService = TestBed.inject(MotionPreferenceService) as jasmine.SpyObj<MotionPreferenceService>;
     
     // Setup mocks
-    const mockTimeline = {
+    mockTimeline = {
       to: jasmine.createSpy('to').and.returnValue({}),
       progress: jasmine.createSpy('progress').and.returnValue(0),
       play: jasmine.createSpy('play'),
@@ -45,7 +47,6 @@ describe('KnotCanvasService', () => {
     gsapUtils.createTimeline.and.returnValue(mockTimeline as any);
     gsapUtils.createScrollTrigger.and.returnValue(null);
     motionService.getAnimationDuration.and.returnValue(1.5);
-    motionService.currentPreference = false;
   });
 
   it('should be created', () => {
@@ -204,7 +205,7 @@ describe('KnotCanvasService', () => {
     service.initializeKnot(canvas);
     service.setProgress(0.5);
     
-    expect(gsapUtils.createTimeline().progress).toHaveBeenCalledWith(0.5);
+    expect(mockTimeline.progress).toHaveBeenCalledWith(0.5);
   });
 
   it('should clear canvas', () => {

@@ -18,7 +18,7 @@ export class CtaSectionComponent {
   // Configuration variables (customizable)
   @Input() title: string = 'Vamos Construir o Futuro';
   @Input() subtitle?: string;
-  @Input() primaryCta: { label: string; href: string; variant?: string } = {
+  @Input() primaryCta: { label: string; href: string; variant?: string; onClick?: () => void } = {
     label: 'Fale Conosco',
     href: 'mailto:athenity@gmail.com'
   };
@@ -41,6 +41,9 @@ export class CtaSectionComponent {
    * Handle primary CTA click
    */
   onPrimaryCtaClick(event: Event): void {
+    if (this.primaryCta.onClick) {
+      this.primaryCta.onClick();
+    }
     this.primaryCtaClicked.emit(event);
   }
 
