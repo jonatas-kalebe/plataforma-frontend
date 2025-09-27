@@ -1,0 +1,12 @@
+/* src/app/components/athena-chat-widget/athena-chat-widget.component.css */
+@keyframes pop {
+  0% { transform: scale(0.8); opacity: 0 }
+  100% { transform: scale(1); opacity: 1 }
+}
+@keyframes float {
+  0% { transform: translateY(0) }
+  50% { transform: translateY(-4px) }
+  100% { transform: translateY(0) }
+}
+.animate-pop { animation: pop .24s ease-out both }
+.animate-float { animation: float 2.6s ease-in-out infinite }
