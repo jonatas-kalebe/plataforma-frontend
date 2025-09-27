@@ -3,17 +3,15 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
-import { WorkCardRingComponent } from '../../components/work-card-ring/work-card-ring.component';
-import {
-  ThreeParticleBackgroundComponent
-} from '../../components/three-particle-background/three-particle-background.component';
+import { ScrollOrchestrationService, ScrollState } from '../../services/scroll-orchestration.service';
+import { Subject, takeUntil } from 'rxjs';
 
 // Import section components
 import { HeroSectionComponent } from '../../components/sections/hero-section/hero-section.component';
 import { FilosofiaSectionComponent } from '../../components/sections/filosofia-section/filosofia-section.component';
-
-import { ScrollOrchestrationService, ScrollState } from '../../services/scroll-orchestration.service';
-import { Subject, takeUntil } from 'rxjs';
+import { ServicosSectionComponent } from '../../components/sections/servicos-section/servicos-section.component';
+import { TrabalhosSectionComponent } from '../../components/sections/trabalhos-section/trabalhos-section.component';
+import { CtaSectionComponent } from '../../components/sections/cta-section/cta-section.component';
 
 // Expose GSAP globally for the scroll service
 if (typeof window !== 'undefined') {
@@ -26,14 +24,13 @@ gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 @Component({
   selector: 'app-landing',
   standalone: true,
-  imports: [CommonModule, WorkCardRingComponent, ThreeParticleBackgroundComponent, HeroSectionComponent, FilosofiaSectionComponent],
+  imports: [CommonModule, HeroSectionComponent, FilosofiaSectionComponent, ServicosSectionComponent, TrabalhosSectionComponent, CtaSectionComponent],
   templateUrl: './landing.component.html',
   styleUrls: ['./landing.component.css']
 })
 export class LandingComponent implements AfterViewInit, OnDestroy {
   private readonly platformId = inject(PLATFORM_ID);
   @ViewChild('knotCanvas', { static: true }) knotCanvas!: ElementRef<HTMLCanvasElement>;
-  @ViewChild(ThreeParticleBackgroundComponent) particleBackground!: ThreeParticleBackgroundComponent;
 
   private zone = new NgZone({ enableLongStackTrace: false });
   private knotCtx!: CanvasRenderingContext2D | null;
@@ -67,6 +64,34 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     // The knot canvas animation is handled by the landing component
     // We need to pass this canvas to the knot animation method
     this.setupKnotCanvas(canvas);
+  }
+
+  onServicosSectionReady(event: any): void {
+    console.log('Serviços section ready:', event);
+  }
+
+  onServiceClicked(event: { service: any; index: number; event: Event }): void {
+    console.log('Service clicked:', event);
+  }
+
+  onRingReady(ring: any): void {
+    console.log('Work card ring ready:', ring);
+  }
+
+  onCardSelected(card: any): void {
+    console.log('Work card selected:', card);
+  }
+
+  onTrabalhosSectionReady(elementRef: ElementRef): void {
+    console.log('Trabalhos section ready:', elementRef);
+  }
+
+  onPrimaryCtaClicked(event: Event): void {
+    console.log('Primary CTA clicked:', event);
+  }
+
+  onCtaSectionReady(event: any): void {
+    console.log('CTA section ready:', event);
   }
 
   private setupKnotCanvas(canvas: HTMLCanvasElement): void {
@@ -172,12 +197,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
             gsap.to('#hero-title, #hero-subtitle, #hero-cta', { opacity: 0, duration: 0.3, ease: 'power2.in' });
           } else if (progress <= 0.15) {
             gsap.to('#hero-title, #hero-subtitle, #hero-cta', { opacity: 1, duration: 0.3, ease: 'power2.out' });
-          }
-          if (progress >= 0.85 && this.particleBackground) {
-            this.particleBackground.triggerRipple();
-          }
-          if (this.particleBackground && this.scrollState) {
-            this.particleBackground.setScrollVelocity(this.scrollState.velocity || 0);
           }
         }
       });

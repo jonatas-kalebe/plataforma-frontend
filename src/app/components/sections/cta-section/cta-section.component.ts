@@ -5,7 +5,7 @@
 
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { SECTION_IDS } from '../../../shared/constants';
+import { SECTION_IDS } from '../../../shared/constants/section.constants';
 
 @Component({
   selector: 'app-cta-section',

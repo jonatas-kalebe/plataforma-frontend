@@ -5,8 +5,8 @@
 
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ServiceItem } from '../../../shared/types';
-import { SECTION_IDS } from '../../../shared/constants';
+import { ServiceItem } from '../../../shared/types/common.types';
+import { SECTION_IDS } from '../../../shared/constants/section.constants';
 
 @Component({
   selector: 'app-servicos-section',
