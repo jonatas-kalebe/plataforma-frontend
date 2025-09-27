@@ -49,6 +49,11 @@
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Enable native scroll snap for fallback and mobile */
+    scroll-snap-type: y mandatory;
+    scroll-snap-points-y: repeat(100vh);
+    overflow-y: scroll;
+    height: 100%;
   }
 
   body {
@@ -57,6 +62,7 @@
     padding: 0;
     line-height: 1.6;
     overflow-x: hidden;
+    height: 100%;
   }
 
   /* Typography */
@@ -148,9 +154,11 @@
 
   /* Section Layout Classes */
   .section-base {
-    @apply w-full min-h-screen flex items-center px-6;
-    padding-top: var(--spacing-section);
-    padding-bottom: var(--spacing-section);
+    @apply w-full h-screen flex items-center px-6;
+    /* Enable scroll snap for each section */
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    position: relative;
   }
 
   .section-content {

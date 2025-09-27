@@ -460,12 +460,25 @@ export class ScrollOrchestrationService {
     if (!this.activeSectionTrigger || this.prefersReducedMotion) return;
     const progress = this.activeSectionTrigger.progress || 0;
     const direction = this.activeSectionTrigger.direction || 0;
-    if (progress > 0.2 && direction > 0 && this.intentionDetected.direction !== 'forward') {
+
+    // Forward intention: crossed 20% threshold while moving forward
+    if (progress >= 0.2 && direction > 0 && this.intentionDetected.direction !== 'forward') {
       this.intentionDetected = { direction: 'forward', at: progress };
-    } else if (progress <= 0.2) {
+      console.log(`Forward intention detected at ${(progress * 100).toFixed(1)}%`);
+    } 
+    // Reset forward intention if scrolling back under 20%
+    else if (progress < 0.2 && this.intentionDetected.direction === 'forward') {
       this.intentionDetected = { direction: null, at: 0 };
-    } else if (progress <= 0.15 && direction < 0 && this.intentionDetected.direction !== 'backward') {
+    }
+    
+    // Backward intention: crossed 15% threshold while moving backward
+    if (progress <= 0.15 && direction < 0 && this.intentionDetected.direction !== 'backward') {
       this.intentionDetected = { direction: 'backward', at: progress };
+      console.log(`Backward intention detected at ${(progress * 100).toFixed(1)}%`);
+    }
+    // Reset backward intention if scrolling forward over 15%
+    else if (progress > 0.15 && this.intentionDetected.direction === 'backward') {
+      this.intentionDetected = { direction: null, at: 0 };
     }
   }
 
@@ -475,25 +488,31 @@ export class ScrollOrchestrationService {
 
     const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
 
-    // ALTERAÇÃO: se seção ativa for "trabalhos" OU se qualquer trigger com pin estiver ativo, não fazer snap
+    // Skip snapping if trabalhos is pinned
     const activeId = this.scrollStateSubject.value.activeSection?.id;
-    if (activeId === 'trabalhos') return; // não snap durante pin de "trabalhos"
+    if (activeId === 'trabalhos') return; 
     const anyPinnedActive = ScrollTriggerInstance.getAll().some((t: any) => t.pin && t.isActive);
     if (anyPinnedActive) return;
 
     const progress = this.activeSectionTrigger.progress || 0;
     const direction = this.activeSectionTrigger.direction || 0;
-    // Use our own velocity tracking since ScrollTrigger.getVelocity() doesn't exist
-    const currentVelocity = this.scrollStateSubject.value.velocity * 1000; // Convert to pixels per second
+    const currentVelocity = Math.abs(this.scrollStateSubject.value.velocity * 1000);
 
     if (this.snapTimeoutId) {
       clearTimeout(this.snapTimeoutId);
       this.snapTimeoutId = null;
     }
 
-    // Only snap when velocity is low (user has stopped or is scrolling slowly)
-    if (Math.abs(currentVelocity) < 500) { // Increased threshold for more responsive snapping
-      const delay = this.isMobile ? 250 : 100; // Reduced delay for quicker response
+    // Check for intention thresholds first
+    if (progress >= 0.20 && direction > 0 && this.intentionDetected.direction !== 'forward') {
+      this.intentionDetected = { direction: 'forward', at: progress };
+    } else if (progress <= 0.15 && direction < 0 && this.intentionDetected.direction !== 'backward') {
+      this.intentionDetected = { direction: 'backward', at: progress };
+    }
+
+    // Only snap when velocity is low (user has stopped scrolling)
+    if (currentVelocity < 200) { // Lowered threshold for more responsive snapping
+      const delay = this.isMobile ? 150 : 80; // Quicker response
       this.snapTimeoutId = window.setTimeout(() => {
         this.performMagneticSnap();
       }, delay);
@@ -504,7 +523,6 @@ export class ScrollOrchestrationService {
     if (!this.activeSectionTrigger) return;
 
     const activeId = this.scrollStateSubject.value.activeSection?.id;
-    // ALTERAÇÃO: proteção extra
     if (activeId === 'trabalhos') return;
 
     const gsapInstance = (window as any).gsap || gsap;
@@ -512,10 +530,13 @@ export class ScrollOrchestrationService {
     const direction = this.activeSectionTrigger.direction || 0;
     const sectionId = this.activeSectionTrigger.vars?.id;
 
-    // Snap forward when progress >= 85% 
-    if (progress >= 0.85) {
+    console.log(`Snap check: ${sectionId} at ${(progress * 100).toFixed(1)}%, direction: ${direction}`);
+
+    // Snap forward when progress >= 85% with forward intention
+    if (progress >= 0.85 && this.intentionDetected.direction === 'forward') {
       const nextSectionElement = this.getNextSectionElement(sectionId);
       if (nextSectionElement) {
+        console.log(`Snapping forward from ${sectionId} to next section`);
         gsapInstance.to(window, {
           scrollTo: { y: nextSectionElement.offsetTop, autoKill: false },
           ease: 'power2.inOut',
@@ -526,10 +547,11 @@ export class ScrollOrchestrationService {
       }
     }
 
-    // Snap backward when progress <= 15% and moving backward
-    if (progress <= 0.15 && direction < 0) {
+    // Snap backward when progress <= 15% and moving backward with intention
+    if (progress <= 0.15 && direction < 0 && this.intentionDetected.direction === 'backward') {
       const prevSectionElement = this.getPrevSectionElement(sectionId);
       if (prevSectionElement) {
+        console.log(`Snapping backward from ${sectionId} to previous section`);
         gsapInstance.to(window, {
           scrollTo: { y: prevSectionElement.offsetTop, autoKill: false },
           ease: 'power2.inOut',
@@ -538,6 +560,23 @@ export class ScrollOrchestrationService {
         this.intentionDetected = { direction: null, at: 0 };
         return;
       }
+    }
+
+    // Special case for CTA section - no downward snap, only upward snap
+    if (sectionId === 'cta') {
+      if (progress <= 0.15 && direction < 0) {
+        const prevSectionElement = this.getPrevSectionElement(sectionId);
+        if (prevSectionElement) {
+          console.log(`Snapping up from CTA to previous section`);
+          gsapInstance.to(window, {
+            scrollTo: { y: prevSectionElement.offsetTop, autoKill: false },
+            ease: 'power2.inOut',
+            duration: 0.8
+          });
+          this.intentionDetected = { direction: null, at: 0 };
+        }
+      }
+      return; // No forward snap from CTA
     }
   }
 
