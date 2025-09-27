@@ -46,13 +46,9 @@
   }
 
   html {
-    scroll-behavior: smooth;
+    /* Disable smooth scroll to let custom magnetic snapping work */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    /* Enable native scroll snap for fallback and mobile */
-    scroll-snap-type: y mandatory;
-    scroll-snap-points-y: repeat(100vh);
-    overflow-y: scroll;
     height: 100%;
   }
 
@@ -155,9 +151,7 @@
   /* Section Layout Classes */
   .section-base {
     @apply w-full h-screen flex items-center px-6;
-    /* Enable scroll snap for each section */
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
+    /* Remove scroll snap for custom magnetic snapping */
     position: relative;
   }
 

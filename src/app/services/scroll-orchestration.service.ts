@@ -503,16 +503,9 @@ export class ScrollOrchestrationService {
       this.snapTimeoutId = null;
     }
 
-    // Check for intention thresholds first
-    if (progress >= 0.20 && direction > 0 && this.intentionDetected.direction !== 'forward') {
-      this.intentionDetected = { direction: 'forward', at: progress };
-    } else if (progress <= 0.15 && direction < 0 && this.intentionDetected.direction !== 'backward') {
-      this.intentionDetected = { direction: 'backward', at: progress };
-    }
-
-    // Only snap when velocity is low (user has stopped scrolling)
-    if (currentVelocity < 200) { // Lowered threshold for more responsive snapping
-      const delay = this.isMobile ? 150 : 80; // Quicker response
+    // More aggressive snapping - lower velocity threshold and quicker response
+    if (currentVelocity < 100) { // Much lower threshold
+      const delay = this.isMobile ? 50 : 30; // Much quicker response
       this.snapTimeoutId = window.setTimeout(() => {
         this.performMagneticSnap();
       }, delay);
@@ -532,51 +525,45 @@ export class ScrollOrchestrationService {
 
     console.log(`Snap check: ${sectionId} at ${(progress * 100).toFixed(1)}%, direction: ${direction}`);
 
-    // Snap forward when progress >= 85% with forward intention
-    if (progress >= 0.85 && this.intentionDetected.direction === 'forward') {
+    // More aggressive snapping - snap at 70% forward or 30% backward
+    if (progress >= 0.7) {
       const nextSectionElement = this.getNextSectionElement(sectionId);
       if (nextSectionElement) {
         console.log(`Snapping forward from ${sectionId} to next section`);
         gsapInstance.to(window, {
           scrollTo: { y: nextSectionElement.offsetTop, autoKill: false },
           ease: 'power2.inOut',
-          duration: 0.8
+          duration: 0.6 // Faster snapping
         });
-        this.intentionDetected = { direction: null, at: 0 };
         return;
       }
     }
 
-    // Snap backward when progress <= 15% and moving backward with intention
-    if (progress <= 0.15 && direction < 0 && this.intentionDetected.direction === 'backward') {
+    // Snap backward when progress <= 30% and moving backward
+    if (progress <= 0.3 && direction < 0) {
       const prevSectionElement = this.getPrevSectionElement(sectionId);
       if (prevSectionElement) {
         console.log(`Snapping backward from ${sectionId} to previous section`);
         gsapInstance.to(window, {
           scrollTo: { y: prevSectionElement.offsetTop, autoKill: false },
           ease: 'power2.inOut',
-          duration: 0.8
+          duration: 0.6
         });
-        this.intentionDetected = { direction: null, at: 0 };
         return;
       }
     }
 
-    // Special case for CTA section - no downward snap, only upward snap
-    if (sectionId === 'cta') {
-      if (progress <= 0.15 && direction < 0) {
-        const prevSectionElement = this.getPrevSectionElement(sectionId);
-        if (prevSectionElement) {
-          console.log(`Snapping up from CTA to previous section`);
-          gsapInstance.to(window, {
-            scrollTo: { y: prevSectionElement.offsetTop, autoKill: false },
-            ease: 'power2.inOut',
-            duration: 0.8
-          });
-          this.intentionDetected = { direction: null, at: 0 };
-        }
+    // Special case for CTA section - only upward snap
+    if (sectionId === 'cta' && progress <= 0.3 && direction < 0) {
+      const prevSectionElement = this.getPrevSectionElement(sectionId);
+      if (prevSectionElement) {
+        console.log(`Snapping up from CTA to previous section`);
+        gsapInstance.to(window, {
+          scrollTo: { y: prevSectionElement.offsetTop, autoKill: false },
+          ease: 'power2.inOut',
+          duration: 0.6
+        });
       }
-      return; // No forward snap from CTA
     }
   }
 

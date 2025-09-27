@@ -147,11 +147,13 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   }
 
   private initScrollytellingTimelines(): void {
+    // Entry animations only - scroll-linked animations are handled by ScrollOrchestrationService
     this.initHeroTimeline();
     this.initFilosofiaTimeline();
     this.initServicosTimeline();
-    this.initTrabalhosTimeline();
-    this.initCtaTimeline();
+    // Remove ScrollTrigger timelines that conflict with ScrollOrchestrationService
+    // this.initTrabalhosTimeline();
+    // this.initCtaTimeline();
   }
 
   private initHeroTimeline(): void {
@@ -171,23 +173,22 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   }
 
   private initFilosofiaTimeline(): void {
+    // Only basic entry animation, scroll-linked animations handled by ScrollOrchestrationService
     const tl = gsap.timeline({
       scrollTrigger: {
         trigger: '#filosofia',
         start: 'top 80%',
-        end: this.prefersReducedMotion ? 'top 80%' : 'bottom center',
-        ...(this.prefersReducedMotion ? {toggleActions: 'play none none reverse'} : {scrub: 1})
+        end: 'top 80%',
+        toggleActions: 'play none none reverse'
       }
     });
 
     tl.from('#filosofia h2', {
-
       y: this.prefersReducedMotion ? 0 : 80,
       duration: this.prefersReducedMotion ? 0.3 : 1,
       ease: this.prefersReducedMotion ? 'none' : 'power3.out'
     })
       .from('#filosofia p', {
-
         y: this.prefersReducedMotion ? 0 : 60,
         duration: this.prefersReducedMotion ? 0.3 : 0.8,
         ease: this.prefersReducedMotion ? 'none' : 'power3.out'
