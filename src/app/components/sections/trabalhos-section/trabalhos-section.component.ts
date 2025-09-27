@@ -6,7 +6,7 @@
 import { Component, Input, Output, EventEmitter, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { WorkCardRingComponent } from '../../work-card-ring/work-card-ring.component';
-import { SECTION_IDS } from '../../../shared/constants';
+import { SECTION_IDS } from '../../../shared/constants/section.constants';
 
 @Component({
   selector: 'app-trabalhos-section',

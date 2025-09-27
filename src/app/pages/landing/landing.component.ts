@@ -5,7 +5,6 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
 import { ScrollOrchestrationService, ScrollState } from '../../services/scroll-orchestration.service';
 import { Subject, takeUntil } from 'rxjs';
-import { WorkCardRingComponent } from '../../components/work-card-ring/work-card-ring.component';
 
 // Import section components
 import { HeroSectionComponent } from '../../components/sections/hero-section/hero-section.component';
@@ -25,7 +24,7 @@ gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 @Component({
   selector: 'app-landing',
   standalone: true,
-  imports: [CommonModule, WorkCardRingComponent, HeroSectionComponent, FilosofiaSectionComponent],
+  imports: [CommonModule, HeroSectionComponent, FilosofiaSectionComponent, ServicosSectionComponent, TrabalhosSectionComponent, CtaSectionComponent],
   templateUrl: './landing.component.html',
   styleUrls: ['./landing.component.css']
 })

@@ -13,39 +13,20 @@
 </app-filosofia-section>
 
 <!-- Serviços Section Component -->
-<section id="servicos" class="w-full h-screen flex items-center px-6 bg-athenity-blue-deep">
-  <div class="max-w-7xl mx-auto">
-    <h3 class="text-3xl md:text-4xl font-extrabold text-center">Nosso Arsenal</h3>
-    <div class="mt-14 grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-      <div class="service-card bg-athenity-blue-card p-8 rounded-2xl transition-transform hover:-translate-y-2 hover:shadow-glow border border-transparent hover:border-athenity-green-circuit/60">
-        <h4 class="text-2xl text-athenity-green-circuit">Aplicações Sob Medida</h4>
-        <p class="mt-4">Soluções web e mobile robustas e elegantes, moldadas pelo contexto do seu cliente.</p>
-      </div>
-      <div class="service-card bg-athenity-blue-card p-8 rounded-2xl transition-transform hover:-translate-y-2 hover:shadow-glow border border-transparent hover:border-athenity-green-circuit/60">
-        <h4 class="text-2xl text-athenity-green-circuit">IA & Machine Learning</h4>
-        <p class="mt-4">Produtos inteligentes, dados acionáveis e automações que liberam valor real.</p>
-      </div>
-      <div class="service-card bg-athenity-blue-card p-8 rounded-2xl transition-transform hover:-translate-y-2 hover:shadow-glow border border-transparent hover:border-athenity-green-circuit/60">
-        <h4 class="text-2xl text-athenity-green-circuit">Arquitetura em Nuvem</h4>
-        <p class="mt-4">Escalabilidade, observabilidade e segurança para crescer sem atrito.</p>
-      </div>
-    </div>
-  </div>
-</section>
+<app-servicos-section
+  (sectionReady)="onServicosSectionReady($event)"
+  (serviceClicked)="onServiceClicked($event)">
+</app-servicos-section>
 
 <!-- Trabalhos Section Component -->
-<section id="trabalhos" class="w-full h-screen flex items-center px-6">
-  <div class="pin-container max-w-7xl mx-auto">
-    <h3 class="text-3xl md:text-4xl font-extrabold text-center">Prova de Conceito</h3>
-    <app-work-card-ring></app-work-card-ring>
-    <div class="mt-6 text-center text-sm text-athenity-text-body/70">Arraste para girar</div>
-  </div>
-</section>
+<app-trabalhos-section
+  (ringReady)="onRingReady($event)"
+  (cardSelected)="onCardSelected($event)"
+  (sectionReady)="onTrabalhosSectionReady($event)">
+</app-trabalhos-section>
 
 <!-- CTA Section Component -->
-<section id="cta" class="w-full h-screen flex items-center px-6">
-  <div class="max-w-4xl mx-auto text-center">
-    <h2 class="text-4xl md:text-5xl font-extrabold">Vamos Construir o Futuro</h2>
-    <a href="mailto:athenity@gmail.com" class="mt-10 inline-block bg-athenity-gold text-athenity-blue-deep px-8 py-4 rounded-xl font-bold hover:opacity-90 transition transform hover:scale-[1.03] shadow-glow">Fale Conosco</a>
-  </div>
-</section>
+<app-cta-section
+  (primaryCtaClicked)="onPrimaryCtaClicked($event)"
+  (sectionReady)="onCtaSectionReady($event)">
+</app-cta-section>
