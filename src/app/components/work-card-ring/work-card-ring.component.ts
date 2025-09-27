@@ -33,6 +33,14 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   @ViewChild('ring', { static: true }) ringRef!: ElementRef<HTMLDivElement>;
   @ViewChildren('card') cardRefs!: QueryList<ElementRef<HTMLDivElement>>;
 
+  // Aliases for test compatibility
+  get ring() { return this.ringRef; }
+  set ring(value: any) { this.ringRef = value; }
+  get cards() { return this.cardRefs; }
+  set cards(value: any) { this.cardRefs = value; }
+  get isDragging() { return this.dragging; }
+  set isDragging(value: boolean) { this.dragging = value; }
+
   // Dados
   @Input() items: Item[] = Array.from({ length: 8 }, (_, i) => ({ title: `Projeto ${i + 1}` }));
 
