@@ -241,6 +241,12 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   @HostListener('window:resize')
   onWindowResize = () => {
+    // Add safety check to ensure components are initialized before resizing
+    if (!this.camera || !this.renderer) {
+      console.log('Resize called before initialization - skipping');
+      return;
+    }
+    
     const host = this.el.nativeElement;
     this.camera.aspect = host.clientWidth / host.clientHeight;
     this.camera.updateProjectionMatrix();
@@ -311,8 +317,25 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       });
       rendererCreated = true;
       console.log('WebGL renderer created successfully');
+      
+      // Verify the renderer's context is working
+      const gl = this.renderer.getContext();
+      if (!gl) {
+        console.error('WebGL context is null after renderer creation');
+        throw new Error('WebGL context is null');
+      }
+      
+      // Test basic WebGL functionality
+      try {
+        gl.getParameter(gl.VERSION);
+        console.log('WebGL context verification successful');
+      } catch (contextError) {
+        console.error('WebGL context verification failed:', contextError);
+        throw contextError;
+      }
     } catch (webglError) {
       console.warn('WebGL renderer failed:', webglError);
+      rendererCreated = false;
       
       // Second attempt: Canvas Renderer (if available)
       try {
@@ -342,7 +365,12 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
       // Only call setClearColor if it exists
       if (typeof this.renderer.setClearColor === 'function') {
-        this.renderer.setClearColor(0x000000, 0);
+        this.renderer.setClearColor(0x000000, 0); // Transparent background
+      }
+      
+      // Enable alpha blending for transparency
+      if (this.renderer.domElement) {
+        this.renderer.domElement.style.backgroundColor = 'transparent';
       }
 
       // Add the renderer's DOM element to the host
@@ -422,10 +450,10 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     // Create particles in a more visible area and with better distribution
     for (let i = 0; i < particleCount; i++) {
       const i3 = i * 3;
-      // Spread particles more evenly in view
-      positions[i3] = (Math.random() - 0.5) * 100;     // X: -50 to 50
-      positions[i3 + 1] = (Math.random() - 0.5) * 60;  // Y: -30 to 30
-      positions[i3 + 2] = (Math.random() - 0.5) * 60;  // Z: -30 to 30 (closer to camera)
+      // Position particles much closer to center and closer to camera for better visibility
+      positions[i3] = (Math.random() - 0.5) * 40;     // X: -20 to 20 (smaller spread)
+      positions[i3 + 1] = (Math.random() - 0.5) * 30;  // Y: -15 to 15 (smaller spread)
+      positions[i3 + 2] = (Math.random() - 0.5) * 20 + 10;  // Z: 0 to 20 (much closer to camera)
     }
     
     this.originalPositions = new Float32Array(positions);
@@ -433,26 +461,46 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     posAttr.setUsage && posAttr.setUsage(ThreeInstance.StreamDrawUsage);
     geometry.setAttribute('position', posAttr);
     
-    const material = new ThreeInstance.PointsMaterial({
-      size: this.isMobile ? 4.0 : 6.0, // Increased size for better visibility
-      map: this.createParticleTexture(),
+    // Create particle texture
+    const particleTexture = this.createParticleTexture();
+    
+    // Create material with or without texture - simplified approach for better compatibility
+    const materialConfig: any = {
+      size: this.isMobile ? 8.0 : 12.0, // Much larger particles for visibility
       transparent: true,
       opacity: 1.0, // Full opacity
-      blending: ThreeInstance.AdditiveBlending,
       depthWrite: false,
       color: 0x64FFDA, // Bright cyan color
-      sizeAttenuation: true // Size decreases with distance
-    });
+      sizeAttenuation: false, // Don't let size decrease with distance - keep particles large
+      // Remove blending temporarily to test basic visibility
+      // blending: ThreeInstance.AdditiveBlending,
+    };
+    
+    // Only add texture if it was created successfully
+    if (particleTexture) {
+      materialConfig.map = particleTexture;
+    }
+    
+    const material = new ThreeInstance.PointsMaterial(materialConfig);
     
     this.particles = new ThreeInstance.Points(geometry, material);
     this.particles.frustumCulled = false;
     this.scene.add(this.particles);
     
     console.log(`Created ${particleCount} particles with enhanced visibility`);
+    console.log('Particle system details:', {
+      particleCount,
+      materialSize: materialConfig.size,
+      materialColor: materialConfig.color.toString(16),
+      particlePosition: this.particles.position,
+      cameraPosition: this.camera.position,
+      cameraZ: this.camera.position.z
+    });
     
     // Render a single frame to ensure particles are visible
     if (this.prefersReducedMotion && this.renderer) {
       this.renderer.render(this.scene, this.camera);
+      console.log('Rendered single frame for reduced motion');
     }
   }
 
@@ -470,7 +518,21 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
     context.fillStyle = gradient;
     context.fillRect(0, 0, 64, 64);
-    return ThreeInstance.CanvasTexture ? new ThreeInstance.CanvasTexture(canvas) : null;
+    
+    // Ensure texture is created properly - fallback to basic texture if CanvasTexture fails
+    if (ThreeInstance.CanvasTexture) {
+      try {
+        const texture = new ThreeInstance.CanvasTexture(canvas);
+        console.log('Particle texture created successfully');
+        return texture;
+      } catch (error) {
+        console.warn('Failed to create CanvasTexture:', error);
+      }
+    }
+    
+    // Fallback: Return null and let material handle it (will use default behavior)
+    console.log('Using default particle material (no custom texture)');
+    return null;
   }
 
   private tryEnableGyro = async () => {
