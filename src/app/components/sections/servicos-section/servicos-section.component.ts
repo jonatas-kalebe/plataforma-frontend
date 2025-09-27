@@ -80,7 +80,7 @@ export class ServicosSectionComponent implements AfterViewInit {
    */
   getSectionClasses(): string {
     const classes: string[] = [];
-    
+
     switch (this.backgroundColor) {
       case 'deep':
         classes.push('bg-athenity-blue-deep');
@@ -92,7 +92,7 @@ export class ServicosSectionComponent implements AfterViewInit {
         // Use default styling from template
         break;
     }
-    
+
     return classes.join(' ');
   }
 
@@ -101,7 +101,7 @@ export class ServicosSectionComponent implements AfterViewInit {
    */
   getGridClasses(): string {
     const classes: string[] = [];
-    
+
     // Grid columns
     switch (this.gridColumns) {
       case '1':
@@ -121,7 +121,7 @@ export class ServicosSectionComponent implements AfterViewInit {
         classes.push('sm:grid-cols-2 lg:grid-cols-3');
         break;
     }
-    
+
     // Grid spacing
     switch (this.gridSpacing) {
       case 'compact':
@@ -134,7 +134,7 @@ export class ServicosSectionComponent implements AfterViewInit {
         classes.push('gap-8');
         break;
     }
-    
+
     return classes.join(' ');
   }
 
@@ -143,12 +143,12 @@ export class ServicosSectionComponent implements AfterViewInit {
    */
   getCardClass(index: number): string {
     const classes: string[] = ['service-card'];
-    
+
     // Add animation delay class if staggering is enabled
     if (this.staggerAnimation) {
       classes.push(`animation-delay-${index}`);
     }
-    
+
     return classes.join(' ');
   }
 
@@ -159,35 +159,8 @@ export class ServicosSectionComponent implements AfterViewInit {
     return this.staggerAnimation ? index * this.animationDelay : 0;
   }
 
-  /**
-   * Show section content with animation
-   */
-  showContent(): void {
-    if (typeof document === 'undefined') return;
+  showContent(): void {}
+  hideContent(): void {}
 
-    const grid = document.querySelector('.servicos-grid');
-    const cards = document.querySelectorAll('.service-card');
 
-    // Show grid
-    setTimeout(() => grid?.classList.add('visible'), 100);
-
-    // Show cards with stagger
-    cards.forEach((card, index) => {
-      const delay = this.staggerAnimation ? 200 + (index * 100) : 200;
-      setTimeout(() => card.classList.add('visible'), delay);
-    });
-  }
-
-  /**
-   * Hide section content
-   */
-  hideContent(): void {
-    if (typeof document === 'undefined') return;
-
-    const grid = document.querySelector('.servicos-grid');
-    const cards = document.querySelectorAll('.service-card');
-
-    grid?.classList.remove('visible');
-    cards.forEach(card => card.classList.remove('visible'));
-  }
 }

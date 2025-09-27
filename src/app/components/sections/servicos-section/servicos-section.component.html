@@ -1,44 +1,35 @@
-<section 
+<section
   #sectionElement
-  id="servicos" 
+  id="servicos"
   class="w-full h-screen flex items-center px-6"
   [ngClass]="getSectionClasses()"
   [attr.data-testid]="testId">
-  
   <div class="max-w-7xl mx-auto w-full">
-    
-    <!-- Section Header -->
     <h3 class="text-3xl md:text-4xl font-extrabold text-center text-athenity-text-title font-heading">
       {{ sectionTitle }}
     </h3>
     <p *ngIf="sectionSubtitle" class="mt-4 text-center text-athenity-text-body">
       {{ sectionSubtitle }}
     </p>
-
-    <!-- Services Grid -->
-    <div class="mt-14 grid gap-8" [ngClass]="getGridClasses()">
+    <div class="mt-14 grid servicos-grid" [ngClass]="getGridClasses()">
       <div
         *ngFor="let service of services; let i = index; trackBy: trackByService"
+        [ngClass]="getCardClass(i)"
         class="service-card bg-athenity-blue-card p-8 rounded-2xl transition-transform border border-transparent hover:-translate-y-2 hover:shadow-glow hover:border-athenity-green-circuit/60"
         [attr.data-testid]="'service-card-' + i"
+        [style.transitionDelay.s]="getCardAnimationDelay(i)"
         (click)="onServiceClick(service, i, $event)">
-        
         <h4 class="text-2xl text-athenity-green-circuit font-heading font-bold">
           {{ service.title }}
         </h4>
-        
         <p class="mt-4 text-athenity-text-body leading-relaxed">
           {{ service.description }}
         </p>
-        
-        <!-- Optional icon slot -->
         <div *ngIf="service.icon" class="mt-6">
-          <i [class]="service.icon" class="text-3xl text-athenity-green-circuit"></i>
+          <i [ngClass]="service.icon" class="text-3xl text-athenity-green-circuit"></i>
         </div>
       </div>
     </div>
-
-    <!-- Optional additional content -->
     <div *ngIf="showAdditionalContent" class="mt-12 text-center">
       <ng-content select="[slot=additional-content]"></ng-content>
     </div>

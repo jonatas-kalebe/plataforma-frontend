@@ -1,17 +1,17 @@
-import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, ViewChild, PLATFORM_ID, inject } from '@angular/core';
-import { CommonModule, isPlatformBrowser } from '@angular/common';
+import {AfterViewInit, Component, ElementRef, inject, NgZone, OnDestroy, PLATFORM_ID, ViewChild} from '@angular/core';
+import {CommonModule, isPlatformBrowser} from '@angular/common';
 import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
-import { ScrollOrchestrationService, ScrollState } from '../../services/scroll-orchestration.service';
-import { Subject, takeUntil } from 'rxjs';
+import {ScrollTrigger} from 'gsap/ScrollTrigger';
+import {ScrollToPlugin} from 'gsap/ScrollToPlugin';
+import {ScrollOrchestrationService, ScrollState} from '../../services/scroll-orchestration.service';
+import {Subject, takeUntil} from 'rxjs';
 
 // Import section components
-import { HeroSectionComponent } from '../../components/sections/hero-section/hero-section.component';
-import { FilosofiaSectionComponent } from '../../components/sections/filosofia-section/filosofia-section.component';
-import { ServicosSectionComponent } from '../../components/sections/servicos-section/servicos-section.component';
-import { TrabalhosSectionComponent } from '../../components/sections/trabalhos-section/trabalhos-section.component';
-import { CtaSectionComponent } from '../../components/sections/cta-section/cta-section.component';
+import {HeroSectionComponent} from '../../components/sections/hero-section/hero-section.component';
+import {FilosofiaSectionComponent} from '../../components/sections/filosofia-section/filosofia-section.component';
+import {ServicosSectionComponent} from '../../components/sections/servicos-section/servicos-section.component';
+import {TrabalhosSectionComponent} from '../../components/sections/trabalhos-section/trabalhos-section.component';
+import {CtaSectionComponent} from '../../components/sections/cta-section/cta-section.component';
 
 // Expose GSAP globally for the scroll service
 if (typeof window !== 'undefined') {
@@ -29,10 +29,10 @@ gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
   styleUrls: ['./landing.component.css']
 })
 export class LandingComponent implements AfterViewInit, OnDestroy {
+  @ViewChild('knotCanvas', {static: true}) knotCanvas!: ElementRef<HTMLCanvasElement>;
+  public scrollState: ScrollState | null = null;
   private readonly platformId = inject(PLATFORM_ID);
-  @ViewChild('knotCanvas', { static: true }) knotCanvas!: ElementRef<HTMLCanvasElement>;
-
-  private zone = new NgZone({ enableLongStackTrace: false });
+  private zone = new NgZone({enableLongStackTrace: false});
   private knotCtx!: CanvasRenderingContext2D | null;
   private knotId = 0;
   private destroy$ = new Subject<void>();
@@ -40,9 +40,8 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   private scrollTriggers: ScrollTrigger[] = [];
   private prefersReducedMotion = false;
 
-  public scrollState: ScrollState | null = null;
-
-  constructor(private scrollService: ScrollOrchestrationService) {}
+  constructor(private scrollService: ScrollOrchestrationService) {
+  }
 
   // Event handlers for section components
   onHeroCta(event: Event): void {
@@ -94,14 +93,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     console.log('CTA section ready:', event);
   }
 
-  private setupKnotCanvas(canvas: HTMLCanvasElement): void {
-    if (!isPlatformBrowser(this.platformId)) return;
-    
-    // Extract knot animation logic for use with component canvas
-    this.knotCanvas = new ElementRef(canvas);
-    this.initKnot();
-  }
-
   ngAfterViewInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
 
@@ -140,6 +131,14 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     this.scrollService.destroy();
   }
 
+  private setupKnotCanvas(canvas: HTMLCanvasElement): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    // Extract knot animation logic for use with component canvas
+    this.knotCanvas = new ElementRef(canvas);
+    this.initKnot();
+  }
+
   private checkReducedMotion(): void {
     if (typeof window !== 'undefined' && window.matchMedia) {
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -157,12 +156,12 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
   private initHeroTimeline(): void {
     const tl = gsap.timeline({
-      defaults: { ease: this.prefersReducedMotion ? 'none' : 'power3.out', duration: this.prefersReducedMotion ? 0.3 : 1 }
+      defaults: {ease: this.prefersReducedMotion ? 'none' : 'power3.out', duration: this.prefersReducedMotion ? 0.3 : 1}
     });
 
-    tl.from('#hero-title', { opacity: 0, y: this.prefersReducedMotion ? 0 : 50, delay: 0.2 })
-      .from('#hero-subtitle', { opacity: 0, y: this.prefersReducedMotion ? 0 : 40 }, '-=0.8')
-      .from('#hero-cta', { opacity: 0, y: this.prefersReducedMotion ? 0 : 30 }, '-=0.6');
+    tl.from('#hero-title', { y: this.prefersReducedMotion ? 0 : 50, delay: 0.2})
+      .from('#hero-subtitle', { y: this.prefersReducedMotion ? 0 : 40}, '-=0.8')
+      .from('#hero-cta', { y: this.prefersReducedMotion ? 0 : 30}, '-=0.6');
 
     this.timelines.push(tl);
 
@@ -196,9 +195,9 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
             opacity: Math.max(1 - opacityMultiplier * 0.4, 0.6)
           });
           if (progress >= 0.85) {
-            gsap.to('#hero-title, #hero-subtitle, #hero-cta', { opacity: 0, duration: 0.3, ease: 'power2.in' });
+            gsap.to('#hero-title, #hero-subtitle, #hero-cta', { duration: 0.3, ease: 'power2.in'});
           } else if (progress <= 0.15) {
-            gsap.to('#hero-title, #hero-subtitle, #hero-cta', { opacity: 1, duration: 0.3, ease: 'power2.out' });
+            gsap.to('#hero-title, #hero-subtitle, #hero-cta', {opacity: 1, duration: 0.3, ease: 'power2.out'});
           }
         }
       });
@@ -212,18 +211,18 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         trigger: '#filosofia',
         start: 'top 80%',
         end: this.prefersReducedMotion ? 'top 80%' : 'bottom center',
-        ...(this.prefersReducedMotion ? { toggleActions: 'play none none reverse' } : { scrub: 1 })
+        ...(this.prefersReducedMotion ? {toggleActions: 'play none none reverse'} : {scrub: 1})
       }
     });
 
     tl.from('#filosofia h2', {
-      opacity: 0,
+
       y: this.prefersReducedMotion ? 0 : 80,
       duration: this.prefersReducedMotion ? 0.3 : 1,
       ease: this.prefersReducedMotion ? 'none' : 'power3.out'
     })
       .from('#filosofia p', {
-        opacity: 0,
+
         y: this.prefersReducedMotion ? 0 : 60,
         duration: this.prefersReducedMotion ? 0.3 : 0.8,
         ease: this.prefersReducedMotion ? 'none' : 'power3.out'
@@ -239,16 +238,15 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
           trigger: card,
           start: 'top 85%',
           end: this.prefersReducedMotion ? 'top 85%' : 'bottom center',
-          ...(this.prefersReducedMotion ? { toggleActions: 'play none none reverse' } : { scrub: 0.5 })
+          ...(this.prefersReducedMotion ? {toggleActions: 'play none none reverse'} : {scrub: 0.5})
         }
       });
-
-      tl.from(card, {
-        opacity: 0,
+      tl.fromTo(card, {y: 40}, {
         y: this.prefersReducedMotion ? 0 : 100,
-        duration: this.prefersReducedMotion ? 0.3 : 0.8,
         ease: this.prefersReducedMotion ? 'none' : 'power3.out',
-        delay: this.prefersReducedMotion ? index * 0.1 : 0
+        duration: this.prefersReducedMotion ? 0.3 : 0.8,
+        delay: this.prefersReducedMotion ? index * 0.1 : 0,
+        immediateRender: false
       });
 
       if (!this.prefersReducedMotion) {
@@ -268,7 +266,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         trigger: '#trabalhos',
         start: 'top center',
         end: 'bottom center',
-        ...(this.prefersReducedMotion ? { toggleActions: 'play none none reverse' } : {
+        ...(this.prefersReducedMotion ? {toggleActions: 'play none none reverse'} : {
           // ALTERAÇÃO: remover pin aqui (pin é feito no serviço para evitar conflito)
           scrub: 1
         })
@@ -276,7 +274,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     });
 
     tl.from('#trabalhos h3', {
-      opacity: 0,
+
       y: this.prefersReducedMotion ? 0 : 50,
       duration: this.prefersReducedMotion ? 0.3 : 0.5,
       ease: this.prefersReducedMotion ? 'none' : 'power2.out'
@@ -291,18 +289,18 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         trigger: '#cta',
         start: 'top 80%',
         end: this.prefersReducedMotion ? 'top 80%' : 'bottom center',
-        ...(this.prefersReducedMotion ? { toggleActions: 'play none none reverse' } : { scrub: 0.5 })
+        ...(this.prefersReducedMotion ? {toggleActions: 'play none none reverse'} : {scrub: 0.5})
       }
     });
 
     tl.from('#cta h2', {
-      opacity: 0,
+
       y: this.prefersReducedMotion ? 0 : 40,
       duration: this.prefersReducedMotion ? 0.3 : 0.8,
       ease: this.prefersReducedMotion ? 'none' : 'power3.out'
     })
       .from('#cta a', {
-        opacity: 0,
+
         y: this.prefersReducedMotion ? 0 : 30,
         duration: this.prefersReducedMotion ? 0.3 : 0.6,
         ease: this.prefersReducedMotion ? 'none' : 'power3.out'
@@ -314,7 +312,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   private initKnot(): void {
     if (!isPlatformBrowser(this.platformId)) return;
     if (!this.knotCanvas?.nativeElement) return;
-    
+
     this.knotCtx = this.knotCanvas.nativeElement.getContext('2d');
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
@@ -365,15 +363,15 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         trigger: '#filosofia',
         start: 'top bottom',
         end: this.prefersReducedMotion ? 'top bottom' : 'center center',
-        ...(this.prefersReducedMotion ? { toggleActions: 'play none none reverse' } : { scrub: 1 })
+        ...(this.prefersReducedMotion ? {toggleActions: 'play none none reverse'} : {scrub: 1})
       }
     });
 
-    knotTl.to({ val: 0 }, {
+    knotTl.to({val: 0}, {
       val: 1,
       duration: this.prefersReducedMotion ? 0.3 : 1.5,
       ease: 'none',
-      onUpdate: function() {
+      onUpdate: function () {
         t = (this as any).targets()[0].val;
         draw();
       }

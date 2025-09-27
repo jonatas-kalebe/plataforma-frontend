@@ -1,22 +1,20 @@
-<section 
+<section
   #sectionElement
-  id="trabalhos" 
+  id="trabalhos"
   class="w-full h-screen flex items-center px-6"
   [attr.data-testid]="testId">
-  
+
   <div class="pin-container max-w-7xl mx-auto w-full">
-    
+
     <!-- Section Header -->
     <h3 class="text-3xl md:text-4xl font-extrabold text-center text-athenity-text-title font-heading">
       {{ sectionTitle }}
     </h3>
-    
+
     <!-- Work Card Ring Component -->
     <div class="trabalhos-showcase" [attr.data-testid]="'work-showcase'">
       <app-work-card-ring
-        #workCardRing
-        (ringReady)="onRingReady($event)"
-        (cardSelected)="onCardSelected($event)">
+        #workCardRing>
       </app-work-card-ring>
     </div>
 

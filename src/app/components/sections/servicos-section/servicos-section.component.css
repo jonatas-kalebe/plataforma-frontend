@@ -1,34 +1,19 @@
 #servicos {
   background: linear-gradient(135deg, var(--athenity-blue-deep) 0%, rgba(17, 34, 64, 0.95) 100%);
 }
-
 .servicos-grid {
-  opacity: 0;
-  transform: translateY(30px);
+  opacity: 1;
+  transform: none;
   transition: all 0.8s ease;
 }
-
-.servicos-grid.visible {
+.service-card {
   opacity: 1;
   transform: translateY(0);
-}
-
-.service-card {
-  opacity: 0;
-  transform: translateY(20px);
   transition: all 0.6s ease;
 }
-
-.service-card.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Grid responsive variations */
 .grid-compact {
   gap: 1rem;
 }
-
 .grid-spacious {
   gap: 2rem;
 }

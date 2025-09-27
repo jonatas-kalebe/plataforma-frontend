@@ -2,38 +2,6 @@
   background: linear-gradient(135deg, var(--athenity-blue-deep) 0%, rgba(10, 25, 47, 0.95) 100%);
 }
 
-.cta-title {
-  opacity: 0;
-  transform: translateY(30px);
-  transition: all 0.8s ease;
-}
-
-.cta-title.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.cta-subtitle {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: all 0.8s ease 0.2s;
-}
-
-.cta-subtitle.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.cta-buttons {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: all 0.8s ease 0.4s;
-}
-
-.cta-buttons.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
 
 /* Button layout variations */
 .buttons-stacked .cta-buttons {
