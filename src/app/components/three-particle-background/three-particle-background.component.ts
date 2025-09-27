@@ -241,6 +241,12 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   @HostListener('window:resize')
   onWindowResize = () => {
+    // Add safety check to ensure components are initialized before resizing
+    if (!this.camera || !this.renderer) {
+      console.log('Resize called before initialization - skipping');
+      return;
+    }
+    
     const host = this.el.nativeElement;
     this.camera.aspect = host.clientWidth / host.clientHeight;
     this.camera.updateProjectionMatrix();
@@ -311,8 +317,25 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       });
       rendererCreated = true;
       console.log('WebGL renderer created successfully');
+      
+      // Verify the renderer's context is working
+      const gl = this.renderer.getContext();
+      if (!gl) {
+        console.error('WebGL context is null after renderer creation');
+        throw new Error('WebGL context is null');
+      }
+      
+      // Test basic WebGL functionality
+      try {
+        gl.getParameter(gl.VERSION);
+        console.log('WebGL context verification successful');
+      } catch (contextError) {
+        console.error('WebGL context verification failed:', contextError);
+        throw contextError;
+      }
     } catch (webglError) {
       console.warn('WebGL renderer failed:', webglError);
+      rendererCreated = false;
       
       // Second attempt: Canvas Renderer (if available)
       try {
@@ -342,7 +365,12 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
       // Only call setClearColor if it exists
       if (typeof this.renderer.setClearColor === 'function') {
-        this.renderer.setClearColor(0x000000, 0);
+        this.renderer.setClearColor(0x000000, 0); // Transparent background
+      }
+      
+      // Enable alpha blending for transparency
+      if (this.renderer.domElement) {
+        this.renderer.domElement.style.backgroundColor = 'transparent';
       }
 
       // Add the renderer's DOM element to the host
@@ -419,13 +447,13 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     const positions = new Float32Array(particleCount * 3);
     this.particleVelocities = new Float32Array(particleCount * 3);
     
-    // Create particles in a more visible area and with better distribution
+    // Position particles much closer to center and closer to camera for guaranteed visibility
     for (let i = 0; i < particleCount; i++) {
       const i3 = i * 3;
-      // Spread particles more evenly in view
-      positions[i3] = (Math.random() - 0.5) * 100;     // X: -50 to 50
-      positions[i3 + 1] = (Math.random() - 0.5) * 60;  // Y: -30 to 30
-      positions[i3 + 2] = (Math.random() - 0.5) * 60;  // Z: -30 to 30 (closer to camera)
+      // Place particles in a very tight, clearly visible area
+      positions[i3] = (Math.random() - 0.5) * 20;     // X: -10 to 10
+      positions[i3 + 1] = (Math.random() - 0.5) * 20;  // Y: -10 to 10  
+      positions[i3 + 2] = (Math.random() - 0.5) * 10 + 20;  // Z: 15 to 25 (very close to camera)
     }
     
     this.originalPositions = new Float32Array(positions);
@@ -433,26 +461,30 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     posAttr.setUsage && posAttr.setUsage(ThreeInstance.StreamDrawUsage);
     geometry.setAttribute('position', posAttr);
     
+    // Create the simplest possible material that will definitely render
     const material = new ThreeInstance.PointsMaterial({
-      size: this.isMobile ? 4.0 : 6.0, // Increased size for better visibility
-      map: this.createParticleTexture(),
-      transparent: true,
-      opacity: 1.0, // Full opacity
-      blending: ThreeInstance.AdditiveBlending,
-      depthWrite: false,
-      color: 0x64FFDA, // Bright cyan color
-      sizeAttenuation: true // Size decreases with distance
+      size: 15, // Very large particles
+      color: 0x00FF00, // Bright green - impossible to miss
+      transparent: false, // No transparency issues
+      sizeAttenuation: false, // Constant size
+      // No texture, no blending - just simple solid color
     });
     
     this.particles = new ThreeInstance.Points(geometry, material);
     this.particles.frustumCulled = false;
     this.scene.add(this.particles);
     
-    console.log(`Created ${particleCount} particles with enhanced visibility`);
+    console.log(`Created ${particleCount} BRIGHT GREEN particles at size 15 - should be impossible to miss!`);
+    console.log('Particle positions sample:', {
+      firstParticle: [positions[0], positions[1], positions[2]],
+      cameraZ: this.camera.position.z,
+      particleZRange: '15-25'
+    });
     
-    // Render a single frame to ensure particles are visible
-    if (this.prefersReducedMotion && this.renderer) {
+    // Force render a frame immediately to test visibility
+    if (this.renderer && this.scene && this.camera) {
       this.renderer.render(this.scene, this.camera);
+      console.log('Force rendered frame - particles should now be visible');
     }
   }
 
@@ -470,7 +502,21 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
     context.fillStyle = gradient;
     context.fillRect(0, 0, 64, 64);
-    return ThreeInstance.CanvasTexture ? new ThreeInstance.CanvasTexture(canvas) : null;
+    
+    // Ensure texture is created properly - fallback to basic texture if CanvasTexture fails
+    if (ThreeInstance.CanvasTexture) {
+      try {
+        const texture = new ThreeInstance.CanvasTexture(canvas);
+        console.log('Particle texture created successfully');
+        return texture;
+      } catch (error) {
+        console.warn('Failed to create CanvasTexture:', error);
+      }
+    }
+    
+    // Fallback: Return null and let material handle it (will use default behavior)
+    console.log('Using default particle material (no custom texture)');
+    return null;
   }
 
   private tryEnableGyro = async () => {
