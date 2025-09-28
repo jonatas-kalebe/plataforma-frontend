@@ -15,7 +15,7 @@
  */
 
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { DebugElement, ElementRef } from '@angular/core';
+import { Component, DebugElement, ElementRef, NO_ERRORS_SCHEMA } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { HeroSectionComponent } from './hero-section.component';
 import { CommonModule } from '@angular/common';
@@ -32,11 +32,7 @@ const mockGsap = {
   to: jasmine.createSpy('to')
 };
 
-import { Component, NO_ERRORS_SCHEMA } from '@angular/core';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { By } from '@angular/platform-browser';
-import { HeroSectionComponent } from './hero-section.component';
-import { ThreeParticleBackgroundComponent } from '../../shared/three-particle-background/three-particle-background.component';
+
 
 @Component({
   template: `
@@ -258,9 +254,9 @@ describe('HeroSectionComponent - Comprehensive Addictive Scroll Tests', () => {
         // Should have greater movement after 20% threshold
         if (mockGsap.timeline().to.calls.count() > 0) {
           const translateCalls = mockGsap.timeline().to.calls.all()
-            .filter(call => call.args[1]?.y !== undefined);
+            .filter((call: any) => call.args[1]?.y !== undefined);
           
-          translateCalls.forEach(call => {
+          translateCalls.forEach((call: any) => {
             const yTranslation = Math.abs(call.args[1].y);
             // After 20%, movement should be more substantial
             expect(yTranslation).toBeGreaterThan(20);
@@ -282,9 +278,9 @@ describe('HeroSectionComponent - Comprehensive Addictive Scroll Tests', () => {
       // At 60% progress, elements should be significantly faded
       if (mockGsap.timeline().to.calls.count() > 0) {
         const opacityCalls = mockGsap.timeline().to.calls.all()
-          .filter(call => call.args[1]?.opacity !== undefined);
+          .filter((call: any) => call.args[1]?.opacity !== undefined);
         
-        opacityCalls.forEach(call => {
+        opacityCalls.forEach((call: any) => {
           const opacity = call.args[1].opacity;
           expect(opacity).toBeLessThan(0.7); // Should be noticeably faded
         });
@@ -315,7 +311,7 @@ describe('HeroSectionComponent - Comprehensive Addictive Scroll Tests', () => {
       // Should reverse the fade and translate effects
       if (mockGsap.timeline().to.calls.count() > 0) {
         const opacityCalls = mockGsap.timeline().to.calls.all()
-          .filter(call => call.args[1]?.opacity !== undefined);
+          .filter((call: any) => call.args[1]?.opacity !== undefined);
         
         // Should restore opacity when scrolling back
         if (opacityCalls.length > 0) {

@@ -76,7 +76,7 @@ describe('ScrollOrchestrationService - COMPREHENSIVE PIXEL-PERFECT VALIDATION', 
     platformId = TestBed.inject(PLATFORM_ID);
 
     // Mock window and document
-    (global as any).window = {
+    (window as any).window = {
       innerHeight: 1000,
       scrollY: 0,
       matchMedia: jasmine.createSpy('matchMedia').and.returnValue({
@@ -90,7 +90,7 @@ describe('ScrollOrchestrationService - COMPREHENSIVE PIXEL-PERFECT VALIDATION', 
       clearInterval: clearInterval
     };
 
-    (global as any).document = {
+    (window as any).document = {
       readyState: 'complete',
       querySelector: jasmine.createSpy('querySelector').and.callFake((selector: string) => {
         const id = selector.replace('#', '');
@@ -100,7 +100,7 @@ describe('ScrollOrchestrationService - COMPREHENSIVE PIXEL-PERFECT VALIDATION', 
       body: { scrollHeight: 5000 }
     };
 
-    (global as any).navigator = {
+    (window as any).navigator = {
       userAgent: 'Mozilla/5.0 Test Browser'
     };
 

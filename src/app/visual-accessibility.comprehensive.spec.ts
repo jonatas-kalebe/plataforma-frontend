@@ -175,11 +175,12 @@ describe('Visual Design and Accessibility - Comprehensive Tests', () => {
         const classList = element.nativeElement.classList;
         
         // Should have responsive grid classes
-        const hasResponsiveGrid = Array.from(classList).some((className: string) => 
-          className.includes('grid-cols') || 
-          className.includes('md:grid-cols') ||
-          className.includes('lg:grid-cols')
-        );
+        const hasResponsiveGrid = (classList as DOMTokenList).contains('grid') || 
+          Array.from(classList as DOMTokenList).some(className => 
+            className.includes('grid-cols') || 
+            className.includes('md:grid-cols') ||
+            className.includes('lg:grid-cols')
+          );
         
         expect(hasResponsiveGrid).toBeTruthy();
       });
@@ -198,8 +199,8 @@ describe('Visual Design and Accessibility - Comprehensive Tests', () => {
                classList.contains('font-semibold')).toBeTruthy();
         
         // Should have hover states
-        const hasHoverState = Array.from(classList).some((className: string) => 
-          className.includes('hover:')
+        const hasHoverState = Array.from(classList as DOMTokenList).some(className => 
+          (className as string).includes('hover:')
         );
         expect(hasHoverState).toBeTruthy();
       });
@@ -270,8 +271,8 @@ describe('Visual Design and Accessibility - Comprehensive Tests', () => {
         const classList = element.nativeElement.classList;
         
         // Should have focus styles (focus:ring, focus:outline, etc.)
-        const hasFocusStyles = Array.from(classList).some((className: string) => 
-          className.includes('focus:')
+        const hasFocusStyles = Array.from(classList as DOMTokenList).some(className => 
+          (className as string).includes('focus:')
         );
         
         // At minimum, should not have outline-none without custom focus styles
@@ -346,8 +347,8 @@ describe('Visual Design and Accessibility - Comprehensive Tests', () => {
         const classList = Array.from(element.nativeElement.classList);
         
         // Should have responsive text sizing
-        const hasResponsiveText = classList.some((className: string) => 
-          className.includes('md:text-') || className.includes('lg:text-')
+        const hasResponsiveText = classList.some(className => 
+          (className as string).includes('md:text-') || (className as string).includes('lg:text-')
         );
         
         if (element.nativeElement.tagName.toLowerCase().startsWith('h')) {
@@ -364,7 +365,7 @@ describe('Visual Design and Accessibility - Comprehensive Tests', () => {
       containerElements.forEach(element => {
         const classList = element.nativeElement.classList;
         expect(classList.contains('container') || 
-               Array.from(classList).some((c: string) => c.startsWith('max-w-'))).toBeTruthy();
+               Array.from(classList as DOMTokenList).some(c => (c as string).startsWith('max-w-'))).toBeTruthy();
       });
     });
   });
@@ -390,7 +391,7 @@ describe('Visual Design and Accessibility - Comprehensive Tests', () => {
         const classList = Array.from(element.nativeElement.classList);
         
         // Should have hover states
-        const hasHoverState = classList.some((className: string) => className.includes('hover:'));
+        const hasHoverState = classList.some(className => (className as string).includes('hover:'));
         expect(hasHoverState).toBeTruthy();
       });
     });
