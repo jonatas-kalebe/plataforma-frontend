@@ -5,7 +5,7 @@
 
 import { TestBed, ComponentFixture, fakeAsync, tick } from '@angular/core/testing';
 import { Component } from '@angular/core';
-import { ScrollOrchestrationService } from '../services/scroll-orchestration.service';
+import { ScrollOrchestrationService } from './services/scroll-orchestration.service';
 import { PLATFORM_ID } from '@angular/core';
 
 @Component({

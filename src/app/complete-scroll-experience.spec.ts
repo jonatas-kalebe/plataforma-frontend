@@ -5,7 +5,7 @@
 
 import { TestBed, ComponentFixture, fakeAsync, tick } from '@angular/core/testing';
 import { Component, PLATFORM_ID } from '@angular/core';
-import { ScrollOrchestrationService } from '../services/scroll-orchestration.service';
+import { ScrollOrchestrationService } from './services/scroll-orchestration.service';
 
 // Mock GSAP for controlled testing
 const mockScrollTrigger = {
@@ -326,7 +326,7 @@ describe('Complete Addictive Scroll Experience - E2E Style Tests', () => {
         'Arquitetura em Nuvem'
       ];
       
-      serviceCards.forEach((card, index) => {
+      serviceCards.forEach((card: any, index: number) => {
         const title = card.querySelector('h4');
         expect(title.textContent.trim()).toBe(expectedServices[index]);
         expect(title.classList.contains('text-2xl')).toBeTruthy();
@@ -338,7 +338,7 @@ describe('Complete Addictive Scroll Experience - E2E Style Tests', () => {
     it('should have EXACTLY the specified service card styling', () => {
       const serviceCards = fixture.nativeElement.querySelectorAll('#servicos .bg-athenity-blue-card');
       
-      serviceCards.forEach(card => {
+      serviceCards.forEach((card: any) => {
         expect(card.classList.contains('bg-athenity-blue-card')).toBeTruthy();
         expect(card.classList.contains('p-8')).toBeTruthy();
         expect(card.classList.contains('rounded-2xl')).toBeTruthy();
@@ -380,7 +380,7 @@ describe('Complete Addictive Scroll Experience - E2E Style Tests', () => {
         'Escalabilidade, observabilidade e segurança para crescer sem atrito.'
       ];
       
-      serviceDescriptions.forEach((desc, index) => {
+      serviceDescriptions.forEach((desc: any, index: number) => {
         expect(desc.textContent.trim()).toBe(expectedDescriptions[index]);
       });
     });
