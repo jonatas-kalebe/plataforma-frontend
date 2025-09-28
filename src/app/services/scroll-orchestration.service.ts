@@ -20,11 +20,11 @@ import { SCROLL_CONFIG, SECTION_SCROLL_CONFIG } from '../shared/constants/scroll
 import { ScrollTelemetryService } from './scroll-telemetry.service';
 
 // Novo sistema de utilidades
-import { 
-  ScrollMetricsManager, 
-  ScrollSection, 
-  ScrollMetrics, 
-  ScrollState 
+import {
+  ScrollMetricsManager,
+  ScrollSection,
+  ScrollMetrics,
+  ScrollState
 } from '../shared/scroll/scroll-metrics.manager';
 import { MagneticScrollManager } from '../shared/scroll/magnetic-scroll.manager';
 import { HeroAnimationManager } from '../shared/scroll/hero-animation.manager';
@@ -118,7 +118,7 @@ export class ScrollOrchestrationService {
       this.initializeGsap();
       this.setupSections();
       this.setupScrollEventListener();
-      
+
       this.isInitialized = true;
       console.log('ScrollOrchestrationService: Successfully initialized');
       return true;
@@ -226,7 +226,7 @@ export class ScrollOrchestrationService {
   private onScroll(): void {
     const currentScrollY = window.scrollY || 0;
     const velocity = currentScrollY - this.lastScrollY;
-    
+
     // Atualiza direção do scroll
     this.scrollDirection = velocity > 0 ? 'down' : velocity < 0 ? 'up' : 'none';
     this.lastScrollY = currentScrollY;
@@ -271,7 +271,7 @@ export class ScrollOrchestrationService {
     if (typeof window !== 'undefined' && window.matchMedia) {
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
       this.prefersReducedMotion = mediaQuery.matches;
-      
+
       // Atualiza managers
       this.magneticScrollManager = new MagneticScrollManager(this.prefersReducedMotion);
       this.heroAnimationManager = new HeroAnimationManager(this.prefersReducedMotion);
