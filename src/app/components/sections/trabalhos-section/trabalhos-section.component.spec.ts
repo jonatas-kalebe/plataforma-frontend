@@ -21,8 +21,9 @@ describe('TrabalhosSectionComponent', () => {
 
   it('should display section header', () => {
     const compiled = fixture.nativeElement as HTMLElement;
-    const header = compiled.querySelector('[data-testid="trabalhos-header"]');
+    const header = compiled.querySelector('h3');
     expect(header).toBeTruthy();
+    expect(header?.textContent?.trim()).toBe('Prova de Conceito');
   });
 
   it('should render work showcase', () => {
@@ -33,8 +34,9 @@ describe('TrabalhosSectionComponent', () => {
 
   it('should display interaction hint', () => {
     const compiled = fixture.nativeElement as HTMLElement;
-    const hint = compiled.querySelector('[data-testid="trabalhos-hint"]');
+    const hint = compiled.querySelector('.text-sm');
     expect(hint).toBeTruthy();
+    expect(hint?.textContent?.trim()).toBe('Arraste para girar');
   });
 
   it('should have correct section ID', () => {
