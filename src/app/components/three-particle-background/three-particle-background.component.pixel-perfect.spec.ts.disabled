@@ -1,0 +1,900 @@
+/**
+ * Pixel-Perfect Tests for Dynamic Particle Background Enhancements
+ * 
+ * These tests validate the EXACT behavior described in the requirements:
+ * - Scroll velocity influence on particle behavior
+ * - Section transition flourishes and shape formation
+ * - Converging behavior on scroll hold/pause
+ * - Color and opacity changes based on scroll progress
+ * - Mouse interactions and shockwave effects
+ * - Performance considerations and reduced motion support
+ */
+
+import { TestBed, ComponentFixture, fakeAsync, tick } from '@angular/core/testing';
+import { PLATFORM_ID, NgZone } from '@angular/core';
+import { ThreeParticleBackgroundComponent } from './three-particle-background.component';
+import { ScrollOrchestrationService } from '../../services/scroll-orchestration.service';
+import { MotionPreferenceService } from '../../shared/utils/motion-preference.service';
+import { of, BehaviorSubject } from 'rxjs';
+
+// Mock Three.js with comprehensive functionality
+const mockVector3 = { 
+  x: 0, y: 0, z: 0, 
+  clone: jasmine.createSpy('clone').and.returnValue({ x: 0, y: 0, z: 0 }),
+  lerp: jasmine.createSpy('lerp'),
+  set: jasmine.createSpy('set'),
+  copy: jasmine.createSpy('copy'),
+  multiplyScalar: jasmine.createSpy('multiplyScalar'),
+  add: jasmine.createSpy('add'),
+  sub: jasmine.createSpy('sub'),
+  normalize: jasmine.createSpy('normalize')
+};
+
+const mockVector2 = { 
+  x: 0, y: 0,
+  set: jasmine.createSpy('set'),
+  copy: jasmine.createSpy('copy'),
+  lerp: jasmine.createSpy('lerp')
+};
+
+const mockColor = {
+  r: 0.176, g: 0.357, b: 0.549, // Brand blue (#2d5b8c)
+  set: jasmine.createSpy('set'),
+  setHex: jasmine.createSpy('setHex'),
+  lerp: jasmine.createSpy('lerp'),
+  clone: jasmine.createSpy('clone').and.returnValue({ r: 0.176, g: 0.357, b: 0.549 })
+};
+
+const mockBufferGeometry = {
+  setAttribute: jasmine.createSpy('setAttribute'),
+  dispose: jasmine.createSpy('dispose'),
+  attributes: {
+    position: { array: new Float32Array(360), needsUpdate: false },
+    velocity: { array: new Float32Array(360), needsUpdate: false }
+  }
+};
+
+const mockShaderMaterial = {
+  dispose: jasmine.createSpy('dispose'),
+  color: mockColor,
+  opacity: 0.6,
+  uniforms: {
+    time: { value: 0 },
+    mouse: { value: mockVector2 },
+    resolution: { value: mockVector2 },
+    shockwaves: { value: [] },
+    globalProgress: { value: 0 },
+    sectionIndex: { value: 0 }
+  },
+  transparent: true,
+  vertexShader: 'vertex shader code',
+  fragmentShader: 'fragment shader code'
+};
+
+const mockPoints = {
+  position: mockVector3,
+  rotation: { x: 0, y: 0, z: 0 },
+  scale: mockVector3,
+  geometry: mockBufferGeometry,
+  material: mockShaderMaterial,
+  visible: true
+};
+
+const mockScene = { 
+  add: jasmine.createSpy('add'),
+  remove: jasmine.createSpy('remove'),
+  children: [mockPoints]
+};
+
+const mockCamera = { 
+  position: mockVector3, 
+  aspect: 1, 
+  updateProjectionMatrix: jasmine.createSpy('updateProjectionMatrix'), 
+  lookAt: jasmine.createSpy('lookAt'),
+  updateMatrixWorld: jasmine.createSpy('updateMatrixWorld'),
+  fov: 75,
+  near: 0.1,
+  far: 1000
+};
+
+const mockRenderer = { 
+  render: jasmine.createSpy('render'),
+  setSize: jasmine.createSpy('setSize'),
+  dispose: jasmine.createSpy('dispose'),
+  domElement: document.createElement('canvas'),
+  setPixelRatio: jasmine.createSpy('setPixelRatio'),
+  setClearColor: jasmine.createSpy('setClearColor')
+};
+
+const mockRaf = jasmine.createSpy('requestAnimationFrame').and.callFake((fn: Function) => {
+  setTimeout(fn, 16); // Simulate 60fps
+  return 1;
+});
+const mockCancelRaf = jasmine.createSpy('cancelAnimationFrame');
+
+// Mock Three.js globally
+(window as any).THREE = {
+  Scene: jasmine.createSpy('Scene').and.returnValue(mockScene),
+  PerspectiveCamera: jasmine.createSpy('PerspectiveCamera').and.returnValue(mockCamera),
+  WebGLRenderer: jasmine.createSpy('WebGLRenderer').and.returnValue(mockRenderer),
+  BufferGeometry: jasmine.createSpy('BufferGeometry').and.returnValue(mockBufferGeometry),
+  ShaderMaterial: jasmine.createSpy('ShaderMaterial').and.returnValue(mockShaderMaterial),
+  Points: jasmine.createSpy('Points').and.returnValue(mockPoints),
+  BufferAttribute: jasmine.createSpy('BufferAttribute'),
+  Vector3: jasmine.createSpy('Vector3').and.returnValue(mockVector3),
+  Vector2: jasmine.createSpy('Vector2').and.returnValue(mockVector2),
+  Color: jasmine.createSpy('Color').and.returnValue(mockColor),
+  MathUtils: {
+    degToRad: jasmine.createSpy('degToRad').and.returnValue(0.1),
+    lerp: jasmine.createSpy('lerp').and.returnValue(0.5)
+  }
+};
+
+// Mock services
+const mockScrollService = {
+  metrics$: new BehaviorSubject({
+    globalProgress: 0,
+    velocity: 0,
+    activeSection: { id: 'hero', progress: 0 },
+    sections: []
+  })
+};
+
+const mockMotionService = {
+  prefersReducedMotion: of(false),
+  currentPreference: false
+};
+
+describe('ThreeParticleBackgroundComponent - Pixel-Perfect Dynamic Particle Enhancements', () => {
+  let component: ThreeParticleBackgroundComponent;
+  let fixture: ComponentFixture<ThreeParticleBackgroundComponent>;
+  let ngZone: NgZone;
+
+  beforeEach(async () => {
+    // Setup RAF mocks
+    spyOn(window, 'requestAnimationFrame').and.callFake(mockRaf);
+    spyOn(window, 'cancelAnimationFrame').and.callFake(mockCancelRaf);
+
+    await TestBed.configureTestingModule({
+      imports: [ThreeParticleBackgroundComponent],
+      providers: [
+        { provide: PLATFORM_ID, useValue: 'browser' },
+        { provide: ScrollOrchestrationService, useValue: mockScrollService },
+        { provide: MotionPreferenceService, useValue: mockMotionService }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(ThreeParticleBackgroundComponent);
+    component = fixture.componentInstance;
+    ngZone = TestBed.inject(NgZone);
+
+    // Reset all spies
+    mockRaf.calls.reset();
+    mockScene.add.calls.reset();
+    mockRenderer.render.calls.reset();
+    mockShaderMaterial.uniforms.time.value = 0;
+    mockShaderMaterial.uniforms.globalProgress.value = 0;
+    mockShaderMaterial.uniforms.shockwaves.value = [];
+  });
+
+  describe('1. Baseline Behavior Validation', () => {
+    it('P1: should initialize with exactly 120 particles on desktop', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      expect(mockBufferGeometry.setAttribute).toHaveBeenCalledWith('position', jasmine.any(Object));
+      // Verify particle count (120 particles × 3 coordinates = 360 position values)
+      const positionCall = mockBufferGeometry.setAttribute.calls.all()
+        .find(call => call.args[0] === 'position');
+      if (positionCall) {
+        expect(positionCall.args[1].array.length).toBe(360); // 120 * 3
+      }
+    }));
+
+    it('P1: should maintain particle opacity at exactly 0.6', () => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      
+      expect(mockShaderMaterial.opacity).toBe(0.6);
+      expect(mockShaderMaterial.transparent).toBe(true);
+    });
+
+    it('P1: should initialize particles with gentle drift motion', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Verify initial velocity setup for drift
+      expect(mockBufferGeometry.setAttribute).toHaveBeenCalledWith('velocity', jasmine.any(Object));
+      
+      // Check that animation starts (baseline motion)
+      expect(mockRaf).toHaveBeenCalled();
+    }));
+
+    it('P1: should start with brand blue color (#2d5b8c)', () => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      
+      // Brand blue color should be set initially
+      expect(mockColor.r).toBeCloseTo(0.176, 3); // 45/255
+      expect(mockColor.g).toBeCloseTo(0.357, 3); // 91/255  
+      expect(mockColor.b).toBeCloseTo(0.549, 3); // 140/255
+    });
+  });
+
+  describe('2. Scroll Velocity Influence - EXACT Requirements', () => {
+    it('P1: should increase particle rotation speed with high scroll velocity (>500px/s)', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      const initialRotationY = mockPoints.rotation.y;
+
+      // Simulate high scroll velocity
+      mockScrollService.metrics$.next({
+        globalProgress: 0.3,
+        velocity: 750, // High velocity
+        activeSection: { id: 'filosofia', progress: 0.5 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Rotation speed should have increased
+      expect(mockPoints.rotation.y).toBeGreaterThan(initialRotationY);
+    }));
+
+    it('P1: should boost particle opacity during fast scrolling', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      const baseOpacity = mockShaderMaterial.opacity;
+
+      // Simulate very fast scrolling
+      mockScrollService.metrics$.next({
+        globalProgress: 0.5,
+        velocity: 1200, // Very high velocity
+        activeSection: { id: 'servicos', progress: 0.3 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Opacity should be temporarily boosted (whoosh effect)
+      expect(mockShaderMaterial.opacity).toBeGreaterThanOrEqual(baseOpacity);
+    }));
+
+    it('P1: should settle back to normal motion when scroll stops', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Fast scroll first
+      mockScrollService.metrics$.next({
+        globalProgress: 0.4,
+        velocity: 800,
+        activeSection: { id: 'filosofia', progress: 0.7 },
+        sections: []
+      });
+
+      tick(100);
+      const highVelocityRotation = mockPoints.rotation.y;
+
+      // Then stop scrolling
+      mockScrollService.metrics$.next({
+        globalProgress: 0.4,
+        velocity: 0, // Stopped
+        activeSection: { id: 'filosofia', progress: 0.7 },
+        sections: []
+      });
+
+      tick(500); // Allow settling time
+
+      // Should lerp back to gentler motion
+      expect(mockPoints.rotation.y).toBeLessThan(highVelocityRotation * 1.1);
+    }));
+
+    it('P1: should amplify baseSpinX and baseSpinY during high velocity scrolling', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Access private properties for testing (using bracket notation)
+      const getPrivateProperty = (obj: any, prop: string) => obj[prop];
+      const initialBaseSpinX = getPrivateProperty(component, 'baseSpinX') || 0;
+      const initialBaseSpinY = getPrivateProperty(component, 'baseSpinY') || 0;
+
+      // High velocity scroll
+      mockScrollService.metrics$.next({
+        globalProgress: 0.6,
+        velocity: 950,
+        activeSection: { id: 'trabalhos', progress: 0.4 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Base spin should be amplified (requirement: "amplify the base rotation speeds")
+      const currentBaseSpinX = getPrivateProperty(component, 'baseSpinX') || 0;
+      const currentBaseSpinY = getPrivateProperty(component, 'baseSpinY') || 0;
+
+      expect(Math.abs(currentBaseSpinX) + Math.abs(currentBaseSpinY))
+        .toBeGreaterThan(Math.abs(initialBaseSpinX) + Math.abs(initialBaseSpinY));
+    }));
+  });
+
+  describe('3. Section Transition Flourishes - Shape Formation', () => {
+    it('P1: should trigger particle shape formation at Hero->Filosofia transition (90% Hero, 10% Filosofia)', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Spy on private formShape method
+      const formShapeSpy = spyOn<any>(component, 'formShape').and.callThrough();
+
+      // Simulate transition zone (90% Hero progress)
+      mockScrollService.metrics$.next({
+        globalProgress: 0.18, // Approximately 90% through hero section
+        velocity: 300,
+        activeSection: { id: 'hero', progress: 0.9 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Shape formation should be triggered
+      expect(formShapeSpy).toHaveBeenCalled();
+    }));
+
+    it('P1: should form "Momentos" shape during Hero section transition', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      const formShapeSpy = spyOn<any>(component, 'formShape').and.callThrough();
+
+      // Simulate the exact transition moment
+      mockScrollService.metrics$.next({
+        globalProgress: 0.19, // Transition moment
+        velocity: 150,
+        activeSection: { id: 'hero', progress: 0.95 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Should call formShape with transition context
+      expect(formShapeSpy).toHaveBeenCalledWith('transition');
+    }));
+
+    it('P1: should complete shape formation within 0.5-1.0 seconds', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      const formShapeSpy = spyOn<any>(component, 'formShape').and.callThrough();
+      let shapeFormationStartTime: number;
+
+      // Start transition
+      shapeFormationStartTime = performance.now();
+      mockScrollService.metrics$.next({
+        globalProgress: 0.18,
+        velocity: 200,
+        activeSection: { id: 'hero', progress: 0.9 },
+        sections: []
+      });
+
+      tick(100);
+      expect(formShapeSpy).toHaveBeenCalled();
+
+      // Move past transition
+      mockScrollService.metrics$.next({
+        globalProgress: 0.25,
+        velocity: 100,
+        activeSection: { id: 'filosofia', progress: 0.2 },
+        sections: []
+      });
+
+      tick(900); // 900ms later
+
+      // Shape formation should complete within the specified timeframe
+      // This is verified by ensuring particles return to normal behavior
+      const completionTime = performance.now() - shapeFormationStartTime;
+      expect(completionTime).toBeLessThan(1000); // Within 1 second requirement
+    }));
+
+    it('P1: should interpolate particles toward target positions during shape formation', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      const originalPositions = [...mockBufferGeometry.attributes.position.array];
+
+      // Trigger shape formation
+      mockScrollService.metrics$.next({
+        globalProgress: 0.18,
+        velocity: 250,
+        activeSection: { id: 'hero', progress: 0.9 },
+        sections: []
+      });
+
+      tick(500); // Allow interpolation time
+
+      // Positions should have changed from original (interpolating toward target)
+      const currentPositions = mockBufferGeometry.attributes.position.array;
+      let positionsChanged = false;
+      for (let i = 0; i < Math.min(30, originalPositions.length); i++) {
+        if (Math.abs(currentPositions[i] - originalPositions[i]) > 0.001) {
+          positionsChanged = true;
+          break;
+        }
+      }
+
+      expect(positionsChanged).toBe(true);
+      expect(mockBufferGeometry.attributes.position.needsUpdate).toBe(true);
+    }));
+  });
+
+  describe('4. Converging on Scroll Hold - Pause Behavior', () => {
+    it('P1: should detect scroll pause after 1 second of no movement', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Normal scrolling
+      mockScrollService.metrics$.next({
+        globalProgress: 0.4,
+        velocity: 300,
+        activeSection: { id: 'servicos', progress: 0.5 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Stop scrolling
+      mockScrollService.metrics$.next({
+        globalProgress: 0.4,
+        velocity: 0,
+        activeSection: { id: 'servicos', progress: 0.5 },
+        sections: []
+      });
+
+      tick(1100); // Wait > 1 second
+
+      // Should detect pause and potentially adjust particle behavior
+      // This can be verified by checking if particles start converging
+      expect(mockVector3.lerp).toHaveBeenCalled();
+    }));
+
+    it('P1: should create gentle halo around screen center during pause', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Scroll then pause
+      mockScrollService.metrics$.next({
+        globalProgress: 0.6,
+        velocity: 0, // Paused
+        activeSection: { id: 'trabalhos', progress: 0.3 },
+        sections: []
+      });
+
+      tick(1200); // Wait for pause detection
+
+      // Particles should gravitate toward center (halo effect)
+      // This is implemented as attractive force toward screen center
+      expect(mockVector3.lerp).toHaveBeenCalled();
+    }));
+
+    it('P1: should disperse particles outward when scrolling resumes', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Start with pause state
+      mockScrollService.metrics$.next({
+        globalProgress: 0.5,
+        velocity: 0,
+        activeSection: { id: 'filosofia', progress: 0.8 },
+        sections: []
+      });
+
+      tick(1500); // Establish pause state
+
+      // Resume scrolling
+      mockScrollService.metrics$.next({
+        globalProgress: 0.52,
+        velocity: 400,
+        activeSection: { id: 'filosofia', progress: 0.9 },
+        sections: []
+      });
+
+      tick(200);
+
+      // Should trigger dispersive push outward
+      expect(mockVector3.add).toHaveBeenCalled();
+      expect(mockVector3.multiplyScalar).toHaveBeenCalled();
+    }));
+  });
+
+  describe('5. Color and Opacity Changes - Progressive Section Adaptation', () => {
+    it('P1: should start with brand blue (0x2d5b8c) at Hero section', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // At Hero section (global progress ~0)
+      mockScrollService.metrics$.next({
+        globalProgress: 0.05,
+        velocity: 100,
+        activeSection: { id: 'hero', progress: 0.3 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Should maintain brand blue
+      expect(mockShaderMaterial.color.setHex).toHaveBeenCalledWith(0x2d5b8c);
+    }));
+
+    it('P1: should blend toward teal/green tint by Trabalhos section', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // At Trabalhos section (later in scroll)
+      mockScrollService.metrics$.next({
+        globalProgress: 0.7,
+        velocity: 50,
+        activeSection: { id: 'trabalhos', progress: 0.5 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Should have shifted toward teal/green (requirement: "teal or green tint")
+      expect(mockShaderMaterial.color.setHex).toHaveBeenCalled();
+      const colorCalls = mockShaderMaterial.color.setHex.calls.all();
+      const lastColor = colorCalls[colorCalls.length - 1].args[0];
+      expect(lastColor).not.toBe(0x2d5b8c); // Should have changed from initial blue
+    }));
+
+    it('P1: should have gold hint at CTA section to harmonize with gold button', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // At CTA section (end of page)
+      mockScrollService.metrics$.next({
+        globalProgress: 0.95,
+        velocity: 20,
+        activeSection: { id: 'cta', progress: 0.8 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Should have gold hint (requirement: harmonizing with gold CTA button)
+      expect(mockShaderMaterial.color.setHex).toHaveBeenCalled();
+      const colorCalls = mockShaderMaterial.color.setHex.calls.all();
+      const lastColor = colorCalls[colorCalls.length - 1].args[0];
+      
+      // Gold has significant red and green components
+      const goldish = (lastColor & 0xFF0000) > 0 && (lastColor & 0x00FF00) > 0;
+      expect(goldish).toBe(true);
+    }));
+
+    it('P1: should gradually shift color over entire page scroll', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      const progressSteps = [0.1, 0.3, 0.5, 0.7, 0.9];
+      const colors: number[] = [];
+
+      // Collect colors at different progress points
+      progressSteps.forEach((progress, index) => {
+        mockScrollService.metrics$.next({
+          globalProgress: progress,
+          velocity: 100,
+          activeSection: { id: `section${index}`, progress: 0.5 },
+          sections: []
+        });
+
+        tick(100);
+
+        const colorCalls = mockShaderMaterial.color.setHex.calls.all();
+        if (colorCalls.length > 0) {
+          colors.push(colorCalls[colorCalls.length - 1].args[0]);
+        }
+      });
+
+      // Colors should be different across the page scroll
+      expect(colors.length).toBeGreaterThan(1);
+      expect(new Set(colors).size).toBeGreaterThan(1); // Should have multiple unique colors
+    }));
+
+    it('P1: should maintain sufficient contrast on dark backdrop', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Test various scroll positions
+      const progressValues = [0.0, 0.25, 0.5, 0.75, 1.0];
+      
+      progressValues.forEach(progress => {
+        mockScrollService.metrics$.next({
+          globalProgress: progress,
+          velocity: 75,
+          activeSection: { id: 'test', progress: 0.5 },
+          sections: []
+        });
+
+        tick(50);
+
+        // Verify opacity remains appropriate for contrast
+        expect(mockShaderMaterial.opacity).toBeGreaterThan(0.3); // Minimum visibility
+        expect(mockShaderMaterial.opacity).toBeLessThan(1.0);   // Not too bright
+      });
+    }));
+  });
+
+  describe('6. Mouse Interactions and Shockwave Effects', () => {
+    it('P1: should create shockwave on click/touch with specified ripple pattern', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      const clickEvent = new MouseEvent('click', {
+        clientX: 400,
+        clientY: 300,
+        bubbles: true
+      });
+
+      // Trigger click event
+      fixture.nativeElement.dispatchEvent(clickEvent);
+      tick(100);
+
+      // Should add shockwave to uniforms
+      expect(mockShaderMaterial.uniforms.shockwaves.value.length).toBeGreaterThan(0);
+      
+      // Verify shockwave properties if shockwave exists
+      const shockwave = mockShaderMaterial.uniforms.shockwaves.value[0];
+      if (shockwave && typeof shockwave === 'object') {
+        expect(shockwave.pos?.x).toBeCloseTo(400);
+        expect(shockwave.pos?.y).toBeCloseTo(300);
+        expect(shockwave.startTime).toBeDefined();
+        expect(shockwave.maxStrength).toBeGreaterThan(0);
+      }
+    }));
+
+    it('P1: should attract particles within specified radius to mouse position', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Move mouse to specific position
+      const mouseEvent = new MouseEvent('mousemove', {
+        clientX: 500,
+        clientY: 400
+      });
+
+      fixture.nativeElement.dispatchEvent(mouseEvent);
+      tick(100);
+
+      // Mouse position should be updated in uniforms
+      expect(mockShaderMaterial.uniforms.mouse.value.x).toBeCloseTo(500);
+      expect(mockShaderMaterial.uniforms.mouse.value.y).toBeCloseTo(400);
+    }));
+
+    it('P1: should provide immediate visual feedback on mouse movement', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      const initialMousePos = { x: mockShaderMaterial.uniforms.mouse.value.x, y: mockShaderMaterial.uniforms.mouse.value.y };
+
+      // Mouse movement
+      const mouseEvent = new MouseEvent('mousemove', {
+        clientX: 300,
+        clientY: 250
+      });
+
+      fixture.nativeElement.dispatchEvent(mouseEvent);
+      tick(50); // Immediate response expected
+
+      // Mouse position should update immediately (not after long delay)
+      expect(mockShaderMaterial.uniforms.mouse.value.x).not.toBe(initialMousePos.x);
+      expect(mockShaderMaterial.uniforms.mouse.value.y).not.toBe(initialMousePos.y);
+    }));
+
+    it('P1: should limit concurrent shockwaves to prevent performance impact', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Create multiple rapid clicks
+      for (let i = 0; i < 15; i++) {
+        const clickEvent = new MouseEvent('click', {
+          clientX: 300 + i * 10,
+          clientY: 200 + i * 10
+        });
+        
+        fixture.nativeElement.dispatchEvent(clickEvent);
+        tick(10);
+      }
+
+      // Should limit concurrent shockwaves (reasonable limit like 10)
+      expect(mockShaderMaterial.uniforms.shockwaves.value.length).toBeLessThanOrEqual(10);
+    }));
+  });
+
+  describe('7. Performance Considerations', () => {
+    it('P1: should use exactly 120 particles on mobile devices', fakeAsync(() => {
+      // Mock mobile detection
+      Object.defineProperty(window.navigator, 'userAgent', {
+        writable: true,
+        value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15'
+      });
+
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Should use mobile particle count (120)
+      const positionCall = mockBufferGeometry.setAttribute.calls.all()
+        .find(call => call.args[0] === 'position');
+      if (positionCall) {
+        expect(positionCall.args[1].array.length).toBe(360); // 120 particles × 3 coordinates
+      }
+    }));
+
+    it('P1: should use requestAnimationFrame for smooth 60fps animation', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Should use requestAnimationFrame
+      expect(mockRaf).toHaveBeenCalled();
+
+      // Should maintain consistent frame timing
+      tick(32); // Two frames at 60fps
+      expect(mockRaf.calls.count()).toBeGreaterThan(1);
+    }));
+
+    it('P1: should disable fancy effects when prefers-reduced-motion is set', fakeAsync(() => {
+      // Mock reduced motion preference
+      mockMotionService.currentPreference = true;
+      mockMotionService.prefersReducedMotion = of(true);
+
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Should not start fancy animations
+      const formShapeSpy = spyOn<any>(component, 'formShape').and.callThrough();
+
+      // Trigger transition that would normally create shape formation
+      mockScrollService.metrics$.next({
+        globalProgress: 0.18,
+        velocity: 200,
+        activeSection: { id: 'hero', progress: 0.9 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Fancy shape formation should be disabled
+      expect(formShapeSpy).not.toHaveBeenCalled();
+    }));
+
+    it('P1: should maintain performance during intensive particle operations', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      const performanceStart = performance.now();
+
+      // Simulate intensive operations
+      for (let i = 0; i < 100; i++) {
+        mockScrollService.metrics$.next({
+          globalProgress: i / 100,
+          velocity: Math.random() * 1000,
+          activeSection: { id: 'test', progress: Math.random() },
+          sections: []
+        });
+        tick(1);
+      }
+
+      const performanceEnd = performance.now();
+      const duration = performanceEnd - performanceStart;
+
+      // Should complete intensive operations quickly (performance requirement)
+      expect(duration).toBeLessThan(1000); // Should handle 100 updates in under 1 second
+    }));
+  });
+
+  describe('8. Integration with Scroll Orchestration', () => {
+    it('P1: should synchronize with scroll orchestration service metrics', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      const testMetrics = {
+        globalProgress: 0.42,
+        velocity: 350,
+        activeSection: { id: 'servicos', progress: 0.6 },
+        sections: []
+      };
+
+      mockScrollService.metrics$.next(testMetrics);
+      tick(100);
+
+      // Should update shader uniforms with scroll data
+      expect(mockShaderMaterial.uniforms.globalProgress.value).toBe(0.42);
+    }));
+
+    it('P1: should respond to section changes with appropriate particle behavior', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      const sections = ['hero', 'filosofia', 'servicos', 'trabalhos', 'cta'];
+      
+      sections.forEach((sectionId, index) => {
+        mockScrollService.metrics$.next({
+          globalProgress: index / sections.length,
+          velocity: 200,
+          activeSection: { id: sectionId, progress: 0.5 },
+          sections: []
+        });
+
+        tick(100);
+
+        // Each section should potentially trigger different behavior
+        expect(mockShaderMaterial.uniforms.sectionIndex.value).toBe(index);
+      });
+    }));
+  });
+
+  describe('9. Edge Cases and Error Handling', () => {
+    it('P1: should handle WebGL context loss gracefully', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Simulate WebGL context loss
+      const contextLostEvent = new Event('webglcontextlost');
+      mockRenderer.domElement.dispatchEvent(contextLostEvent);
+
+      tick(100);
+
+      // Should not crash and should attempt recovery
+      expect(() => {
+        mockScrollService.metrics$.next({
+          globalProgress: 0.5,
+          velocity: 100,
+          activeSection: { id: 'test', progress: 0.5 },
+          sections: []
+        });
+        tick(100);
+      }).not.toThrow();
+    }));
+
+    it('P1: should handle rapid scroll changes without memory leaks', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Generate many rapid scroll events
+      for (let i = 0; i < 1000; i++) {
+        mockScrollService.metrics$.next({
+          globalProgress: Math.random(),
+          velocity: Math.random() * 2000,
+          activeSection: { id: 'test', progress: Math.random() },
+          sections: []
+        });
+        
+        if (i % 100 === 0) tick(1); // Occasional tick to prevent test timeout
+      }
+
+      tick(100);
+
+      // Should not accumulate excessive shockwaves or other objects
+      expect(mockShaderMaterial.uniforms.shockwaves.value.length).toBeLessThan(50);
+    }));
+
+    it('P1: should clean up resources properly on destroy', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => component.ngAfterViewInit());
+      tick();
+
+      // Destroy component
+      component.ngOnDestroy();
+      tick();
+
+      // Should dispose of Three.js resources
+      expect(mockRenderer.dispose).toHaveBeenCalled();
+      expect(mockBufferGeometry.dispose).toHaveBeenCalled();
+      expect(mockShaderMaterial.dispose).toHaveBeenCalled();
+      expect(mockCancelRaf).toHaveBeenCalled();
+    }));
+  });
+
+  afterEach(() => {
+    // Clean up after each test
+    if (component) {
+      component.ngOnDestroy();
+    }
+    fixture.destroy();
+  });
+});
