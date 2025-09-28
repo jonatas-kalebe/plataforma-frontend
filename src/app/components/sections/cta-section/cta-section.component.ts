@@ -3,9 +3,10 @@
  * Dedicated component for the call-to-action section
  */
 
-import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit, OnDestroy, PLATFORM_ID, inject } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { SECTION_IDS } from '../../../shared/constants/section.constants';
+import gsap from 'gsap';
 
 @Component({
   selector: 'app-cta-section',
@@ -14,7 +15,9 @@ import { SECTION_IDS } from '../../../shared/constants/section.constants';
   templateUrl: './cta-section.component.html',
   styleUrls: ['./cta-section.component.css']
 })
-export class CtaSectionComponent implements AfterViewInit {
+export class CtaSectionComponent implements AfterViewInit, OnDestroy {
+  private readonly platformId = inject(PLATFORM_ID);
+
   // Configuration variables (customizable)
   @Input() title: string = 'Vamos Construir o Futuro';
   @Input() subtitle?: string;
@@ -40,8 +43,70 @@ export class CtaSectionComponent implements AfterViewInit {
   // Constants
   readonly SECTION_ID = SECTION_IDS.CTA;
 
+  // Animation references
+  private pulseAnimation: gsap.core.Tween | null = null;
+
   ngAfterViewInit(): void {
     this.sectionReady.emit(this.sectionElement);
+    
+    if (isPlatformBrowser(this.platformId)) {
+      this.initializePulseAnimation();
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (isPlatformBrowser(this.platformId) && this.pulseAnimation) {
+      this.pulseAnimation.kill();
+    }
+  }
+
+  /**
+   * Initialize subtle pulse animation for primary CTA button
+   */
+  private initializePulseAnimation(): void {
+    // Skip animations if user prefers reduced motion
+    const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    const primaryButton = document.querySelector('[data-testid="cta-buttons"] a:first-child');
+    if (!primaryButton) return;
+
+    const gsapInstance = (window as any).gsap || gsap;
+
+    // Create a subtle, continuous pulse animation
+    this.pulseAnimation = gsapInstance.to(primaryButton, {
+      scale: 1.02,
+      duration: 2,
+      ease: 'power2.inOut',
+      yoyo: true,
+      repeat: -1,
+      transformOrigin: 'center center'
+    });
+
+    // Add magnetic hover effect
+    primaryButton.addEventListener('mouseenter', () => {
+      if (this.pulseAnimation) {
+        this.pulseAnimation.pause();
+      }
+      gsapInstance.to(primaryButton, {
+        scale: 1.05,
+        duration: 0.3,
+        ease: 'power2.out'
+      });
+    });
+
+    primaryButton.addEventListener('mouseleave', () => {
+      gsapInstance.to(primaryButton, {
+        scale: 1,
+        duration: 0.3,
+        ease: 'power2.out',
+        onComplete: () => {
+          if (this.pulseAnimation) {
+            this.pulseAnimation.resume();
+          }
+        }
+      });
+    });
   }
 
   /**

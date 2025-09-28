@@ -6,3 +6,4 @@
 export * from './animation.constants';
 export * from './section.constants';
 export * from './style.constants';
+export * from './scroll-config.constants';

@@ -4,6 +4,7 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
+import { SCROLL_CONFIG, SECTION_SCROLL_CONFIG } from '../shared/constants/scroll-config.constants';
 
 export interface ScrollSection {
   id: string;
@@ -593,9 +594,9 @@ export class ScrollOrchestrationService {
 
     // Key fix: Only snap when ScrollTrigger velocity is zero (user has paused scrolling)
     // This matches test expectation: "snaps only after pause"
-    if (scrollTriggerVelocity === 0) { // Zero velocity indicates scrolling stopped
-      console.log(`Zero velocity detected, scheduling snap in ${this.isMobile ? 100 : 80}ms`);
-      const delay = this.isMobile ? 100 : 80; // Allow extra time for mobile kinetic scroll
+    if (scrollTriggerVelocity === SCROLL_CONFIG.VELOCITY_THRESHOLD) { // Zero velocity indicates scrolling stopped
+      const delay = this.isMobile ? SCROLL_CONFIG.MOBILE_SNAP_DELAY_MS : SCROLL_CONFIG.DESKTOP_SNAP_DELAY_MS;
+      console.log(`Zero velocity detected, scheduling snap in ${delay}ms`);
       this.snapTimeoutId = window.setTimeout(() => {
         this.performMagneticSnap();
       }, delay);
@@ -617,45 +618,37 @@ export class ScrollOrchestrationService {
 
     console.log(`Snap check: ${sectionId} at ${(progress * 100).toFixed(1)}%, direction: ${direction}`);
 
-    // Fixed thresholds: snap forward at 85%, backward at 15% (matching test expectations)
-    if (progress >= 0.85) {
+    // Get section-specific thresholds or use defaults
+    const sectionConfig = SECTION_SCROLL_CONFIG[sectionId as keyof typeof SECTION_SCROLL_CONFIG];
+    const forwardThreshold = (sectionConfig as any)?.SNAP_FORWARD_THRESHOLD ?? SCROLL_CONFIG.SNAP_FORWARD_THRESHOLD;
+    const backwardThreshold = (sectionConfig as any)?.SNAP_BACKWARD_THRESHOLD ?? SCROLL_CONFIG.SNAP_BACKWARD_THRESHOLD;
+
+    // Forward snap check
+    if (forwardThreshold !== null && progress >= forwardThreshold) {
       const nextSectionElement = this.getNextSectionElement(sectionId);
       console.log(`Looking for next section after ${sectionId}, found:`, nextSectionElement);
       if (nextSectionElement) {
         console.log(`Snapping forward from ${sectionId} to next section`);
         gsapInstance.to(window, {
           scrollTo: { y: nextSectionElement.offsetTop, autoKill: false },
-          ease: 'power2.inOut', // Gentle easing as expected by tests
-          duration: 0.8 // Smooth duration
+          ease: SCROLL_CONFIG.SCROLL_EASE,
+          duration: SCROLL_CONFIG.SCROLL_EASE_DURATION_MS / 1000 // Convert to seconds
         });
         return;
       }
     }
 
-    // Snap backward when progress <= 15% and moving backward
-    if (progress <= 0.15 && direction < 0) {
+    // Backward snap check
+    if (backwardThreshold !== null && progress <= backwardThreshold && direction < 0) {
       const prevSectionElement = this.getPrevSectionElement(sectionId);
       if (prevSectionElement) {
         console.log(`Snapping backward from ${sectionId} to previous section`);
         gsapInstance.to(window, {
           scrollTo: { y: prevSectionElement.offsetTop, autoKill: false },
-          ease: 'power2.inOut', // Gentle easing as expected by tests
-          duration: 0.8
+          ease: SCROLL_CONFIG.SCROLL_EASE,
+          duration: SCROLL_CONFIG.SCROLL_EASE_DURATION_MS / 1000
         });
         return;
-      }
-    }
-
-    // Special handling for CTA section - only allow upward snapping
-    if (sectionId === 'cta' && progress <= 0.20 && direction < 0) {
-      const prevSectionElement = this.getPrevSectionElement(sectionId);
-      if (prevSectionElement) {
-        console.log(`Snapping up from CTA to previous section`);
-        gsapInstance.to(window, {
-          scrollTo: { y: prevSectionElement.offsetTop, autoKill: false },
-          ease: 'power2.inOut',
-          duration: 0.8
-        });
       }
     }
   }
