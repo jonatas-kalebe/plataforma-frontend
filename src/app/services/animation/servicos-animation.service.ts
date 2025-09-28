@@ -114,19 +114,31 @@ export class ServicosAnimationService {
     cardsArray.forEach((card) => {
       // Mouse enter
       card.addEventListener('mouseenter', () => {
-        if (this.prefersReducedMotion) return;
+        // Always provide some hover feedback, even with reduced motion
+        if (this.prefersReducedMotion) {
+          // Simplified hover for reduced motion
+          gsap.to(card, {
+            scale: 1.02,
+            opacity: 0.95,
+            duration: 0.3,
+            ease: 'power2.out'
+          });
+        } else {
+          // Full magnetic hover effect
+          gsap.to(card, {
+            scale: 1.05,
+            y: -8,
+            rotateY: 2,
+            duration: 0.4,
+            ease: 'power2.out'
+          });
+        }
         
+        // Add glow effect (always)
         gsap.to(card, {
-          scale: 1.05,
-          y: -8,
-          rotateY: 2,
-          duration: 0.4,
-          ease: 'power2.out'
-        });
-        
-        // Add glow effect
-        gsap.to(card, {
-          boxShadow: '0 20px 40px rgba(64, 224, 208, 0.3)',
+          boxShadow: this.prefersReducedMotion 
+            ? '0 10px 30px rgba(64, 224, 208, 0.2)'
+            : '0 20px 40px rgba(64, 224, 208, 0.3)',
           borderColor: 'rgba(64, 224, 208, 0.6)',
           duration: 0.4,
           ease: 'power2.out'
@@ -135,12 +147,12 @@ export class ServicosAnimationService {
 
       // Mouse leave
       card.addEventListener('mouseleave', () => {
-        if (this.prefersReducedMotion) return;
-        
+        // Reset hover state (always)
         gsap.to(card, {
           scale: 1,
           y: 0,
           rotateY: 0,
+          opacity: 1,
           duration: 0.4,
           ease: 'power2.out'
         });
@@ -154,20 +166,25 @@ export class ServicosAnimationService {
         });
       });
 
-      // Touch effects for mobile
-      card.addEventListener('touchstart', () => {
-        if (this.prefersReducedMotion) return;
+      // Touch effects for mobile with haptic feedback
+      card.addEventListener('touchstart', (e) => {
+        // Add haptic feedback for supported devices
+        if (navigator.vibrate) {
+          navigator.vibrate(50); // Short, subtle vibration
+        }
         
+        // Visual feedback for touch
         gsap.to(card, {
-          scale: 1.02,
+          scale: this.prefersReducedMotion ? 1.01 : 1.02,
           duration: 0.2,
           ease: 'power2.out'
         });
+        
+        // Prevent mouse events on touch devices
+        e.preventDefault();
       });
 
       card.addEventListener('touchend', () => {
-        if (this.prefersReducedMotion) return;
-        
         gsap.to(card, {
           scale: 1,
           duration: 0.3,
@@ -175,26 +192,26 @@ export class ServicosAnimationService {
         });
       });
 
-      // Mouse move for subtle magnetic effect - simplified to avoid TypeScript issues
-      card.addEventListener('mousemove', (e: any) => {
-        if (this.prefersReducedMotion) return;
-        
-        if (e.clientX && e.clientY) {
-          const rect = card.getBoundingClientRect();
-          const centerX = rect.left + rect.width / 2;
-          const centerY = rect.top + rect.height / 2;
-          
-          const deltaX = (e.clientX - centerX) / (rect.width / 2);
-          const deltaY = (e.clientY - centerY) / (rect.height / 2);
-          
-          gsap.to(card, {
-            rotateX: deltaY * -5,
-            rotateY: deltaX * 5,
-            duration: 0.3,
-            ease: 'power1.out'
-          });
-        }
-      });
+      // Mouse move for subtle magnetic effect - only if no reduced motion
+      if (!this.prefersReducedMotion) {
+        card.addEventListener('mousemove', (e: any) => {
+          if (e.clientX && e.clientY) {
+            const rect = card.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            const deltaX = (e.clientX - centerX) / (rect.width / 2);
+            const deltaY = (e.clientY - centerY) / (rect.height / 2);
+            
+            gsap.to(card, {
+              rotateX: deltaY * -5,
+              rotateY: deltaX * 5,
+              duration: 0.3,
+              ease: 'power1.out'
+            });
+          }
+        });
+      }
     });
   }
 

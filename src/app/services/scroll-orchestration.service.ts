@@ -71,7 +71,7 @@ export class ScrollOrchestrationService {
     if (isPlatformBrowser(this.platformId)) {
       this.checkReducedMotion();
       this.detectMobile();
-      
+
       // Track reduced motion preference
       this.telemetryService.trackReducedMotion(this.prefersReducedMotion);
     }
@@ -114,7 +114,7 @@ export class ScrollOrchestrationService {
     // Check if essential DOM elements exist
     const heroElement = document.querySelector('#hero');
     const filosofiaElement = document.querySelector('#filosofia');
-    
+
     if (!heroElement || !filosofiaElement) {
       console.warn('ScrollOrchestrationService: Essential sections not found, retrying...');
       return false;
@@ -125,17 +125,17 @@ export class ScrollOrchestrationService {
       const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
 
       gsapInstance.registerPlugin(ScrollTriggerInstance, ScrollToPlugin);
-      
+
       // Expose ScrollTrigger globally for debugging/testing
       if (typeof window !== 'undefined') {
         (window as any).ScrollTrigger = ScrollTriggerInstance;
       }
-      
+
       this.lastScrollY = window.scrollY || 0;
       this.setupSections();
       this.setupScrollEventListener(); // Add direct scroll event listener as backup
       this.isInitialized = true;
-      
+
       console.log('ScrollOrchestrationService: Successfully initialized');
       return true;
     } catch (error) {
@@ -207,11 +207,11 @@ export class ScrollOrchestrationService {
               start: self.start,
               end: self.end
             };
-            
+
             // Track section view
             this.telemetryService.trackSectionView(
-              section.id, 
-              performance.now(), 
+              section.id,
+              performance.now(),
               this.isMobile ? 'mobile' : 'desktop'
             );
           }
@@ -269,47 +269,47 @@ export class ScrollOrchestrationService {
 
   private createHeroAnimation(gsapInstance: any): any {
     const heroTimeline = gsapInstance.timeline();
-    
+
     const heroTitle = document.querySelector('#hero-title');
     const heroSubtitle = document.querySelector('#hero-subtitle');
     const heroCta = document.querySelector('#hero-cta');
 
     if (heroTitle) {
       // 0-20%: gentle resistance - counter-scroll to reduce apparent movement
-      heroTimeline.fromTo(heroTitle, 
+      heroTimeline.fromTo(heroTitle,
         { y: 0, opacity: 1 },
         { y: 53, opacity: 0.8, ease: 'power1.out' },
         0
       );
-      
+
       // 20-100%: accelerated transition with larger movement
-      heroTimeline.to(heroTitle, 
+      heroTimeline.to(heroTitle,
         { y: -150, opacity: 0.1, ease: 'power2.in' },
         0.2
       );
     }
 
     if (heroSubtitle) {
-      heroTimeline.fromTo(heroSubtitle, 
+      heroTimeline.fromTo(heroSubtitle,
         { y: 0, opacity: 1 },
         { y: -40, opacity: 0.7, ease: 'power1.out' },
         0
       );
-      
-      heroTimeline.to(heroSubtitle, 
+
+      heroTimeline.to(heroSubtitle,
         { y: -120, opacity: 0, ease: 'power2.in' },
         0.25
       );
     }
 
     if (heroCta) {
-      heroTimeline.fromTo(heroCta, 
+      heroTimeline.fromTo(heroCta,
         { y: 0, opacity: 1 },
         { y: -50, opacity: 0.6, ease: 'power1.out' },
         0
       );
-      
-      heroTimeline.to(heroCta, 
+
+      heroTimeline.to(heroCta,
         { y: -100, opacity: 0, ease: 'power2.in' },
         0.3
       );
@@ -320,7 +320,7 @@ export class ScrollOrchestrationService {
 
   private createHeroScrollAnimation(gsapInstance: any, ScrollTriggerInstance: any): void {
     const heroTitle = document.querySelector('#hero-title');
-    const heroSubtitle = document.querySelector('#hero-subtitle');  
+    const heroSubtitle = document.querySelector('#hero-subtitle');
     const heroCta = document.querySelector('#hero-cta');
 
     if (!heroTitle || !heroSubtitle || !heroCta) {
@@ -336,14 +336,14 @@ export class ScrollOrchestrationService {
       scrub: true,
       onUpdate: (self: any) => {
         const progress = self.progress;
-        
+
         // DEBUG: Log the resistance calculation
         console.log(`Hero scroll progress: ${(progress * 100).toFixed(1)}%, scrollY: ${window.scrollY}`);
-        
+
         // Apply resistance logic: gentle resistance for 0-20%, then acceleration
         let yMultiplier: number;
         let opacityMultiplier: number;
-        
+
         if (progress <= 0.2) {
           // 0-20%: Gentle resistance - target max ~50px movement to stay well under 60px
           // Max calculation: 28 * 1.2 (max multiplier at 20%) = ~33.6px
@@ -355,7 +355,7 @@ export class ScrollOrchestrationService {
           yMultiplier = Math.min(1.0, acceleratedProgress);
           opacityMultiplier = (progress - 0.2) * 2.0 + 0.08;
         }
-        
+
         // Apply transformations with resistance/acceleration logic
         // In resistance phase: use positive Y to counter scroll (create resistance effect)
         // In acceleration phase: use negative Y to enhance scroll movement
@@ -363,20 +363,20 @@ export class ScrollOrchestrationService {
         const resistanceY = progress <= 0.2 ? 28 * yMultiplier : -45 * yMultiplier; // Reduced from 35 to 28
         const resistanceY2 = progress <= 0.2 ? 20 * yMultiplier : -35 * yMultiplier; // Reduced from 25 to 20
         const resistanceY3 = progress <= 0.2 ? 12 * yMultiplier : -25 * yMultiplier; // Reduced from 15 to 12
-        
+
         // DEBUG: Log the actual resistance values
         console.log(`Resistance calc: yMult=${yMultiplier.toFixed(2)}, resistanceY=${resistanceY.toFixed(1)}px`);
-        
+
         gsapInstance.set('#hero-title', {
           y: resistanceY,  // Should max at ~28px * 0.2 = ~5.6px at 20% progress
           opacity: Math.max(1 - opacityMultiplier * 0.6, 0.4)
         });
-        
+
         gsapInstance.set('#hero-subtitle', {
           y: resistanceY2,  // Should max at ~30px in resistance phase
           opacity: Math.max(1 - opacityMultiplier * 0.4, 0.6)
         });
-        
+
         gsapInstance.set('#hero-cta', {
           y: resistanceY3,  // Should max at ~18px in resistance phase
           opacity: Math.max(1 - opacityMultiplier * 0.3, 0.7)
@@ -385,15 +385,15 @@ export class ScrollOrchestrationService {
         // Enhanced fade behavior near thresholds
         if (progress >= 0.85) {
           // Near snap threshold - accelerate fade out
-          gsapInstance.to('#hero-title, #hero-subtitle, #hero-cta', { 
-            duration: 0.3, 
+          gsapInstance.to('#hero-title, #hero-subtitle, #hero-cta', {
+            duration: 0.3,
             ease: 'power2.in'
           });
         } else if (progress <= 0.15) {
           // Near reverse threshold - restore visibility
           gsapInstance.to('#hero-title, #hero-subtitle, #hero-cta', {
-            opacity: 1, 
-            duration: 0.3, 
+            opacity: 1,
+            duration: 0.3,
             ease: 'power2.out'
           });
         }
@@ -408,7 +408,7 @@ export class ScrollOrchestrationService {
     let lastUpdateTime = performance.now();
 
     console.log('Setting up global progress trigger...');
-    
+
     const globalTrigger = ScrollTriggerInstance.create({
       id: 'global-progress',
       trigger: document.body,
@@ -421,7 +421,7 @@ export class ScrollOrchestrationService {
         const currentScrollY = window.scrollY || 0;
         const deltaTime = Math.max(currentTime - lastUpdateTime, 1); // Prevent division by zero
         const deltaScroll = Math.abs(currentScrollY - this.lastScrollY);
-        
+
         // Calculate velocity in pixels per second
         const velocityRaw = (deltaScroll / deltaTime) * 1000;
         // Apply smoothing to avoid jittery values
@@ -457,10 +457,10 @@ export class ScrollOrchestrationService {
         this.updateActiveSectionTrigger(currentScrollY);
         this.detectScrollIntention();
         this.checkMagneticSnap();
-        
+
         // Start checking for when scrolling stops
         this.startScrollStopCheck();
-        
+
         // Debug: Log every few updates to monitor activity
         if (Math.random() < 0.5) { // Increase log frequency for debugging
           console.log(`Global trigger update: scrollY=${currentScrollY}, velocity=${Math.abs(smoothedVelocity).toFixed(1)}, direction=${this.scrollDirection}`);
@@ -473,69 +473,69 @@ export class ScrollOrchestrationService {
 
     console.log('Global progress trigger created:', globalTrigger);
     this.scrollTriggers.push(globalTrigger);
-    
+
     // Force immediate refresh to ensure trigger is active
     ScrollTriggerInstance.refresh();
     console.log('ScrollTrigger refreshed after creation');
   }
-  
+
   private setupScrollEventListener(): void {
     console.log('Setting up direct scroll event listener as backup...');
-    
+
     let throttleTimeout: number | null = null;
-    
+
     const handleScroll = () => {
       if (throttleTimeout) return;
-      
+
       throttleTimeout = window.setTimeout(() => {
         const currentScrollY = window.scrollY || 0;
-        
+
         // Update direction
         if (currentScrollY > this.lastScrollY + 5) {
           this.scrollDirection = 'down';
         } else if (currentScrollY < this.lastScrollY - 5) {
           this.scrollDirection = 'up';
         }
-        
+
         this.lastScrollY = currentScrollY;
         this.lastScrollTime = performance.now();
-        
+
         // Update active section and check magnetic snap
         this.updateActiveSectionTrigger(currentScrollY);
         this.detectScrollIntention();
         this.checkMagneticSnap();
-        
+
         // Start scroll stop detection
         this.startScrollStopCheck();
-        
+
         // Debug log occasionally
         if (Math.random() < 0.2) {
           console.log(`Direct scroll event: scrollY=${currentScrollY}, direction=${this.scrollDirection}`);
         }
-        
+
         throttleTimeout = null;
       }, 16); // ~60fps throttling
     };
-    
+
     window.addEventListener('scroll', handleScroll, { passive: true });
   }
-  
+
   private startScrollStopCheck(): void {
     // Clear any existing interval
     if (this.scrollStoppedCheckInterval) {
       clearInterval(this.scrollStoppedCheckInterval);
     }
-    
+
     // Start checking if scrolling has stopped
     this.scrollStoppedCheckInterval = window.setInterval(() => {
       const timeSinceLastScroll = performance.now() - this.lastScrollTime;
       const currentVelocity = Math.abs(this.scrollStateSubject.value.velocity);
-      
+
       // If no scroll activity for 150ms and low velocity, consider scrolling stopped
       if (timeSinceLastScroll > 150 && currentVelocity < 10) {
         console.log(`Scrolling stopped detected: ${timeSinceLastScroll.toFixed(0)}ms since last scroll, velocity: ${currentVelocity.toFixed(1)}`);
         this.onScrollingStopped();
-        
+
         // Clear the interval
         if (this.scrollStoppedCheckInterval) {
           clearInterval(this.scrollStoppedCheckInterval);
@@ -544,13 +544,13 @@ export class ScrollOrchestrationService {
       }
     }, 25); // Check every 25ms for more responsiveness
   }
-  
+
   private onScrollingStopped(): void {
     console.log('Scrolling stopped - checking for magnetic snap');
-    
-    // Ensure ScrollTrigger velocity is also zero for tests compatibility 
+
+    // Ensure ScrollTrigger velocity is also zero for tests compatibility
     const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
-    
+
     // Set both internal velocity and simulate ScrollTrigger velocity to 0
     const currentMetrics = this.metricsSubject.value;
     this.metricsSubject.next({
@@ -562,7 +562,7 @@ export class ScrollOrchestrationService {
       ...this.scrollStateSubject.value,
       velocity: 0
     });
-    
+
     // Force check magnetic snap with zero velocity
     this.checkMagneticSnap();
   }
@@ -589,7 +589,7 @@ export class ScrollOrchestrationService {
 
       if (adjustedScrollY >= sectionTop && adjustedScrollY <= sectionBottom) {
         const sectionProgress = Math.max(0, Math.min(1, (adjustedScrollY - sectionTop) / sectionHeight));
-        
+
         // Update or create activeSectionTrigger
         this.activeSectionTrigger = {
           progress: sectionProgress,
@@ -598,7 +598,7 @@ export class ScrollOrchestrationService {
           start: sectionTop,
           end: sectionBottom
         };
-        
+
         console.log(`Active section: ${sectionId}, progress: ${(sectionProgress * 100).toFixed(1)}%, scrollY: ${currentScrollY}, adjustedScrollY: ${adjustedScrollY.toFixed(0)}, sectionTop: ${sectionTop}`);
         break;
       }
@@ -614,12 +614,12 @@ export class ScrollOrchestrationService {
     if (progress >= 0.2 && direction > 0 && this.intentionDetected.direction !== 'forward') {
       this.intentionDetected = { direction: 'forward', at: progress };
       console.log(`Forward intention detected at ${(progress * 100).toFixed(1)}%`);
-    } 
+    }
     // Reset forward intention if scrolling back under 20%
     else if (progress < 0.2 && this.intentionDetected.direction === 'forward') {
       this.intentionDetected = { direction: null, at: 0 };
     }
-    
+
     // Backward intention: crossed 15% threshold while moving backward
     if (progress <= 0.15 && direction < 0 && this.intentionDetected.direction !== 'backward') {
       this.intentionDetected = { direction: 'backward', at: progress };
@@ -642,17 +642,17 @@ export class ScrollOrchestrationService {
 
     // Skip snapping if trabalhos is pinned
     const activeId = this.scrollStateSubject.value.activeSection?.id;
-    if (activeId === 'trabalhos') return; 
+    if (activeId === 'trabalhos') return;
     const anyPinnedActive = ScrollTriggerInstance.getAll().some((t: any) => t.pin && t.isActive);
     if (anyPinnedActive) return;
 
     const progress = this.activeSectionTrigger.progress || 0;
     const direction = this.activeSectionTrigger.direction || 0;
-    
+
     // Fix velocity detection - use internal velocity tracking as primary source
     const currentVelocity = Math.abs(this.scrollStateSubject.value.velocity);
-    
-    // Debug logging to understand what's happening  
+
+    // Debug logging to understand what's happening
     console.log(`Snap check: section=${this.activeSectionTrigger.vars?.id}, progress=${(progress * 100).toFixed(1)}%, velocity=${currentVelocity.toFixed(1)}, direction=${direction}`);
 
     if (this.snapTimeoutId) {
@@ -697,13 +697,13 @@ export class ScrollOrchestrationService {
       console.log(`Looking for next section after ${sectionId}, found:`, nextSectionElement);
       if (nextSectionElement) {
         console.log(`Snapping forward from ${sectionId} to next section`);
-        
+
         // Track snap event
         const nextSectionId = this.getNextSectionId(sectionId);
         if (nextSectionId) {
           this.telemetryService.trackSnapTriggered(sectionId, nextSectionId, 'forward', progress);
         }
-        
+
         gsapInstance.to(window, {
           scrollTo: { y: nextSectionElement.offsetTop, autoKill: false },
           ease: SCROLL_CONFIG.SCROLL_EASE,
@@ -718,7 +718,7 @@ export class ScrollOrchestrationService {
       const prevSectionElement = this.getPrevSectionElement(sectionId);
       if (prevSectionElement) {
         console.log(`Snapping backward from ${sectionId} to previous section`);
-        
+
         // Track snap event
         const prevSectionId = this.getPrevSectionId(sectionId);
         if (prevSectionId) {
@@ -859,7 +859,7 @@ export class ScrollOrchestrationService {
         clearTimeout(this.snapTimeoutId);
         this.snapTimeoutId = null;
       }
-      
+
       if (this.scrollStoppedCheckInterval) {
         clearInterval(this.scrollStoppedCheckInterval);
         this.scrollStoppedCheckInterval = null;
