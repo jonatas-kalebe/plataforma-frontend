@@ -1,13 +1,24 @@
 /**
- * Comprehensive Unit Tests for Hero Section Addictive Scroll Behavior
- * Tests every pixel-perfect behavior as specified in the design document
+ * HERO SECTION - COMPREHENSIVE PIXEL-PERFECT VALIDATION
+ * 
+ * This test suite validates EVERY SINGLE PIXEL and functionality of the Hero section
+ * exactly as described in the addictive scroll experience requirements.
+ * 
+ * Validates:
+ * - Exact text content and typography
+ * - Precise color implementations 
+ * - Perfect spacing and layout
+ * - Scroll resistance animations
+ * - Particle background interactions
+ * - Responsive design behavior
+ * - Accessibility compliance
  */
 
-import { TestBed, ComponentFixture } from '@angular/core/testing';
-import { HeroSectionComponent } from './hero-section.component';
-import { ThreeParticleBackgroundComponent } from '../../three-particle-background/three-particle-background.component';
-import { Component, DebugElement } from '@angular/core';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { DebugElement, ElementRef } from '@angular/core';
 import { By } from '@angular/platform-browser';
+import { HeroSectionComponent } from './hero-section.component';
+import { CommonModule } from '@angular/common';
 
 // Mock GSAP
 const mockGsap = {
