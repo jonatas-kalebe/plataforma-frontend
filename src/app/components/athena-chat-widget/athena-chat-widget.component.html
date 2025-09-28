@@ -1,0 +1,197 @@
+<!-- Athena Chat Widget -->
+<div class="athena-chat-widget fixed bottom-6 right-6 z-50" *ngIf="visible">
+  <!-- Teaser Message -->
+  <div 
+    *ngIf="teaserVisible() && !isOpen()" 
+    class="teaser-bubble animate-pop mb-3 mr-2 bg-athenity-gold text-athenity-blue-deep px-4 py-2 rounded-2xl rounded-br-sm shadow-lg text-sm font-medium max-w-xs"
+    role="tooltip"
+    aria-live="polite">
+    <div class="flex items-center gap-2">
+      <span class="text-xl">⚡</span>
+      <span>Hey, mortal... precisa de ajuda?</span>
+    </div>
+    <div class="teaser-arrow"></div>
+  </div>
+
+  <!-- Chat Window -->
+  <div 
+    *ngIf="isOpen()" 
+    class="chat-window animate-pop bg-white rounded-2xl shadow-2xl w-80 h-96 flex flex-col overflow-hidden"
+    role="dialog"
+    aria-labelledby="athena-title"
+    aria-describedby="athena-description">
+    
+    <!-- Header -->
+    <div class="chat-header bg-gradient-to-r from-athenity-gold/90 to-athenity-gold px-4 py-3 flex items-center gap-3">
+      <div class="athena-avatar w-8 h-8 bg-athenity-blue-deep rounded-full flex items-center justify-center">
+        <span class="text-athenity-gold text-lg font-bold">Α</span>
+      </div>
+      <div class="flex-1">
+        <h2 id="athena-title" class="text-athenity-blue-deep font-bold text-sm">Athena</h2>
+        <p id="athena-description" class="text-athenity-blue-deep/80 text-xs">Deusa da Sabedoria</p>
+      </div>
+      <button 
+        (click)="toggle()"
+        class="close-btn w-6 h-6 rounded-full bg-athenity-blue-deep/10 hover:bg-athenity-blue-deep/20 transition-colors flex items-center justify-center"
+        aria-label="Fechar chat"
+        type="button">
+        <span class="text-athenity-blue-deep text-sm">×</span>
+      </button>
+    </div>
+
+    <!-- Messages Area -->
+    <div 
+      #scrollBox
+      class="messages-area flex-1 p-4 overflow-y-auto space-y-3 bg-gradient-to-b from-gray-50 to-white"
+      role="log"
+      aria-live="polite"
+      aria-label="Mensagens do chat">
+      
+      <div 
+        *ngFor="let msg of messages(); trackBy: trackByMessage"
+        class="message-wrapper"
+        [class.user]="msg.role === 'user'"
+        [class.athena]="msg.role === 'athena'">
+        
+        <!-- Athena Message -->
+        <div *ngIf="msg.role === 'athena'" class="flex gap-2 items-start">
+          <div class="athena-mini-avatar w-6 h-6 bg-athenity-gold rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+            <span class="text-athenity-blue-deep text-xs font-bold">Α</span>
+          </div>
+          <div class="bg-white border border-athenity-gold/20 rounded-2xl rounded-tl-sm px-3 py-2 max-w-64 shadow-sm">
+            <p class="text-gray-800 text-sm leading-relaxed">{{ msg.text }}</p>
+          </div>
+        </div>
+
+        <!-- User Message -->
+        <div *ngIf="msg.role === 'user'" class="flex justify-end">
+          <div class="bg-athenity-gold text-athenity-blue-deep rounded-2xl rounded-tr-sm px-3 py-2 max-w-64 shadow-sm">
+            <p class="text-sm font-medium leading-relaxed">{{ msg.text }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Replies -->
+    <div 
+      *ngIf="quick().length > 0" 
+      class="quick-replies px-4 py-2 bg-gray-50 border-t border-gray-200"
+      role="group"
+      aria-label="Respostas rápidas">
+      
+      <div class="flex flex-wrap gap-2">
+        <button 
+          *ngFor="let q of quick()"
+          (click)="handleQuick(q)"
+          class="quick-reply-btn bg-white border border-athenity-gold/30 text-athenity-blue-deep px-3 py-1 rounded-full text-xs font-medium hover:bg-athenity-gold hover:text-athenity-blue-deep transition-all duration-200 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-athenity-gold focus:ring-offset-1"
+          type="button"
+          [attr.aria-label]="'Resposta rápida: ' + q">
+          {{ q }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Scheduling Form -->
+    <div 
+      *ngIf="mode() === 'schedule'" 
+      class="schedule-form px-4 py-3 bg-gray-50 border-t border-gray-200"
+      role="form"
+      aria-label="Formulário de agendamento">
+      
+      <div class="space-y-2">
+        <div class="flex gap-2">
+          <input 
+            [(ngModel)]="formName"
+            placeholder="Nome"
+            class="flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-athenity-gold focus:border-transparent"
+            type="text"
+            aria-label="Seu nome"
+            required />
+          <input 
+            [(ngModel)]="formEmail"
+            placeholder="Email"
+            class="flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-athenity-gold focus:border-transparent"
+            type="email"
+            aria-label="Seu email"
+            required />
+        </div>
+        <div class="flex gap-2">
+          <input 
+            [(ngModel)]="formDate"
+            class="flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-athenity-gold focus:border-transparent"
+            type="date"
+            aria-label="Data do agendamento"
+            required />
+          <input 
+            [(ngModel)]="formTime"
+            class="flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-athenity-gold focus:border-transparent"
+            type="time"
+            aria-label="Horário do agendamento"
+            required />
+        </div>
+        <button 
+          (click)="schedule()"
+          [disabled]="!canSchedule()"
+          class="w-full bg-athenity-gold text-athenity-blue-deep px-3 py-2 rounded-lg text-sm font-medium hover:bg-athenity-gold/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-athenity-gold focus:ring-offset-1"
+          type="button"
+          [attr.aria-label]="canSchedule() ? 'Agendar reunião' : 'Preencha todos os campos para agendar'">
+          Agendar
+        </button>
+      </div>
+    </div>
+
+    <!-- Input Area -->
+    <div 
+      *ngIf="mode() !== 'schedule'" 
+      class="input-area p-4 bg-white border-t border-gray-200">
+      
+      <div class="flex gap-2">
+        <input 
+          [(ngModel)]="inputValue"
+          (keydown.enter)="send()"
+          placeholder="Digite sua mensagem..."
+          class="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-athenity-gold focus:border-transparent"
+          type="text"
+          aria-label="Digite sua mensagem"
+          [attr.aria-describedby]="'send-help'"
+          maxlength="500" />
+        
+        <button 
+          (click)="send()"
+          [disabled]="!canSend()"
+          class="send-btn bg-athenity-gold text-athenity-blue-deep px-4 py-2 rounded-xl font-medium hover:bg-athenity-gold/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-athenity-gold focus:ring-offset-1 flex items-center gap-1"
+          type="button"
+          aria-label="Enviar mensagem"
+          [attr.aria-describedby]="'send-help'">
+          <span class="text-sm">→</span>
+        </button>
+      </div>
+      
+      <div id="send-help" class="sr-only">Pressione Enter ou clique no botão para enviar</div>
+    </div>
+  </div>
+
+  <!-- Chat Toggle Button -->
+  <button 
+    *ngIf="!isOpen()"
+    (click)="toggle()"
+    class="chat-toggle-btn animate-float bg-gradient-to-r from-athenity-gold to-athenity-gold/90 w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-athenity-gold focus:ring-offset-2 flex items-center justify-center relative overflow-hidden"
+    type="button"
+    aria-label="Abrir chat com Athena"
+    [attr.aria-expanded]="isOpen()">
+    
+    <!-- Athena Icon -->
+    <div class="athena-icon relative">
+      <span class="text-athenity-blue-deep text-2xl font-bold">Α</span>
+      <!-- Subtle glow effect -->
+      <div class="absolute inset-0 bg-white/20 rounded-full animate-pulse"></div>
+    </div>
+
+    <!-- Notification Badge -->
+    <div 
+      *ngIf="teaserVisible()"
+      class="notification-badge absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+      <span class="text-white text-xs font-bold">!</span>
+    </div>
+  </button>
+</div>

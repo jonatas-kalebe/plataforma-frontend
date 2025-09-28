@@ -76,7 +76,13 @@ export class AthenaChatWidgetComponent implements OnChanges {
     }
     if (this.mode() === 'faq') {
       this.pushUser(q);
-      this.sendToApi(q);
+      const localResponse = this.getFaqResponse(q);
+      if (localResponse) {
+        this.pushAthena(localResponse);
+        this.quick.set(['Outra dúvida?', 'Fazer orçamento', 'Agendar reunião']);
+      } else {
+        this.sendToApi(q);
+      }
       return;
     }
     if (this.mode() === 'idle') {
@@ -100,6 +106,16 @@ export class AthenaChatWidgetComponent implements OnChanges {
       } else {
         this.pushAthena('Anotei. Deseja adicionar Blog, Loja, Área logada ou Sem extras?');
         this.quick.set(['Blog', 'Loja', 'Área logada', 'Sem extras']);
+      }
+      return;
+    }
+    if (this.mode() === 'faq') {
+      const localResponse = this.getFaqResponse(text);
+      if (localResponse) {
+        this.pushAthena(localResponse);
+        this.quick.set(['Outra dúvida?', 'Fazer orçamento', 'Agendar reunião']);
+      } else {
+        this.sendToApi(text);
       }
       return;
     }
@@ -164,6 +180,29 @@ export class AthenaChatWidgetComponent implements OnChanges {
       this.formDate.set('');
       this.formTime.set('');
     });
+  }
+  trackByMessage(index: number, msg: AthenaMessage): string {
+    return `${msg.timestamp}-${index}`;
+  }
+  private getFaqResponse(question: string): string | null {
+    const q = question.toLowerCase();
+    const faqResponses = {
+      'seo': 'SEO (Search Engine Optimization) é o conjunto de técnicas para melhorar a visibilidade do seu site nos mecanismos de busca como Google. Inclui otimização de conteúdo, velocidade, estrutura e experiência do usuário. 📈',
+      'prazo': 'Os prazos médios são: Sites simples (1-3 páginas): 5-10 dias úteis. Sites complexos (4-15 páginas): 15-30 dias úteis. E-commerce ou sistemas: 30-60 dias úteis. ⏰',
+      'manutenção': 'Oferecemos planos de manutenção que incluem: atualizações de segurança, backup automático, monitoramento, pequenos ajustes de conteúdo e suporte técnico. Valores a partir de R$ 200/mês. 🔧',
+      'pagamento': 'Aceitamos: PIX (5% desconto), cartão (até 12x), boleto (à vista) e depósito bancário. Para projetos acima de R$ 5.000, parcelamos em até 3x sem juros. 💳',
+      'diferencial': 'Nosso diferencial está na abordagem: não criamos apenas sites, mas experiências digitais completas. Combinamos design moderno, performance técnica e estratégia de negócio. 🚀',
+      'tecnologia': 'Usamos tecnologias modernas: Angular, React, Node.js, Python, bancos SQL/NoSQL, AWS/Azure para cloud, e sempre priorizamos performance e segurança. ⚡',
+      'contato': 'Entre em contato por: E-mail: athenity@gmail.com, WhatsApp: (disponível no site), ou agende uma reunião aqui no chat para conversarmos sobre seu projeto! 📞'
+    };
+    
+    for (const [key, response] of Object.entries(faqResponses)) {
+      if (q.includes(key) || q.includes(key.replace('ç', 'c'))) {
+        return response;
+      }
+    }
+    
+    return null;
   }
   scrollBottom(): void {
     if (!this.scrollBox) return;

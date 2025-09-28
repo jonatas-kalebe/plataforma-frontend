@@ -12,6 +12,7 @@ import {FilosofiaSectionComponent} from '../../components/sections/filosofia-sec
 import {ServicosSectionComponent} from '../../components/sections/servicos-section/servicos-section.component';
 import {TrabalhosSectionComponent} from '../../components/sections/trabalhos-section/trabalhos-section.component';
 import {CtaSectionComponent} from '../../components/sections/cta-section/cta-section.component';
+import {AthenaChatWidgetComponent} from '../../components/athena-chat-widget/athena-chat-widget.component';
 
 // Expose GSAP globally for the scroll service
 if (typeof window !== 'undefined') {
@@ -24,13 +25,14 @@ gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 @Component({
   selector: 'app-landing',
   standalone: true,
-  imports: [CommonModule, HeroSectionComponent, FilosofiaSectionComponent, ServicosSectionComponent, TrabalhosSectionComponent, CtaSectionComponent],
+  imports: [CommonModule, HeroSectionComponent, FilosofiaSectionComponent, ServicosSectionComponent, TrabalhosSectionComponent, CtaSectionComponent, AthenaChatWidgetComponent],
   templateUrl: './landing.component.html',
   styleUrls: ['./landing.component.css']
 })
 export class LandingComponent implements AfterViewInit, OnDestroy {
   @ViewChild('knotCanvas', {static: true}) knotCanvas!: ElementRef<HTMLCanvasElement>;
   public scrollState: ScrollState | null = null;
+  public showAthenaWidget: boolean = true; // Set to true for initial testing
   private readonly platformId = inject(PLATFORM_ID);
   private zone = new NgZone({enableLongStackTrace: false});
   private knotCtx!: CanvasRenderingContext2D | null;
@@ -109,6 +111,10 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
           .subscribe(state => {
             setTimeout(() => {
               this.scrollState = state;
+              // Show Athena widget after scrolling past hero section (25% of page)
+              const shouldShow = (state?.globalProgress || 0) > 0.25;
+              console.log('Scroll state:', state?.globalProgress, 'Should show Athena:', shouldShow);
+              this.showAthenaWidget = shouldShow || true; // Force true for now
             });
           });
       });
