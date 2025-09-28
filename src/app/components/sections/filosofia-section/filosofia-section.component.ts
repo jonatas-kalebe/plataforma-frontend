@@ -118,11 +118,24 @@ export class FilosofiaSectionComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * Update line drawing based on scroll progress
+   * Update line drawing based on scroll progress with enhanced visual feedback
    * @param progress - Scroll progress from 0 to 1
    */
   updateLineProgress(progress: number): void {
     this.currentProgress = Math.max(0, Math.min(1, progress));
+    
+    // Enhanced visual feedback based on scroll engagement
+    if (this.currentProgress >= 0.85) {
+      // Near complete straightening - enhance glow to suggest magnetic attraction
+      this.setEnhancedGlow();
+    } else if (this.currentProgress >= 0.2) {
+      // Past engagement threshold - show acceleration
+      this.setNormalGlow();
+    } else {
+      // In resistance phase - subtle glow
+      this.setSubtleGlow();
+    }
+    
     this.drawLine(this.currentProgress);
   }
 
@@ -220,5 +233,35 @@ export class FilosofiaSectionComponent implements AfterViewInit, OnDestroy {
     
     const canvas = this.knotCanvas.nativeElement;
     context.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  /**
+   * Set enhanced glow for magnetic attraction phase (85%+)
+   */
+  private setEnhancedGlow(): void {
+    if (!this.ctx) return;
+    this.ctx.shadowBlur = 25;
+    this.ctx.shadowColor = '#64FFDA';
+    this.ctx.lineWidth = 4;
+  }
+
+  /**
+   * Set normal glow for acceleration phase (20%-85%)
+   */
+  private setNormalGlow(): void {
+    if (!this.ctx) return;
+    this.ctx.shadowBlur = 15;
+    this.ctx.shadowColor = '#64FFDA';
+    this.ctx.lineWidth = 3;
+  }
+
+  /**
+   * Set subtle glow for resistance phase (0%-20%)
+   */
+  private setSubtleGlow(): void {
+    if (!this.ctx) return;
+    this.ctx.shadowBlur = 10;
+    this.ctx.shadowColor = '#64FFDA';
+    this.ctx.lineWidth = 2;
   }
 }
