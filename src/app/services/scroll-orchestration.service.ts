@@ -704,8 +704,12 @@ export class ScrollOrchestrationService {
           this.telemetryService.trackSnapTriggered(sectionId, nextSectionId, 'forward', progress);
         }
 
+        // Use getBoundingClientRect for more reliable positioning
+        const targetPosition = nextSectionElement.getBoundingClientRect().top + window.scrollY;
+        console.log(`Target position calculated: ${targetPosition} (rect.top: ${nextSectionElement.getBoundingClientRect().top}, scrollY: ${window.scrollY})`);
+        
         gsapInstance.to(window, {
-          scrollTo: { y: nextSectionElement.offsetTop, autoKill: false },
+          scrollTo: { y: targetPosition, autoKill: false },
           ease: SCROLL_CONFIG.SCROLL_EASE,
           duration: SCROLL_CONFIG.SCROLL_EASE_DURATION_MS / 1000 // Convert to seconds
         });
@@ -724,8 +728,12 @@ export class ScrollOrchestrationService {
         if (prevSectionId) {
           this.telemetryService.trackSnapTriggered(sectionId, prevSectionId, 'backward', progress);
         }
+        // Use getBoundingClientRect for more reliable positioning
+        const targetPosition = prevSectionElement.getBoundingClientRect().top + window.scrollY;
+        console.log(`Backward target position calculated: ${targetPosition}`);
+        
         gsapInstance.to(window, {
-          scrollTo: { y: prevSectionElement.offsetTop, autoKill: false },
+          scrollTo: { y: targetPosition, autoKill: false },
           ease: SCROLL_CONFIG.SCROLL_EASE,
           duration: SCROLL_CONFIG.SCROLL_EASE_DURATION_MS / 1000
         });
