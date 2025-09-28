@@ -4,7 +4,7 @@
  */
 
 import { TestBed, ComponentFixture } from '@angular/core/testing';
-import { LandingComponent } from '../pages/landing/landing.component';
+import { LandingComponent } from './pages/landing/landing.component';
 import { By } from '@angular/platform-browser';
 import { DebugElement } from '@angular/core';
 

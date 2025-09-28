@@ -4,7 +4,7 @@
  */
 
 import { TestBed, ComponentFixture } from '@angular/core/testing';
-import { FilosofiaSection } from './filosofia-section.component';
+import { FilosofiaSectionComponent } from './filosofia-section.component';
 import { Component, DebugElement, ElementRef } from '@angular/core';
 import { By } from '@angular/platform-browser';
 
@@ -69,7 +69,7 @@ class TestHostComponent {
 describe('FilosofiaSection - Comprehensive Tests', () => {
   let hostComponent: TestHostComponent;
   let fixture: ComponentFixture<TestHostComponent>;
-  let filosofiaComponent: FilosofiaSection;
+  let filosofiaComponent: FilosofiaSectionComponent;
   let filosofiaElement: HTMLElement;
 
   beforeEach(async () => {
@@ -77,7 +77,7 @@ describe('FilosofiaSection - Comprehensive Tests', () => {
     (window as any).gsap = mockGsap;
 
     await TestBed.configureTestingModule({
-      imports: [FilosofiaSection],
+      imports: [FilosofiaSectionComponent],
       declarations: [TestHostComponent],
       providers: []
     }).compileComponents();
@@ -88,7 +88,7 @@ describe('FilosofiaSection - Comprehensive Tests', () => {
     fixture.detectChanges();
     
     filosofiaComponent = fixture.debugElement
-      .query(By.directive(FilosofiaSection))
+      .query(By.directive(FilosofiaSectionComponent))
       .componentInstance;
     filosofiaElement = fixture.debugElement
       .query(By.css('#filosofia'))
@@ -161,7 +161,7 @@ describe('FilosofiaSection - Comprehensive Tests', () => {
       expect(timelineCalls.length).toBeGreaterThan(0);
       
       // Check for text animation (slide up and fade in)
-      const textAnimations = timelineCalls.filter(call => 
+      const textAnimations = timelineCalls.filter((call: any) =>
         call.args[1]?.opacity === 0 || call.args[1]?.y !== undefined
       );
       expect(textAnimations.length).toBeGreaterThan(0);
@@ -173,14 +173,14 @@ describe('FilosofiaSection - Comprehensive Tests', () => {
       const fromToCalls = mockGsap.timeline().fromTo.calls.all();
       
       // Should animate from below (positive y) to 0
-      const slideAnimations = fromToCalls.filter(call => 
+      const slideAnimations = fromToCalls.filter((call: any) =>
         call.args[1]?.y > 0 && call.args[2]?.y === 0
       );
       
       expect(slideAnimations.length).toBeGreaterThan(0);
       
       // Should use smooth easing
-      slideAnimations.forEach(call => {
+      slideAnimations.forEach((call: any) => {
         expect(call.args[2]?.ease).toBeDefined();
         expect(call.args[2]?.duration).toBeGreaterThan(0);
       });
@@ -192,7 +192,7 @@ describe('FilosofiaSection - Comprehensive Tests', () => {
       const fromToCalls = mockGsap.timeline().fromTo.calls.all();
       
       // Should animate from opacity 0 to 1
-      const fadeAnimations = fromToCalls.filter(call => 
+      const fadeAnimations = fromToCalls.filter((call: any) =>
         call.args[1]?.opacity === 0 && call.args[2]?.opacity === 1
       );
       

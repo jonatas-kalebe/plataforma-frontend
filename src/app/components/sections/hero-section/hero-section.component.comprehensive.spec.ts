@@ -163,9 +163,9 @@ describe('HeroSectionComponent - Comprehensive Addictive Scroll Tests', () => {
       // Opacity should change only slightly during resistance
       if (mockGsap.timeline().to.calls.count() > 0) {
         const opacityCalls = mockGsap.timeline().to.calls.all()
-          .filter(call => call.args[1]?.opacity !== undefined);
+          .filter((call: any) => call.args[1]?.opacity !== undefined);
         
-        opacityCalls.forEach(call => {
+        opacityCalls.forEach((call: any) => {
           const opacity = call.args[1].opacity;
           expect(opacity).toBeGreaterThan(0.8); // Should remain largely visible
         });
