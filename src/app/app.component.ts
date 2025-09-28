@@ -13,7 +13,7 @@ import {LoadingScreenComponent} from './components/loading-screen/loading-screen
 })
 export class AppComponent implements OnInit {
   private readonly platformId = inject(PLATFORM_ID);
-  showOverlay = signal(false); // Temporarily disabled for testing
+  showOverlay = signal(true);
 
   ngOnInit(): void {
     if (isPlatformBrowser(this.platformId)) {
