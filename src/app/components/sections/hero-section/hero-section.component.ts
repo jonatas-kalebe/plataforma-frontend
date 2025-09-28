@@ -55,9 +55,11 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
 
     this.sectionReady.emit(this.heroBg);
     
-    // Set up scroll-based animations
+    // Set up all hero animations and interactions
     this.setupScrollAnimations();
     this.setupScrollHintAnimation();
+    this.setupParallaxEffects();
+    this.setupShockwaveEffects();
   }
 
   ngOnDestroy(): void {
@@ -164,5 +166,175 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
    */
   onCtaClick(event: Event): void {
     this.ctaClicked.emit(event);
+  }
+
+  /**
+   * Setup mouse/tilt parallax effects for Hero elements
+   */
+  private setupParallaxEffects(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    const heroSection = document.querySelector('#hero') as HTMLElement;
+    if (!heroSection) return;
+
+    let mouseX = 0;
+    let mouseY = 0;
+    let targetX = 0;
+    let targetY = 0;
+
+    // Mouse move handler with smooth interpolation
+    const handleMouseMove = (event: MouseEvent) => {
+      const rect = heroSection.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      // Normalize mouse position to -1 to 1
+      targetX = (event.clientX - centerX) / (rect.width / 2);
+      targetY = (event.clientY - centerY) / (rect.height / 2);
+    };
+
+    // Smooth animation loop for parallax
+    const animateParallax = () => {
+      // Smooth interpolation
+      mouseX += (targetX - mouseX) * 0.1;
+      mouseY += (targetY - mouseY) * 0.1;
+
+      if (this.heroTitle) {
+        gsap.set(this.heroTitle, {
+          x: mouseX * 15, // Subtle horizontal movement
+          y: mouseY * 10, // Subtle vertical movement
+          rotateX: mouseY * 2,
+          rotateY: mouseX * 2
+        });
+      }
+
+      if (this.heroSubtitle) {
+        gsap.set(this.heroSubtitle, {
+          x: mouseX * 8, // Less movement for subtitle
+          y: mouseY * 5,
+          rotateX: mouseY * 1,
+          rotateY: mouseX * 1
+        });
+      }
+
+      if (this.heroCta) {
+        gsap.set(this.heroCta, {
+          x: mouseX * 5,
+          y: mouseY * 3
+        });
+      }
+
+      requestAnimationFrame(animateParallax);
+    };
+
+    // Start parallax animation
+    animateParallax();
+
+    // Add event listeners
+    heroSection.addEventListener('mousemove', handleMouseMove);
+    heroSection.addEventListener('mouseleave', () => {
+      targetX = 0;
+      targetY = 0;
+    });
+
+    // DeviceOrientation support for mobile tilt
+    this.setupTiltSupport();
+  }
+
+  /**
+   * Setup device orientation tilt support for mobile
+   */
+  private setupTiltSupport(): void {
+    if (!('DeviceOrientationEvent' in window)) return;
+
+    let tiltX = 0;
+    let tiltY = 0;
+
+    const handleDeviceOrientation = (event: DeviceOrientationEvent) => {
+      // Normalize tilt values
+      tiltX = (event.gamma || 0) / 45; // -1 to 1
+      tiltY = (event.beta || 0) / 90; // -1 to 1
+
+      if (this.heroTitle) {
+        gsap.set(this.heroTitle, {
+          x: tiltX * 20,
+          y: tiltY * 15,
+          rotateX: tiltY * 3,
+          rotateY: tiltX * 3
+        });
+      }
+
+      if (this.heroSubtitle) {
+        gsap.set(this.heroSubtitle, {
+          x: tiltX * 12,
+          y: tiltY * 8,
+          rotateX: tiltY * 2,
+          rotateY: tiltX * 2
+        });
+      }
+    };
+
+    // Request permission for iOS 13+
+    if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+      (DeviceOrientationEvent as any).requestPermission()
+        .then((response: string) => {
+          if (response == 'granted') {
+            window.addEventListener('deviceorientation', handleDeviceOrientation);
+          }
+        });
+    } else {
+      // Non iOS 13+ devices
+      window.addEventListener('deviceorientation', handleDeviceOrientation);
+    }
+  }
+
+  /**
+   * Setup click/tap shockwave effects
+   */
+  private setupShockwaveEffects(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    const heroSection = document.querySelector('#hero') as HTMLElement;
+    if (!heroSection) return;
+
+    const handleClick = (event: MouseEvent | TouchEvent) => {
+      // Trigger shockwave through particle background
+      if (this.particleBackground) {
+        const rect = heroSection.getBoundingClientRect();
+        let clientX, clientY;
+
+        if (event instanceof MouseEvent) {
+          clientX = event.clientX;
+          clientY = event.clientY;
+        } else {
+          // TouchEvent
+          const touch = event.touches[0] || event.changedTouches[0];
+          clientX = touch.clientX;
+          clientY = touch.clientY;
+        }
+
+        // Normalize coordinates for particle system
+        const normalizedX = ((clientX - rect.left) / rect.width) * 2 - 1;
+        const normalizedY = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+        // Visual feedback: brief scale animation on clicked element
+        const target = event.target as HTMLElement;
+        if (target && (target.closest('#hero-title') || target.closest('#hero-subtitle') || target.closest('#hero-cta'))) {
+          gsap.to(target, {
+            scale: 1.05,
+            duration: 0.1,
+            ease: 'power2.out',
+            yoyo: true,
+            repeat: 1
+          });
+        }
+      }
+    };
+
+    heroSection.addEventListener('click', handleClick);
+    heroSection.addEventListener('touchend', handleClick);
   }
 }

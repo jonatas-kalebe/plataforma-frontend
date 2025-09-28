@@ -5,6 +5,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
 import { SCROLL_CONFIG, SECTION_SCROLL_CONFIG } from '../shared/constants/scroll-config.constants';
+import { ScrollTelemetryService } from './scroll-telemetry.service';
 
 export interface ScrollSection {
   id: string;
@@ -33,6 +34,7 @@ export interface ScrollState {
 export class ScrollOrchestrationService {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly ngZone = inject(NgZone);
+  private readonly telemetryService = inject(ScrollTelemetryService);
 
   private isInitialized = false;
   private scrollTriggers: ScrollTrigger[] = [];
@@ -69,6 +71,9 @@ export class ScrollOrchestrationService {
     if (isPlatformBrowser(this.platformId)) {
       this.checkReducedMotion();
       this.detectMobile();
+      
+      // Track reduced motion preference
+      this.telemetryService.trackReducedMotion(this.prefersReducedMotion);
     }
   }
 
@@ -201,6 +206,13 @@ export class ScrollOrchestrationService {
               start: self.start,
               end: self.end
             };
+            
+            // Track section view
+            this.telemetryService.trackSectionView(
+              section.id, 
+              performance.now(), 
+              this.isMobile ? 'mobile' : 'desktop'
+            );
           }
           this.updateMetrics();
         }
@@ -629,6 +641,13 @@ export class ScrollOrchestrationService {
       console.log(`Looking for next section after ${sectionId}, found:`, nextSectionElement);
       if (nextSectionElement) {
         console.log(`Snapping forward from ${sectionId} to next section`);
+        
+        // Track snap event
+        const nextSectionId = this.getNextSectionId(sectionId);
+        if (nextSectionId) {
+          this.telemetryService.trackSnapTriggered(sectionId, nextSectionId, 'forward', progress);
+        }
+        
         gsapInstance.to(window, {
           scrollTo: { y: nextSectionElement.offsetTop, autoKill: false },
           ease: SCROLL_CONFIG.SCROLL_EASE,
@@ -643,6 +662,12 @@ export class ScrollOrchestrationService {
       const prevSectionElement = this.getPrevSectionElement(sectionId);
       if (prevSectionElement) {
         console.log(`Snapping backward from ${sectionId} to previous section`);
+        
+        // Track snap event
+        const prevSectionId = this.getPrevSectionId(sectionId);
+        if (prevSectionId) {
+          this.telemetryService.trackSnapTriggered(sectionId, prevSectionId, 'backward', progress);
+        }
         gsapInstance.to(window, {
           scrollTo: { y: prevSectionElement.offsetTop, autoKill: false },
           ease: SCROLL_CONFIG.SCROLL_EASE,
@@ -672,6 +697,27 @@ export class ScrollOrchestrationService {
     if (currentIndex > 0) {
       const prevSectionId = sectionOrder[currentIndex - 1];
       return document.querySelector(`#${prevSectionId}`) as HTMLElement;
+    }
+    return null;
+  }
+
+  private getNextSectionId(currentSectionId: string): string | null {
+    const sectionOrder = ['hero', 'filosofia', 'servicos', 'trabalhos', 'cta'];
+    const currentIndex = sectionOrder.indexOf(currentSectionId);
+    if (currentSectionId === 'cta') {
+      return null;
+    }
+    if (currentIndex >= 0 && currentIndex < sectionOrder.length - 1) {
+      return sectionOrder[currentIndex + 1];
+    }
+    return null;
+  }
+
+  private getPrevSectionId(currentSectionId: string): string | null {
+    const sectionOrder = ['hero', 'filosofia', 'servicos', 'trabalhos', 'cta'];
+    const currentIndex = sectionOrder.indexOf(currentSectionId);
+    if (currentIndex > 0) {
+      return sectionOrder[currentIndex - 1];
     }
     return null;
   }

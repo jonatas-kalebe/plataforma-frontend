@@ -30,22 +30,18 @@ export class TrabalhosSectionAnimationService {
     const trigger = ScrollTrigger.create({
       trigger: '#trabalhos',
       start: 'top top',
-      end: '+=100%', // Extended interaction area
+      end: '+=100%', // Extended interaction area as specified
       pin: true,
       pinSpacing: true,
       scrub: true,
       onUpdate: (self) => {
         const progress = self.progress;
         
-        // Update ring rotation based on scroll progress
-        const ringContainer = document.querySelector('#trabalhos .ring-container');
-        if (ringContainer) {
-          // Smooth rotation based on scroll
-          const rotationDegrees = progress * 360 * 2; // 2 full rotations
-          gsap.set(ringContainer, {
-            rotateY: rotationDegrees
-          });
-        }
+        // Store scroll progress for access by external components
+        this.scrollProgress = progress;
+        
+        // Try to update ring component if available
+        this.updateRingScrollProgress(progress);
         
         // Visual feedback near the end of pin
         if (progress > 0.9) {
@@ -71,6 +67,29 @@ export class TrabalhosSectionAnimationService {
     });
 
     this.scrollTriggers.push(trigger);
+  }
+
+  // Store scroll progress for external access
+  public scrollProgress: number = 0;
+  private currentRingComponent: any = null;
+
+  /**
+   * Register ring component for scroll progress updates
+   */
+  setRingComponent(ringComponent: any): void {
+    this.currentRingComponent = ringComponent;
+  }
+
+  /**
+   * Update ring component with scroll progress
+   */
+  private updateRingScrollProgress(progress: number): void {
+    if (this.currentRingComponent && typeof this.currentRingComponent === 'object') {
+      // Directly set scrollProgress if it exists
+      if ('scrollProgress' in this.currentRingComponent) {
+        this.currentRingComponent.scrollProgress = progress;
+      }
+    }
   }
 
   /**

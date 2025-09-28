@@ -64,6 +64,11 @@ export class TrabalhosSectionComponent implements AfterViewInit, OnDestroy {
     // Create entrance animation for the ring
     this.trabalhosSectionAnimation.createRingEntrance();
     
+    // Register ring component for scroll updates
+    if (this.workCardRing) {
+      this.trabalhosSectionAnimation.setRingComponent(this.workCardRing);
+    }
+    
     // Create pinned section behavior if enabled
     if (this.enablePinning) {
       this.trabalhosSectionAnimation.createPinnedSection();
