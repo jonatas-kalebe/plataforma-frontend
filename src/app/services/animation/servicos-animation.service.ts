@@ -23,17 +23,18 @@ export class ServicosAnimationService {
 
   /**
    * Create staggered entrance animations for service cards
+   * Enhanced with 85% scroll trigger as specified in requirements
    */
   createStaggeredEntrance(cards: NodeListOf<Element> | Element[]): void {
-    if (!this.isBrowser || this.prefersReducedMotion) return;
+    if (!this.isBrowser) return;
 
     const cardsArray = Array.from(cards);
     
     // Initial state - cards hidden and translated
     gsap.set(cardsArray, {
       opacity: 0,
-      y: 60,
-      scale: 0.95
+      y: this.prefersReducedMotion ? 20 : 60,
+      scale: this.prefersReducedMotion ? 1 : 0.95
     });
 
     // Create staggered entrance animation
@@ -45,22 +46,22 @@ export class ServicosAnimationService {
       opacity: 1,
       y: 0,
       scale: 1,
-      duration: 0.8,
-      ease: 'power2.out',
-      stagger: 0.15 // 150ms delay between cards
+      duration: this.prefersReducedMotion ? 0.3 : 0.8,
+      ease: this.prefersReducedMotion ? 'none' : 'power3.out',
+      stagger: this.prefersReducedMotion ? 0.1 : 0.15 // 150ms delay between cards
     });
 
     this.animations.push(entranceTimeline);
 
-    // ScrollTrigger to play animation when section comes into view
+    // ScrollTrigger to play animation at 85% as specified in requirements
     const trigger = ScrollTrigger.create({
       trigger: '#servicos',
-      start: 'top 75%',
+      start: 'top 85%', // Changed from 75% to 85% as specified
       onEnter: () => {
         entranceTimeline.play();
       },
       onLeave: () => {
-        // Don't reverse, keep cards visible
+        // Don't reverse, keep cards visible for reading
       },
       onEnterBack: () => {
         // Cards should already be visible
@@ -72,6 +73,7 @@ export class ServicosAnimationService {
 
   /**
    * Create subtle parallax effect for service cards
+   * Enhanced with drift upward movement as specified in requirements
    */
   createParallaxEffect(cards: NodeListOf<Element> | Element[]): void {
     if (!this.isBrowser || this.prefersReducedMotion) return;
@@ -80,21 +82,26 @@ export class ServicosAnimationService {
 
     cardsArray.forEach((card, index) => {
       // Different parallax speeds for visual depth
-      const speed = 1 + (index * 0.1); // Cards move at slightly different rates
+      const speed = 1 + (index * 0.1);
       
       const trigger = ScrollTrigger.create({
-        trigger: card,
+        trigger: '#servicos',
         start: 'top bottom',
         end: 'bottom top',
         scrub: true,
         onUpdate: (self) => {
           const progress = self.progress;
-          // Subtle parallax movement
-          const yMove = (progress - 0.5) * 30 * speed;
+          
+          // Subtle parallax movement that drifts cards upward
+          // Extra 30px upward movement when section is scrolled further (as specified)
+          const baseMove = (progress - 0.5) * 20 * speed;
+          const extraDrift = progress > 0.5 ? (progress - 0.5) * 30 : 0;
+          const totalMove = baseMove - extraDrift; // Negative for upward drift
           
           gsap.set(card, {
-            y: yMove,
-            rotateX: (progress - 0.5) * 2 // Slight 3D tilt
+            y: totalMove,
+            rotateX: (progress - 0.5) * 1.5, // Reduced for subtlety
+            force3D: true // Optimize for performance
           });
         }
       });
@@ -105,6 +112,7 @@ export class ServicosAnimationService {
 
   /**
    * Create magnetic hover effects for cards
+   * Enhanced with mobile touch handling and haptic feedback
    */
   createMagneticHover(cards: NodeListOf<Element> | Element[]): void {
     if (!this.isBrowser) return;
@@ -124,7 +132,7 @@ export class ServicosAnimationService {
             ease: 'power2.out'
           });
         } else {
-          // Full magnetic hover effect
+          // Full magnetic hover effect with lift and glow
           gsap.to(card, {
             scale: 1.05,
             y: -8,
@@ -134,11 +142,11 @@ export class ServicosAnimationService {
           });
         }
         
-        // Add glow effect (always)
+        // Enhanced glow effect that feels rewarding
         gsap.to(card, {
           boxShadow: this.prefersReducedMotion 
             ? '0 10px 30px rgba(64, 224, 208, 0.2)'
-            : '0 20px 40px rgba(64, 224, 208, 0.3)',
+            : '0 20px 40px rgba(64, 224, 208, 0.3), 0 0 20px rgba(64, 224, 208, 0.1)',
           borderColor: 'rgba(64, 224, 208, 0.6)',
           duration: 0.4,
           ease: 'power2.out'
@@ -166,16 +174,24 @@ export class ServicosAnimationService {
         });
       });
 
-      // Touch effects for mobile with haptic feedback
+      // Enhanced touch effects for mobile with haptic feedback
       card.addEventListener('touchstart', (e) => {
         // Add haptic feedback for supported devices
         if (navigator.vibrate) {
-          navigator.vibrate(50); // Short, subtle vibration
+          navigator.vibrate(50); // Short, subtle vibration as specified
         }
         
-        // Visual feedback for touch
+        // Visual feedback for touch - scale up slightly
         gsap.to(card, {
           scale: this.prefersReducedMotion ? 1.01 : 1.02,
+          duration: 0.2,
+          ease: 'power2.out'
+        });
+        
+        // Add subtle glow on touch
+        gsap.to(card, {
+          boxShadow: '0 8px 25px rgba(64, 224, 208, 0.15)',
+          borderColor: 'rgba(64, 224, 208, 0.3)',
           duration: 0.2,
           ease: 'power2.out'
         });
@@ -187,6 +203,14 @@ export class ServicosAnimationService {
       card.addEventListener('touchend', () => {
         gsap.to(card, {
           scale: 1,
+          duration: 0.3,
+          ease: 'power2.out'
+        });
+        
+        // Remove touch glow
+        gsap.to(card, {
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+          borderColor: 'transparent',
           duration: 0.3,
           ease: 'power2.out'
         });
@@ -203,9 +227,12 @@ export class ServicosAnimationService {
             const deltaX = (e.clientX - centerX) / (rect.width / 2);
             const deltaY = (e.clientY - centerY) / (rect.height / 2);
             
+            // Subtle magnetic attraction to cursor
             gsap.to(card, {
-              rotateX: deltaY * -5,
-              rotateY: deltaX * 5,
+              rotateX: deltaY * -3, // Reduced intensity for subtlety
+              rotateY: deltaX * 3,
+              x: deltaX * 2, // Slight movement toward cursor
+              y: deltaY * 2,
               duration: 0.3,
               ease: 'power1.out'
             });
@@ -216,7 +243,8 @@ export class ServicosAnimationService {
   }
 
   /**
-   * Create scroll-based section snapping with 90-95% threshold
+   * Create scroll-based section snapping with 90-95% threshold for reading content
+   * Enhanced magnetic behavior that doesn't interrupt reading
    */
   createSectionSnapping(): void {
     if (!this.isBrowser || this.prefersReducedMotion) return;
@@ -225,29 +253,36 @@ export class ServicosAnimationService {
       trigger: '#servicos',
       start: 'top top',
       end: 'bottom bottom',
+      pin: true,
+      pinSpacing: true,
+      scrub: 0.5,
       onUpdate: (self) => {
         const progress = self.progress;
         
-        // Pin briefly at 50% for reading focus
+        // Brief pin at 50% for reading focus (20% viewport height as specified)
         if (progress > 0.45 && progress < 0.55) {
-          // Brief pin effect - slow down scroll
-          gsap.set('#servicos', {
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100%',
-            zIndex: 1
-          });
-        } else {
-          // Release pin
-          gsap.set('#servicos', {
-            position: 'relative',
-            top: 'auto',
-            left: 'auto',
-            width: 'auto',
-            zIndex: 'auto'
-          });
+          // Slow down scroll in the middle for content absorption
+          self.scroll(self.start + (self.end - self.start) * 0.5);
         }
+        
+        // Visual feedback for the floating cards effect
+        const cards = document.querySelectorAll('#servicos .service-card');
+        cards.forEach((card, i) => {
+          const cardProgress = Math.min(1, Math.max(0, progress + (i * 0.1)));
+          const floatIntensity = Math.sin(cardProgress * Math.PI) * 5;
+          
+          gsap.set(card, {
+            y: `+=${floatIntensity}`,
+            rotateY: cardProgress * 2,
+            force3D: true
+          });
+        });
+      },
+      onEnter: () => {
+        console.log('Serviços section pinned for enhanced reading experience');
+      },
+      onLeave: () => {
+        console.log('Serviços section released, transitioning to next section');
       }
     });
 
