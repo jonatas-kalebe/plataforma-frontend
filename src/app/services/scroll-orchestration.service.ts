@@ -613,21 +613,31 @@ export class ScrollOrchestrationService {
     // Forward intention: crossed 20% threshold while moving forward
     if (progress >= 0.2 && direction > 0 && this.intentionDetected.direction !== 'forward') {
       this.intentionDetected = { direction: 'forward', at: progress };
-      console.log(`Forward intention detected at ${(progress * 100).toFixed(1)}%`);
+      console.log(`Forward intention detected at ${(progress * 100).toFixed(1)}% - reducing resistance`);
+      
+      // Visual feedback for engagement threshold - reduce resistance visually
+      this.triggerEngagementFeedback(this.activeSectionTrigger.vars?.id, 'forward');
     }
     // Reset forward intention if scrolling back under 20%
     else if (progress < 0.2 && this.intentionDetected.direction === 'forward') {
       this.intentionDetected = { direction: null, at: 0 };
+      console.log('Forward intention reset - resistance restored');
+      this.resetEngagementFeedback(this.activeSectionTrigger.vars?.id);
     }
 
     // Backward intention: crossed 15% threshold while moving backward
     if (progress <= 0.15 && direction < 0 && this.intentionDetected.direction !== 'backward') {
       this.intentionDetected = { direction: 'backward', at: progress };
-      console.log(`Backward intention detected at ${(progress * 100).toFixed(1)}%`);
+      console.log(`Backward intention detected at ${(progress * 100).toFixed(1)}% - reducing resistance`);
+      
+      // Visual feedback for reverse engagement threshold
+      this.triggerEngagementFeedback(this.activeSectionTrigger.vars?.id, 'backward');
     }
     // Reset backward intention if scrolling forward over 15%
     else if (progress > 0.15 && this.intentionDetected.direction === 'backward') {
       this.intentionDetected = { direction: null, at: 0 };
+      console.log('Backward intention reset - resistance restored');
+      this.resetEngagementFeedback(this.activeSectionTrigger.vars?.id);
     }
   }
 
@@ -704,6 +714,11 @@ export class ScrollOrchestrationService {
           this.telemetryService.trackSnapTriggered(sectionId, nextSectionId, 'forward', progress);
         }
 
+        // Enhanced visual feedback during magnetic snap
+        if (nextSectionId) {
+          this.addVisualFeedbackForSnap(sectionId, nextSectionId, 'forward');
+        }
+        
         // Use getBoundingClientRect for more reliable positioning
         const targetPosition = nextSectionElement.getBoundingClientRect().top + window.scrollY;
         console.log(`Target position calculated: ${targetPosition} (rect.top: ${nextSectionElement.getBoundingClientRect().top}, scrollY: ${window.scrollY})`);
@@ -711,7 +726,13 @@ export class ScrollOrchestrationService {
         gsapInstance.to(window, {
           scrollTo: { y: targetPosition, autoKill: false },
           ease: SCROLL_CONFIG.SCROLL_EASE,
-          duration: SCROLL_CONFIG.SCROLL_EASE_DURATION_MS / 1000 // Convert to seconds
+          duration: SCROLL_CONFIG.SCROLL_EASE_DURATION_MS / 1000, // Convert to seconds
+          onComplete: () => {
+            // Ensure next section content is fully visible after snap
+            if (nextSectionId) {
+              this.completeSnapTransition(nextSectionId, 'forward');
+            }
+          }
         });
         return;
       }
@@ -728,6 +749,11 @@ export class ScrollOrchestrationService {
         if (prevSectionId) {
           this.telemetryService.trackSnapTriggered(sectionId, prevSectionId, 'backward', progress);
         }
+        // Enhanced visual feedback during magnetic snap
+        if (prevSectionId) {
+          this.addVisualFeedbackForSnap(sectionId, prevSectionId, 'backward');
+        }
+        
         // Use getBoundingClientRect for more reliable positioning
         const targetPosition = prevSectionElement.getBoundingClientRect().top + window.scrollY;
         console.log(`Backward target position calculated: ${targetPosition}`);
@@ -735,7 +761,13 @@ export class ScrollOrchestrationService {
         gsapInstance.to(window, {
           scrollTo: { y: targetPosition, autoKill: false },
           ease: SCROLL_CONFIG.SCROLL_EASE,
-          duration: SCROLL_CONFIG.SCROLL_EASE_DURATION_MS / 1000
+          duration: SCROLL_CONFIG.SCROLL_EASE_DURATION_MS / 1000,
+          onComplete: () => {
+            // Ensure previous section content is fully visible after snap
+            if (prevSectionId) {
+              this.completeSnapTransition(prevSectionId, 'backward');
+            }
+          }
         });
         return;
       }
@@ -805,6 +837,171 @@ export class ScrollOrchestrationService {
   private updateMetrics(): void {
     const current = this.metricsSubject.value;
     this.metricsSubject.next({ ...current });
+  }
+
+  /**
+   * Add visual feedback during magnetic snap transitions
+   * Enhances the addictive feel by providing immediate visual response
+   */
+  private addVisualFeedbackForSnap(fromSectionId: string, toSectionId: string, direction: 'forward' | 'backward'): void {
+    const gsapInstance = (window as any).gsap || gsap;
+    
+    // Get current and target section elements
+    const fromSection = document.querySelector(`#${fromSectionId}`);
+    const toSection = document.querySelector(`#${toSectionId}`);
+    
+    if (!fromSection || !toSection) return;
+
+    console.log(`Adding visual feedback: ${fromSectionId} → ${toSectionId} (${direction})`);
+
+    // Accelerated fade-out of current section content during snap
+    const fromContent = fromSection.querySelectorAll('h1, h2, h3, p, button, a, canvas');
+    gsapInstance.to(fromContent, {
+      opacity: 0.3,
+      duration: SCROLL_CONFIG.SCROLL_EASE_DURATION_MS / 1000 * 0.7, // Slightly faster than snap
+      ease: 'power2.in'
+    });
+
+    // Preemptive fade-in preparation for next section (creates magnetic "pull" feeling)
+    const toContent = toSection.querySelectorAll('h1, h2, h3, p, button, a, canvas');
+    gsapInstance.set(toContent, { opacity: 0.8 }); // Start slightly faded
+    gsapInstance.to(toContent, {
+      opacity: 1,
+      duration: SCROLL_CONFIG.SCROLL_EASE_DURATION_MS / 1000 * 0.8, // Sync with snap
+      ease: 'power2.out',
+      delay: 0.1 // Slight delay for magnetic feel
+    });
+
+    // Add subtle scale effect to enhance magnetic attraction feeling
+    if (direction === 'forward') {
+      gsapInstance.to(toSection, {
+        scale: 1.02,
+        duration: 0.2,
+        ease: 'power2.out',
+        yoyo: true,
+        repeat: 1
+      });
+    }
+  }
+
+  /**
+   * Complete the snap transition by ensuring content visibility is restored
+   */
+  private completeSnapTransition(targetSectionId: string, direction: 'forward' | 'backward'): void {
+    const gsapInstance = (window as any).gsap || gsap;
+    const targetSection = document.querySelector(`#${targetSectionId}`);
+    
+    if (!targetSection) return;
+
+    console.log(`Completing snap transition to ${targetSectionId}`);
+
+    // Ensure all content in target section is fully visible
+    const content = targetSection.querySelectorAll('h1, h2, h3, p, button, a, canvas');
+    gsapInstance.to(content, {
+      opacity: 1,
+      scale: 1,
+      duration: 0.3,
+      ease: 'power2.out'
+    });
+
+    // Reset any scale effects
+    gsapInstance.set(targetSection, { scale: 1 });
+  }
+
+  /**
+   * Trigger visual feedback when user crosses the 20% engagement threshold
+   * Creates the feeling that the section stops resisting and begins to "release"
+   */
+  private triggerEngagementFeedback(sectionId: string, direction: 'forward' | 'backward'): void {
+    if (!sectionId) return;
+
+    const gsapInstance = (window as any).gsap || gsap;
+    const section = document.querySelector(`#${sectionId}`);
+    
+    if (!section) return;
+
+    console.log(`Engagement feedback: ${sectionId} (${direction})`);
+
+    // Different feedback for different sections
+    if (sectionId === 'hero') {
+      // Hero: Reduce particle intensity, accelerate content movement
+      const heroContent = section.querySelectorAll('h1, p, a');
+      gsapInstance.to(heroContent, {
+        scale: 1.02, // Subtle scale suggesting movement acceleration  
+        duration: 0.4,
+        ease: 'power2.out',
+        yoyo: true,
+        repeat: 1
+      });
+
+      // Trigger particle acceleration if particle component available
+      this.accelerateParticleBackground();
+
+    } else if (sectionId === 'filosofia') {
+      // Filosofia: Accelerate line animation, subtle glow
+      const canvas = section.querySelector('canvas');
+      if (canvas) {
+        gsapInstance.to(canvas, {
+          boxShadow: '0 0 30px rgba(100, 255, 218, 0.4)',
+          duration: 0.5,
+          ease: 'power2.out'
+        });
+      }
+    }
+
+    // Universal engagement feedback: subtle border glow
+    gsapInstance.to(section, {
+      boxShadow: 'inset 0 0 20px rgba(100, 255, 218, 0.1)',
+      duration: 0.6,
+      ease: 'power2.out'
+    });
+  }
+
+  /**
+   * Reset engagement visual feedback when user returns below threshold
+   */
+  private resetEngagementFeedback(sectionId: string): void {
+    if (!sectionId) return;
+
+    const gsapInstance = (window as any).gsap || gsap;
+    const section = document.querySelector(`#${sectionId}`);
+    
+    if (!section) return;
+
+    console.log(`Resetting engagement feedback: ${sectionId}`);
+
+    // Reset all engagement visual effects
+    gsapInstance.to(section, {
+      boxShadow: 'none',
+      scale: 1,
+      duration: 0.4,
+      ease: 'power2.out'
+    });
+
+    // Reset content scales
+    const content = section.querySelectorAll('h1, h2, h3, p, button, a, canvas');
+    gsapInstance.to(content, {
+      scale: 1,
+      boxShadow: 'none',
+      duration: 0.4,
+      ease: 'power2.out'
+    });
+  }
+
+  /**
+   * Accelerate particle background when hero engagement threshold is crossed
+   */
+  private accelerateParticleBackground(): void {
+    // This would communicate with the Three.js particle background component
+    // For now, just log the intent - actual implementation would need component communication
+    console.log('🎯 Accelerating particle background - engagement threshold crossed');
+    
+    // Could dispatch a custom event that the particle component listens to
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('hero-engagement', {
+        detail: { action: 'accelerate' }
+      }));
+    }
   }
 
   private updateAnimationSettings(): void {
