@@ -43,6 +43,41 @@
 .fade-in-stagger:nth-child(4) { animation-delay: 0.4s; }
 .fade-in-stagger:nth-child(5) { animation-delay: 0.5s; }
 
+/* Trabalhos section specific animations */
+.trabalhos-ring.snapped {
+  animation: snapPulse 0.15s ease-out;
+}
+
+.trabalhos-card {
+  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.trabalhos-card.active {
+  transform: scale(1.1);
+  filter: brightness(1.2);
+}
+
+/* Servicos section animations */
+.service-card {
+  transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+#servicos.snapped {
+  animation: sectionSnap 0.3s ease-out;
+}
+
+/* Interaction hints */
+.interaction-hints {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.interaction-hints.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* Keyframes */
 @keyframes fadeIn {
   to {
@@ -64,6 +99,18 @@
   }
 }
 
+@keyframes snapPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+@keyframes sectionSnap {
+  0% { opacity: 1; }
+  50% { opacity: 0.95; }
+  100% { opacity: 1; }
+}
+
 /* Parallax effects com CSS (apenas para casos simples) */
 .parallax-slow {
   transform: translateZ(0);
@@ -76,7 +123,12 @@
   .fade-in,
   .fade-in-up,
   .fade-in-down,
-  .fade-in-stagger {
+  .fade-in-stagger,
+  .trabalhos-ring.snapped,
+  .trabalhos-card,
+  .service-card,
+  #servicos.snapped,
+  .interaction-hints {
     animation: none !important;
     transition: none !important;
     opacity: 1 !important;
@@ -85,6 +137,11 @@
   
   .hover-scale-animation:hover {
     transform: none !important;
+  }
+  
+  .trabalhos-card.active {
+    transform: none !important;
+    filter: none !important;
   }
 }
 
