@@ -3,10 +3,11 @@
  * Dedicated component for the work showcase section
  */
 
-import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { WorkCardRingComponent } from '../../work-card-ring/work-card-ring.component';
 import { SECTION_IDS } from '../../../shared/constants/section.constants';
+import { TrabalhosSectionAnimationService } from '../../../services/animation/trabalhos-section-animation.service';
 
 @Component({
   selector: 'app-trabalhos-section',
@@ -15,7 +16,7 @@ import { SECTION_IDS } from '../../../shared/constants/section.constants';
   templateUrl: './trabalhos-section.component.html',
   styleUrls: ['./trabalhos-section.component.css']
 })
-export class TrabalhosSectionComponent implements AfterViewInit {
+export class TrabalhosSectionComponent implements AfterViewInit, OnDestroy {
   // Configuration variables (customizable)
   @Input() sectionTitle: string = 'Prova de Conceito';
   @Input() sectionSubtitle?: string;
@@ -40,8 +41,41 @@ export class TrabalhosSectionComponent implements AfterViewInit {
   @ViewChild('workCardRing') workCardRing!: WorkCardRingComponent;
   @ViewChild('sectionElement') sectionElement!: ElementRef;
 
+  constructor(private trabalhosSectionAnimation: TrabalhosSectionAnimationService) {}
+
   ngAfterViewInit(): void {
     this.sectionReady.emit(this.sectionElement);
+    
+    // Initialize animations after view is ready
+    setTimeout(() => {
+      this.initializeAnimations();
+    }, 200); // Slightly longer delay for ring to initialize
+  }
+
+  ngOnDestroy(): void {
+    // Clean up all animations
+    this.trabalhosSectionAnimation.destroy();
+  }
+
+  /**
+   * Initialize all animations for the trabalhos section
+   */
+  private initializeAnimations(): void {
+    // Create entrance animation for the ring
+    this.trabalhosSectionAnimation.createRingEntrance();
+    
+    // Create pinned section behavior if enabled
+    if (this.enablePinning) {
+      this.trabalhosSectionAnimation.createPinnedSection();
+    }
+    
+    // Enhance ring interactions
+    if (this.workCardRing) {
+      this.trabalhosSectionAnimation.enhanceRingInteractions(this.workCardRing);
+    }
+    
+    // Create exit transition
+    this.trabalhosSectionAnimation.createExitTransition();
   }
 
   // Constants

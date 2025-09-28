@@ -1,8 +1,25 @@
 #trabalhos {
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden; /* Prevent horizontal overflow during animations */
+}
+
+.ring-container {
+  perspective: 1200px;
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+  transition: transform 0.6s ease, opacity 0.6s ease;
+}
+
+.ring-container:hover {
+  cursor: grab;
+}
+
+.ring-container:active {
+  cursor: grabbing;
 }
 
 .pin-container {
-
   transform: translateY(20px);
   transition: all 0.8s ease;
 }
@@ -16,6 +33,7 @@
   opacity: 1;
   transform: scale(0.95);
   transition: all 1s ease 0.2s;
+  position: relative;
 }
 
 .trabalhos-showcase.visible {
@@ -23,9 +41,70 @@
   transform: scale(1);
 }
 
+/* Interaction hints styling */
+.drag-hint {
+  transition: all 0.3s ease;
+  user-select: none;
+  pointer-events: none;
+}
+
+.drag-hint.pulsing {
+  animation: hintPulse 2s ease-in-out infinite;
+}
+
+@keyframes hintPulse {
+  0%, 100% { 
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+/* Enhanced work card styling for better integration */
+:host ::ng-deep .work-card {
+  transition: all 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+:host ::ng-deep .work-card.active {
+  border-color: rgba(64, 224, 208, 0.8);
+  box-shadow: 0 0 30px rgba(64, 224, 208, 0.4);
+  transform: scale(1.05);
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .pin-container {
     padding: 0 1rem;
+  }
+  
+  .ring-container {
+    perspective: 800px; /* Reduce perspective on mobile */
+  }
+  
+  /* Disable 3D transforms on mobile for better performance */
+  .ring-container,
+  :host ::ng-deep .work-card {
+    transform-style: flat;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .ring-container,
+  .trabalhos-showcase,
+  .drag-hint,
+  :host ::ng-deep .work-card {
+    transition: opacity 0.3s ease;
+    transform: none !important;
+  }
+  
+  @keyframes hintPulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 0.9; }
   }
 }

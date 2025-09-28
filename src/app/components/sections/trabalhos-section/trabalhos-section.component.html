@@ -12,7 +12,7 @@
     </h3>
 
     <!-- Work Card Ring Component -->
-    <div class="trabalhos-showcase" [attr.data-testid]="'work-showcase'">
+    <div class="trabalhos-showcase ring-container" [attr.data-testid]="'work-showcase'">
       <app-work-card-ring
         #workCardRing>
       </app-work-card-ring>
@@ -20,7 +20,7 @@
 
     <!-- Interaction Hint -->
     <div class="mt-6 text-center">
-      <div class="text-sm text-athenity-text-body/70">
+      <div class="drag-hint text-sm text-athenity-text-body/70">
         {{ hintText }}
       </div>
     </div>

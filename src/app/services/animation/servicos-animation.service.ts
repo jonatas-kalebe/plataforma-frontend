@@ -176,15 +176,16 @@ export class ServicosAnimationService {
       });
 
       // Mouse move for subtle magnetic effect
-      card.addEventListener('mousemove', (e) => {
+      card.addEventListener('mousemove', (e: Event) => {
         if (this.prefersReducedMotion) return;
         
+        const mouseEvent = e as MouseEvent;
         const rect = card.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
         
-        const deltaX = (e.clientX - centerX) / (rect.width / 2);
-        const deltaY = (e.clientY - centerY) / (rect.height / 2);
+        const deltaX = (mouseEvent.clientX - centerX) / (rect.width / 2);
+        const deltaY = (mouseEvent.clientY - centerY) / (rect.height / 2);
         
         gsap.to(card, {
           rotateX: deltaY * -5,
