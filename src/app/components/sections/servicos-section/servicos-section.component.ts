@@ -3,10 +3,11 @@
  * Dedicated component for the services grid section
  */
 
-import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ServiceItem } from '../../../shared/types/common.types';
 import { SECTION_IDS } from '../../../shared/constants/section.constants';
+import { ServicosAnimationService } from '../../../services/animation/servicos-animation.service';
 
 @Component({
   selector: 'app-servicos-section',
@@ -15,7 +16,7 @@ import { SECTION_IDS } from '../../../shared/constants/section.constants';
   templateUrl: './servicos-section.component.html',
   styleUrls: ['./servicos-section.component.css']
 })
-export class ServicosSectionComponent implements AfterViewInit {
+export class ServicosSectionComponent implements AfterViewInit, OnDestroy {
   // Configuration variables (customizable)
   @Input() sectionTitle: string = 'Nosso Arsenal';
   @Input() sectionSubtitle?: string;
@@ -57,8 +58,45 @@ export class ServicosSectionComponent implements AfterViewInit {
   // Constants
   readonly SECTION_ID = SECTION_IDS.SERVICOS;
 
+  constructor(private servicosAnimation: ServicosAnimationService) {}
+
   ngAfterViewInit(): void {
     this.sectionReady.emit(this.sectionElement);
+    
+    // Initialize animations after view is ready
+    setTimeout(() => {
+      this.initializeAnimations();
+    }, 100); // Small delay to ensure DOM is fully rendered
+  }
+
+  ngOnDestroy(): void {
+    // Clean up all animations
+    this.servicosAnimation.destroy();
+  }
+
+  /**
+   * Initialize all animations for the services section
+   */
+  private initializeAnimations(): void {
+    const cards = this.sectionElement.nativeElement.querySelectorAll('.service-card');
+    
+    if (cards.length > 0) {
+      // Create staggered entrance animation
+      if (this.staggerAnimation) {
+        this.servicosAnimation.createStaggeredEntrance(cards);
+      }
+
+      // Create subtle parallax effect
+      this.servicosAnimation.createParallaxEffect(cards);
+
+      // Create magnetic hover effects
+      if (this.enableCardHover) {
+        this.servicosAnimation.createMagneticHover(cards);
+      }
+
+      // Create section snapping behavior
+      this.servicosAnimation.createSectionSnapping();
+    }
   }
 
   /**

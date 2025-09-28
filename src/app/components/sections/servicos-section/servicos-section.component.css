@@ -1,19 +1,88 @@
 #servicos {
   background: linear-gradient(135deg, var(--athenity-blue-deep) 0%, rgba(17, 34, 64, 0.95) 100%);
+  overflow: hidden; /* Prevent parallax overflow */
 }
+
 .servicos-grid {
   opacity: 1;
   transform: none;
   transition: all 0.8s ease;
+  perspective: 1000px; /* Enable 3D transforms */
 }
+
 .service-card {
   opacity: 1;
   transform: translateY(0);
   transition: all 0.6s ease;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  will-change: transform, opacity, box-shadow;
+  border: 1px solid transparent;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  position: relative;
 }
+
+.service-card:hover {
+  /* Base hover state - enhanced by JavaScript */
+  transition: all 0.4s ease;
+}
+
+/* Enhanced magnetic hover effect */
+.service-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(64, 224, 208, 0.05) 0%, rgba(64, 224, 208, 0.02) 100%);
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.service-card:hover::before {
+  opacity: 1;
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 768px) {
+  .service-card {
+    transform-style: flat; /* Disable 3D on mobile for performance */
+  }
+  
+  .service-card:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+}
+
 .grid-compact {
   gap: 1rem;
 }
+
 .grid-spacious {
   gap: 2rem;
+}
+
+/* Animation enhancement classes */
+.service-card.magnetic-hover {
+  transform: translateY(-8px) scale(1.05) rotateY(2deg);
+  box-shadow: 0 20px 40px rgba(64, 224, 208, 0.3);
+  border-color: rgba(64, 224, 208, 0.6);
+}
+
+/* Reduced motion fallbacks */
+@media (prefers-reduced-motion: reduce) {
+  .service-card {
+    transform: none !important;
+    transition: opacity 0.3s ease;
+  }
+  
+  .service-card:hover {
+    opacity: 0.9;
+    transform: none !important;
+  }
 }
