@@ -13,7 +13,10 @@ import {ServicosSectionComponent} from '../../components/sections/servicos-secti
 import {TrabalhosSectionComponent} from '../../components/sections/trabalhos-section/trabalhos-section.component';
 import {CtaSectionComponent} from '../../components/sections/cta-section/cta-section.component';
 
-// Expose GSAP globally for the scroll service
+// Import new animation system
+import { SectionAnimations } from '../../shared/animation/section-animations.class';
+
+// Configuração global do GSAP (centralizada)
 if (typeof window !== 'undefined') {
   (window as any).gsap = gsap;
   (window as any).ScrollTrigger = ScrollTrigger;
@@ -30,27 +33,40 @@ gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 })
 export class LandingComponent implements AfterViewInit, OnDestroy {
   @ViewChild('knotCanvas', {static: true}) knotCanvas!: ElementRef<HTMLCanvasElement>;
+  
+  // Estado público para template
   public scrollState: ScrollState | null = null;
+  
+  // Dependências do Angular
   private readonly platformId = inject(PLATFORM_ID);
   private zone = new NgZone({enableLongStackTrace: false});
+  
+  // Sistema de animações consolidado
+  private sectionAnimations = new SectionAnimations();
+  
+  // Canvas e animação do knot
   private knotCtx!: CanvasRenderingContext2D | null;
   private knotId = 0;
+  
+  // Gerenciamento de lifecycle
   private destroy$ = new Subject<void>();
-  private timelines: gsap.core.Timeline[] = [];
-  private scrollTriggers: ScrollTrigger[] = [];
+  
+  // Configurações de acessibilidade
   private prefersReducedMotion = false;
 
   constructor(private scrollService: ScrollOrchestrationService) {
+    this.checkReducedMotion();
   }
 
-  // Event handlers for section components
+  /**
+   * Event handlers para componentes de seção
+   * Simplificados e consolidados para reduzir duplicação
+   */
   onHeroCta(event: Event): void {
-    // Handle CTA click - scroll to services section
     this.scrollService.scrollToSection('servicos', 1);
   }
 
   onHeroSectionReady(heroBgRef: ElementRef): void {
-    // Store reference for animations if needed
     console.log('Hero section ready:', heroBgRef);
   }
 
@@ -60,13 +76,12 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
   onKnotCanvasReady(canvas: HTMLCanvasElement): void {
     console.log('Knot canvas ready:', canvas);
-    // The knot canvas animation is handled by the landing component
-    // We need to pass this canvas to the knot animation method
     this.setupKnotCanvas(canvas);
   }
 
   onServicosSectionReady(event: any): void {
     console.log('Serviços section ready:', event);
+    this.initializeServicosAnimations();
   }
 
   onServiceClicked(event: { service: any; index: number; event: Event }): void {
@@ -97,23 +112,9 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     if (!isPlatformBrowser(this.platformId)) return;
 
     this.zone.runOutsideAngular(() => {
-      this.checkReducedMotion();
-
-      // Ensure DOM is fully rendered before initializing scroll service
-      requestAnimationFrame(() => {
-        // Initialize the scroll orchestration service
-        this.scrollService.initialize();
-
-        this.scrollService.scrollState$
-          .pipe(takeUntil(this.destroy$))
-          .subscribe(state => {
-            setTimeout(() => {
-              this.scrollState = state;
-            });
-          });
-      });
-
-      this.initScrollytellingTimelines();
+      // Inicialização consolidada dos sistemas
+      this.initializeScrollSystem();
+      this.initializeSectionAnimations();
       this.initKnot();
     });
   }
@@ -121,24 +122,26 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     if (!isPlatformBrowser(this.platformId)) return;
 
+    // Cleanup consolidado e organizado
     this.destroy$.next();
     this.destroy$.complete();
-
+    
     cancelAnimationFrame(this.knotId);
-    this.timelines.forEach(tl => tl.kill());
-    this.scrollTriggers.forEach(st => st.kill());
+    this.sectionAnimations.destroy();
     ScrollTrigger.getAll().forEach(st => st.kill());
     this.scrollService.destroy();
   }
 
   private setupKnotCanvas(canvas: HTMLCanvasElement): void {
     if (!isPlatformBrowser(this.platformId)) return;
-
-    // Extract knot animation logic for use with component canvas
     this.knotCanvas = new ElementRef(canvas);
     this.initKnot();
   }
 
+  /**
+   * Verifica preferências de movimento reduzido
+   * Movido para o construtor para centralizar configuração
+   */
   private checkReducedMotion(): void {
     if (typeof window !== 'undefined' && window.matchMedia) {
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -146,146 +149,73 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private initScrollytellingTimelines(): void {
-    // Entry animations only - scroll-linked animations are handled by ScrollOrchestrationService
-    this.initHeroTimeline();
-    this.initFilosofiaTimeline();
-    this.initServicosTimeline();
-    // Remove ScrollTrigger timelines that conflict with ScrollOrchestrationService
-    // this.initTrabalhosTimeline();
-    // this.initCtaTimeline();
+  /**
+   * Inicializa sistema de scroll de forma consolidada
+   */
+  private initializeScrollSystem(): void {
+    requestAnimationFrame(() => {
+      this.scrollService.initialize();
+      this.scrollService.scrollState$
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(state => {
+          setTimeout(() => {
+            this.scrollState = state;
+          });
+        });
+    });
   }
 
-  private initHeroTimeline(): void {
-    // TEMPORARILY DISABLED: Initial entrance animation to test scroll resistance
-    // The entrance animation might be interfering with scroll-linked resistance animations
-    console.log('Hero entrance animation temporarily disabled for testing');
-    /*
-    const tl = gsap.timeline({
-      defaults: {ease: this.prefersReducedMotion ? 'none' : 'power3.out', duration: this.prefersReducedMotion ? 0.3 : 1}
+  /**
+   * Inicializa animações de seção usando o novo sistema consolidado
+   */
+  private initializeSectionAnimations(): void {
+    // Filosofia section - usando sistema unificado
+    this.sectionAnimations.animateSectionEntry('filosofia', {
+      title: '#filosofia h2',
+      content: '#filosofia p'
     });
 
-    tl.from('#hero-title', { y: this.prefersReducedMotion ? 0 : 50, delay: 0.2})
-      .from('#hero-subtitle', { y: this.prefersReducedMotion ? 0 : 40}, '-=0.8')
-      .from('#hero-cta', { y: this.prefersReducedMotion ? 0 : 30}, '-=0.6');
-
-    this.timelines.push(tl);
-    */
-
-    // Scroll-linked animations are now handled by ScrollOrchestrationService
-    // Remove the conflicting ScrollTrigger that was here before
-  }
-
-  private initFilosofiaTimeline(): void {
-    // Only basic entry animation, scroll-linked animations handled by ScrollOrchestrationService
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: '#filosofia',
-        start: 'top 80%',
-        end: 'top 80%',
-        toggleActions: 'play none none reverse'
-      }
+    // CTA section - usando sistema unificado
+    this.sectionAnimations.animateSectionEntry('cta', {
+      title: '#cta h2',
+      cta: '#cta a'
     });
-
-    tl.from('#filosofia h2', {
-      y: this.prefersReducedMotion ? 0 : 80,
-      duration: this.prefersReducedMotion ? 0.3 : 1,
-      ease: this.prefersReducedMotion ? 'none' : 'power3.out'
-    })
-      .from('#filosofia p', {
-        y: this.prefersReducedMotion ? 0 : 60,
-        duration: this.prefersReducedMotion ? 0.3 : 0.8,
-        ease: this.prefersReducedMotion ? 'none' : 'power3.out'
-      }, '-=0.4');
-
-    this.timelines.push(tl);
   }
 
-  private initServicosTimeline(): void {
-    gsap.utils.toArray<HTMLElement>('.service-card').forEach((card, index) => {
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: card,
+  /**
+   * Inicializa animações específicas da seção de serviços
+   * Substituindo múltiplas animações GSAP por sistema consolidado
+   */
+  private initializeServicosAnimations(): void {
+    const serviceCards = document.querySelectorAll('.service-card');
+    serviceCards.forEach((card, index) => {
+      this.sectionAnimations.animateScrollTriggeredElements({
+        selector: `.service-card:nth-child(${index + 1})`,
+        trigger: card as HTMLElement,
+        animationConfig: {
+          y: 40,
+          duration: 0.8,
+          delay: this.prefersReducedMotion ? index * 0.1 : 0
+        },
+        scrollConfig: {
           start: 'top 85%',
-          end: this.prefersReducedMotion ? 'top 85%' : 'bottom center',
-          ...(this.prefersReducedMotion ? {toggleActions: 'play none none reverse'} : {scrub: 0.5})
+          end: this.prefersReducedMotion ? 'top 85%' : 'bottom center'
         }
       });
-      tl.fromTo(card, {y: 40}, {
-        y: this.prefersReducedMotion ? 0 : 100,
-        ease: this.prefersReducedMotion ? 'none' : 'power3.out',
-        duration: this.prefersReducedMotion ? 0.3 : 0.8,
-        delay: this.prefersReducedMotion ? index * 0.1 : 0,
-        immediateRender: false
-      });
-
-      if (!this.prefersReducedMotion) {
-        tl.to(card, {
-          y: -30,
-          ease: 'none'
-        });
-      }
-
-      this.timelines.push(tl);
     });
   }
-
-  private initTrabalhosTimeline(): void {
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: '#trabalhos',
-        start: 'top center',
-        end: 'bottom center',
-        ...(this.prefersReducedMotion ? {toggleActions: 'play none none reverse'} : {
-          // ALTERAÇÃO: remover pin aqui (pin é feito no serviço para evitar conflito)
-          scrub: 1
-        })
-      }
-    });
-
-    tl.from('#trabalhos h3', {
-
-      y: this.prefersReducedMotion ? 0 : 50,
-      duration: this.prefersReducedMotion ? 0.3 : 0.5,
-      ease: this.prefersReducedMotion ? 'none' : 'power2.out'
-    });
-
-    this.timelines.push(tl);
-  }
-
-  private initCtaTimeline(): void {
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: '#cta',
-        start: 'top 80%',
-        end: this.prefersReducedMotion ? 'top 80%' : 'bottom center',
-        ...(this.prefersReducedMotion ? {toggleActions: 'play none none reverse'} : {scrub: 0.5})
-      }
-    });
-
-    tl.from('#cta h2', {
-
-      y: this.prefersReducedMotion ? 0 : 40,
-      duration: this.prefersReducedMotion ? 0.3 : 0.8,
-      ease: this.prefersReducedMotion ? 'none' : 'power3.out'
-    })
-      .from('#cta a', {
-
-        y: this.prefersReducedMotion ? 0 : 30,
-        duration: this.prefersReducedMotion ? 0.3 : 0.6,
-        ease: this.prefersReducedMotion ? 'none' : 'power3.out'
-      }, '-=0.4');
-
-    this.timelines.push(tl);
-  }
-
+  /**
+   * Inicializa animação do knot (canvas)
+   * Otimizada e simplificada mantendo funcionalidade
+   */
   private initKnot(): void {
-    if (!isPlatformBrowser(this.platformId)) return;
-    if (!this.knotCanvas?.nativeElement) return;
+    if (!isPlatformBrowser(this.platformId) || !this.knotCanvas?.nativeElement) return;
 
+    // Configuração inicial do canvas
     this.knotCtx = this.knotCanvas.nativeElement.getContext('2d');
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
+    // Função de redimensionamento otimizada
     const resize = () => {
       const el = this.knotCanvas.nativeElement;
       const rect = el.getBoundingClientRect();
@@ -293,26 +223,33 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       el.height = rect.height * dpr;
       if (this.knotCtx) this.knotCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
+    
     resize();
     window.addEventListener('resize', resize);
 
+    // Variáveis de animação
     let t = 0;
+    
+    // Função de desenho otimizada
     const draw = () => {
       const ctx = this.knotCtx;
       if (!ctx) return;
+      
       const el = this.knotCanvas.nativeElement;
-
       ctx.clearRect(0, 0, el.clientWidth, el.clientHeight);
+      
       const w = el.clientWidth;
       const h = el.clientHeight;
       const cy = h / 2;
       const pad = 24;
 
+      // Configuração de estilo
       ctx.lineWidth = 2;
       ctx.strokeStyle = '#64FFDA';
       ctx.shadowColor = 'rgba(100,255,218,0.4)';
       ctx.shadowBlur = 12;
 
+      // Desenho do knot otimizado
       ctx.beginPath();
       const segments = 120;
       for (let i = 0; i <= segments; i++) {
@@ -328,7 +265,8 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       ctx.stroke();
     };
 
-    const knotTl = gsap.timeline({
+    // ScrollTrigger usando novo sistema
+    const knotTimeline = gsap.timeline({
       scrollTrigger: {
         trigger: '#filosofia',
         start: 'top bottom',
@@ -337,7 +275,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       }
     });
 
-    knotTl.to({val: 0}, {
+    knotTimeline.to({val: 0}, {
       val: 1,
       duration: this.prefersReducedMotion ? 0.3 : 1.5,
       ease: 'none',
@@ -346,7 +284,5 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         draw();
       }
     });
-
-    this.timelines.push(knotTl);
   }
 }

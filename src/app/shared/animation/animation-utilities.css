@@ -1,0 +1,119 @@
+/**
+ * Animation Utility CSS Classes
+ * Classes CSS para substituir animações GSAP simples
+ */
+
+/* Classes base para animações de hover */
+.hover-scale-animation {
+  transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.hover-scale-animation:hover {
+  transform: scale(1.05);
+}
+
+/* Animações de fade-in com CSS puro */
+.fade-in {
+  animation: fadeIn 0.6s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+  opacity: 0;
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.8s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.fade-in-down {
+  animation: fadeInDown 0.8s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+  opacity: 0;
+  transform: translateY(-30px);
+}
+
+/* Staggered animations */
+.fade-in-stagger {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeInUp 0.6s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+}
+
+.fade-in-stagger:nth-child(1) { animation-delay: 0.1s; }
+.fade-in-stagger:nth-child(2) { animation-delay: 0.2s; }
+.fade-in-stagger:nth-child(3) { animation-delay: 0.3s; }
+.fade-in-stagger:nth-child(4) { animation-delay: 0.4s; }
+.fade-in-stagger:nth-child(5) { animation-delay: 0.5s; }
+
+/* Keyframes */
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Parallax effects com CSS (apenas para casos simples) */
+.parallax-slow {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Responsive animations - redução de movimento */
+@media (prefers-reduced-motion: reduce) {
+  .hover-scale-animation,
+  .fade-in,
+  .fade-in-up,
+  .fade-in-down,
+  .fade-in-stagger {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  
+  .hover-scale-animation:hover {
+    transform: none !important;
+  }
+}
+
+/* Performance optimizations */
+.animate-gpu {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Loading states */
+.loading-shimmer {
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.1) 25%, 
+    rgba(255, 255, 255, 0.2) 50%, 
+    rgba(255, 255, 255, 0.1) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-shimmer {
+    animation: none;
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
