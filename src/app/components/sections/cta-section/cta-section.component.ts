@@ -66,45 +66,123 @@ export class CtaSectionComponent implements AfterViewInit, OnDestroy {
   private initializePulseAnimation(): void {
     // Skip animations if user prefers reduced motion
     const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (prefersReducedMotion) return;
 
-    const primaryButton = document.querySelector('[data-testid="cta-buttons"] a:first-child');
-    if (!primaryButton) return;
-
+    const primaryButton = document.querySelector('[data-testid="cta-buttons"] a:first-child') as HTMLElement;
+    const secondaryButton = document.querySelector('[data-testid="cta-buttons"] a:last-child') as HTMLElement;
+    
     const gsapInstance = (window as any).gsap || gsap;
 
-    // Create a subtle, continuous pulse animation
-    this.pulseAnimation = gsapInstance.to(primaryButton, {
-      scale: 1.02,
-      duration: 2,
-      ease: 'power2.inOut',
-      yoyo: true,
-      repeat: -1,
-      transformOrigin: 'center center'
-    });
-
-    // Add magnetic hover effect
-    primaryButton.addEventListener('mouseenter', () => {
-      if (this.pulseAnimation) {
-        this.pulseAnimation.pause();
-      }
-      gsapInstance.to(primaryButton, {
-        scale: 1.05,
-        duration: 0.3,
-        ease: 'power2.out'
-      });
-    });
-
-    primaryButton.addEventListener('mouseleave', () => {
-      gsapInstance.to(primaryButton, {
-        scale: 1,
-        duration: 0.3,
-        ease: 'power2.out',
-        onComplete: () => {
-          if (this.pulseAnimation) {
-            this.pulseAnimation.resume();
-          }
+    // Enhanced magnetic effects for all buttons
+    const buttons = [primaryButton, secondaryButton].filter(Boolean);
+    
+    buttons.forEach((button, index) => {
+      const isPrimary = index === 0;
+      
+      // Continuous pulse for primary button (even with reduced motion, but simpler)
+      if (isPrimary) {
+        if (prefersReducedMotion) {
+          // Simple opacity pulse for reduced motion
+          this.pulseAnimation = gsapInstance.to(button, {
+            opacity: 0.9,
+            duration: 2,
+            ease: 'power2.inOut',
+            yoyo: true,
+            repeat: -1
+          });
+        } else {
+          // Full scale pulse for normal motion
+          this.pulseAnimation = gsapInstance.to(button, {
+            scale: 1.02,
+            duration: 2,
+            ease: 'power2.inOut',
+            yoyo: true,
+            repeat: -1,
+            transformOrigin: 'center center'
+          });
         }
+      }
+
+      // Enhanced magnetic hover effects
+      button.addEventListener('mouseenter', () => {
+        if (isPrimary && this.pulseAnimation) {
+          this.pulseAnimation.pause();
+        }
+        
+        if (prefersReducedMotion) {
+          // Simple hover for reduced motion
+          gsapInstance.to(button, {
+            scale: 1.03,
+            opacity: 0.9,
+            duration: 0.3,
+            ease: 'power2.out'
+          });
+        } else {
+          // Full magnetic effect with tilt
+          gsapInstance.to(button, {
+            scale: 1.05,
+            y: -3,
+            rotateY: 2,
+            duration: 0.4,
+            ease: 'power2.out'
+          });
+        }
+      });
+
+      button.addEventListener('mouseleave', () => {
+        gsapInstance.to(button, {
+          scale: 1,
+          y: 0,
+          rotateY: 0,
+          opacity: 1,
+          duration: 0.3,
+          ease: 'power2.out',
+          onComplete: () => {
+            if (isPrimary && this.pulseAnimation) {
+              this.pulseAnimation.resume();
+            }
+          }
+        });
+      });
+
+      // Mouse movement for magnetic tracking (only if no reduced motion)
+      if (!prefersReducedMotion) {
+        button.addEventListener('mousemove', (e: MouseEvent) => {
+          const rect = button.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          
+          const deltaX = (e.clientX - centerX) / (rect.width / 2);
+          const deltaY = (e.clientY - centerY) / (rect.height / 2);
+          
+          gsapInstance.to(button, {
+            rotateX: deltaY * -3,
+            rotateY: deltaX * 3,
+            duration: 0.3,
+            ease: 'power1.out'
+          });
+        });
+      }
+
+      // Touch effects with haptic feedback
+      button.addEventListener('touchstart', () => {
+        // Haptic feedback for mobile devices
+        if (navigator.vibrate) {
+          navigator.vibrate(50);
+        }
+        
+        gsapInstance.to(button, {
+          scale: prefersReducedMotion ? 1.01 : 1.02,
+          duration: 0.2,
+          ease: 'power2.out'
+        });
+      });
+
+      button.addEventListener('touchend', () => {
+        gsapInstance.to(button, {
+          scale: 1,
+          duration: 0.3,
+          ease: 'power2.out'
+        });
       });
     });
   }

@@ -415,6 +415,11 @@ export class ScrollOrchestrationService {
         const deltaTime = Math.max(currentTime - lastUpdateTime, 1); // Prevent division by zero
         const deltaScroll = Math.abs(currentScrollY - this.lastScrollY);
         
+        // DEBUG: Add logging to see if this is being called
+        if (Math.random() < 0.3) {
+          console.log(`Global progress update: scrollY=${currentScrollY}, progress=${(self.progress * 100).toFixed(1)}%`);
+        }
+        
         // Calculate velocity in pixels per second
         const velocityRaw = (deltaScroll / deltaTime) * 1000;
         // Apply smoothing to avoid jittery values
