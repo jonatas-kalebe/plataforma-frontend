@@ -27,11 +27,10 @@ const commonEngine = new CommonEngine();
 /**
  * Serve static files from /browser
  */
-app.get(
-  '**',
+app.use(
   express.static(browserDistFolder, {
     maxAge: '1y',
-    index: 'index.html'
+    index: false // Important: Don't auto-serve index.html from static files
   }),
 );
 
@@ -49,7 +48,11 @@ app.get('**', (req, res, next) => {
       publicPath: browserDistFolder,
       providers: [{ provide: APP_BASE_HREF, useValue: baseUrl }],
     })
-    .then((html) => res.send(html))
+    .then((html) => {
+      if (!res.headersSent) {
+        res.send(html);
+      }
+    })
     .catch((err) => next(err));
 });
 

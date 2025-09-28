@@ -48,7 +48,9 @@
                 }
               ],
               "outputHashing": "all",
-              "appShell": true
+              "optimization": {
+                "fonts": false
+              }
             },
             "development": {
               "optimization": false,
