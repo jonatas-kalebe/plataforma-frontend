@@ -1,0 +1,962 @@
+/**
+ * Integration Tests for Particle System with Scroll Orchestration
+ * 
+ * Tests the exact integration between particle background and scroll orchestration
+ * as described in the requirements:
+ * - Synchronization with scroll metrics
+ * - Section-based particle behavior changes
+ * - Magnetic scroll snapping integration
+ * - Cross-component state management
+ * - Real-time scroll velocity reactions
+ */
+
+import { TestBed, ComponentFixture, fakeAsync, tick } from '@angular/core/testing';
+import { PLATFORM_ID, NgZone } from '@angular/core';
+import { BehaviorSubject, Subject } from 'rxjs';
+
+import { ThreeParticleBackgroundComponent } from './three-particle-background.component';
+import { ScrollOrchestrationService, ScrollMetrics } from '../../services/scroll-orchestration.service';
+import { MotionPreferenceService } from '../../shared/utils/motion-preference.service';
+
+// Mock complete Three.js environment
+const createMockThreeJS = () => {
+  const mockVector3 = { x: 0, y: 0, z: 0, set: jasmine.createSpy('set'), lerp: jasmine.createSpy('lerp') };
+  const mockVector2 = { x: 0, y: 0, set: jasmine.createSpy('set'), lerp: jasmine.createSpy('lerp') };
+  const mockColor = { 
+    r: 0.176, g: 0.357, b: 0.549, 
+    setHex: jasmine.createSpy('setHex'), 
+    set: jasmine.createSpy('set'),
+    lerp: jasmine.createSpy('lerp')
+  };
+  
+  const mockGeometry = {
+    setAttribute: jasmine.createSpy('setAttribute'),
+    dispose: jasmine.createSpy('dispose'),
+    attributes: {
+      position: { array: new Float32Array(360), needsUpdate: false, count: 120 },
+      velocity: { array: new Float32Array(360), needsUpdate: false }
+    }
+  };
+  
+  const mockMaterial = {
+    dispose: jasmine.createSpy('dispose'),
+    color: mockColor,
+    opacity: 0.6,
+    uniforms: {
+      time: { value: 0 },
+      mouse: { value: mockVector2 },
+      resolution: { value: mockVector2 },
+      shockwaves: { value: [] },
+      globalProgress: { value: 0 },
+      sectionIndex: { value: 0 },
+      scrollVelocity: { value: 0 }
+    }
+  };
+  
+  const mockPoints = {
+    position: mockVector3,
+    rotation: { x: 0, y: 0, z: 0 },
+    scale: mockVector3,
+    geometry: mockGeometry,
+    material: mockMaterial,
+    visible: true
+  };
+  
+  return {
+    Scene: jasmine.createSpy('Scene').and.returnValue({ add: jasmine.createSpy('add'), children: [mockPoints] }),
+    PerspectiveCamera: jasmine.createSpy('PerspectiveCamera').and.returnValue({
+      position: mockVector3,
+      aspect: 1,
+      updateProjectionMatrix: jasmine.createSpy('updateProjectionMatrix')
+    }),
+    WebGLRenderer: jasmine.createSpy('WebGLRenderer').and.returnValue({
+      render: jasmine.createSpy('render'),
+      setSize: jasmine.createSpy('setSize'),
+      dispose: jasmine.createSpy('dispose'),
+      domElement: document.createElement('canvas')
+    }),
+    BufferGeometry: jasmine.createSpy('BufferGeometry').and.returnValue(mockGeometry),
+    ShaderMaterial: jasmine.createSpy('ShaderMaterial').and.returnValue(mockMaterial),
+    Points: jasmine.createSpy('Points').and.returnValue(mockPoints),
+    BufferAttribute: jasmine.createSpy('BufferAttribute'),
+    Vector3: jasmine.createSpy('Vector3').and.returnValue(mockVector3),
+    Vector2: jasmine.createSpy('Vector2').and.returnValue(mockVector2),
+    Color: jasmine.createSpy('Color').and.returnValue(mockColor),
+    MathUtils: {
+      degToRad: jasmine.createSpy('degToRad').and.returnValue(0.1),
+      lerp: jasmine.createSpy('lerp').and.returnValue(0.5)
+    },
+    mockObjects: { mockPoints, mockMaterial, mockGeometry, mockColor }
+  };
+};
+
+describe('Particle-Scroll Integration - Pixel-Perfect Synchronization Tests', () => {
+  let particleComponent: ThreeParticleBackgroundComponent;
+  let fixture: ComponentFixture<ThreeParticleBackgroundComponent>;
+  let mockScrollService: jasmine.SpyObj<ScrollOrchestrationService>;
+  let mockMotionService: jasmine.SpyObj<MotionPreferenceService>;
+  let mockThreeJS: any;
+  let metricsSubject: BehaviorSubject<ScrollMetrics>;
+  let ngZone: NgZone;
+
+  beforeEach(async () => {
+    // Create Three.js mocks
+    mockThreeJS = createMockThreeJS();
+    (window as any).THREE = mockThreeJS;
+    spyOn(window, 'requestAnimationFrame').and.callFake((fn) => setTimeout(fn, 16));
+
+    // Create metrics subject for scroll service
+    metricsSubject = new BehaviorSubject<ScrollMetrics>({
+      globalProgress: 0,
+      velocity: 0,
+      activeSection: { id: 'hero', progress: 0 },
+      sections: []
+    });
+
+    // Create mock services
+    mockScrollService = jasmine.createSpyObj('ScrollOrchestrationService', [], {
+      metrics$: metricsSubject
+    });
+
+    mockMotionService = jasmine.createSpyObj('MotionPreferenceService', [], {
+      prefersReducedMotion: new BehaviorSubject(false),
+      currentPreference: false
+    });
+
+    await TestBed.configureTestingModule({
+      imports: [ThreeParticleBackgroundComponent],
+      providers: [
+        { provide: PLATFORM_ID, useValue: 'browser' },
+        { provide: ScrollOrchestrationService, useValue: mockScrollService },
+        { provide: MotionPreferenceService, useValue: mockMotionService }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(ThreeParticleBackgroundComponent);
+    particleComponent = fixture.componentInstance;
+    ngZone = TestBed.inject(NgZone);
+  });
+
+  describe('1. Real-time Scroll Metrics Synchronization', () => {
+    
+    it('P1: should immediately sync globalProgress to particle shader uniforms', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      // Update global progress
+      metricsSubject.next({
+        globalProgress: 0.42,
+        velocity: 200,
+        activeSection: { id: 'filosofia', progress: 0.6 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Shader uniforms should reflect exact scroll progress
+      const material = mockThreeJS.mockObjects.mockMaterial;
+      expect(material.uniforms.globalProgress.value).toBe(0.42);
+    }));
+
+    it('P1: should update particle velocity uniform in real-time with scroll speed', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      const velocitySequence = [0, 150, 500, 1200, 800, 50, 0];
+      
+      velocitySequence.forEach((velocity, index) => {
+        metricsSubject.next({
+          globalProgress: index * 0.1,
+          velocity,
+          activeSection: { id: 'test', progress: 0.5 },
+          sections: []
+        });
+
+        tick(50);
+
+        // Particle system should track velocity exactly
+        const material = mockThreeJS.mockObjects.mockMaterial;
+        expect(material.uniforms.scrollVelocity.value).toBe(velocity);
+      });
+    }));
+
+    it('P1: should synchronize section changes with particle behavior modification', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      const sections = [
+        { id: 'hero', index: 0, expectedColor: 0x2d5b8c },
+        { id: 'filosofia', index: 1, expectedColor: 0x2d6b8c },
+        { id: 'servicos', index: 2, expectedColor: 0x2d7b8c },
+        { id: 'trabalhos', index: 3, expectedColor: 0x2d8b7c },
+        { id: 'cta', index: 4, expectedColor: 0x5d8b2c }
+      ];
+
+      sections.forEach(section => {
+        metricsSubject.next({
+          globalProgress: section.index * 0.25,
+          velocity: 100,
+          activeSection: { id: section.id, progress: 0.5 },
+          sections: []
+        });
+
+        tick(100);
+
+        // Section index should update particle behavior
+        const material = mockThreeJS.mockObjects.mockMaterial;
+        expect(material.uniforms.sectionIndex.value).toBe(section.index);
+      });
+    }));
+
+    it('P1: should handle rapid scroll updates without dropping frames', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      // Simulate 60fps scroll updates for 2 seconds
+      const frameCount = 120; // 2 seconds at 60fps
+      let processedUpdates = 0;
+
+      for (let frame = 0; frame < frameCount; frame++) {
+        metricsSubject.next({
+          globalProgress: frame / frameCount,
+          velocity: Math.sin(frame * 0.1) * 500 + 500, // Varying velocity
+          activeSection: { id: 'test', progress: (frame % 60) / 60 },
+          sections: []
+        });
+
+        tick(16); // 60fps timing
+        processedUpdates++;
+      }
+
+      // All updates should be processed
+      expect(processedUpdates).toBe(frameCount);
+      
+      // Final state should reflect last update
+      const material = mockThreeJS.mockObjects.mockMaterial;
+      expect(material.uniforms.globalProgress.value).toBeCloseTo(1.0, 2);
+    }));
+  });
+
+  describe('2. Section Transition Detection and Particle Formation', () => {
+
+    it('P1: should trigger shape formation exactly at Hero->Filosofia transition (90% Hero)', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      const formShapeSpy = spyOn<any>(particleComponent, 'formShape').and.callThrough();
+
+      // Approach transition point
+      metricsSubject.next({
+        globalProgress: 0.17, // Just before transition
+        velocity: 250,
+        activeSection: { id: 'hero', progress: 0.85 },
+        sections: []
+      });
+
+      tick(100);
+      expect(formShapeSpy).not.toHaveBeenCalled();
+
+      // Hit exact transition point
+      metricsSubject.next({
+        globalProgress: 0.18, // Transition moment (90% Hero)
+        velocity: 250,
+        activeSection: { id: 'hero', progress: 0.9 },
+        sections: []
+      });
+
+      tick(100);
+      expect(formShapeSpy).toHaveBeenCalledWith('transition');
+    }));
+
+    it('P1: should detect all section transitions and trigger appropriate particle formations', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      const formShapeSpy = spyOn<any>(particleComponent, 'formShape').and.callThrough();
+      const isInTransitionSpy = spyOn<any>(particleComponent, 'isInTransition').and.callThrough();
+
+      const transitions = [
+        { from: 'hero', to: 'filosofia', globalProgress: 0.18, velocity: 200 },
+        { from: 'filosofia', to: 'servicos', globalProgress: 0.38, velocity: 300 },
+        { from: 'servicos', to: 'trabalhos', globalProgress: 0.58, velocity: 150 },
+        { from: 'trabalhos', to: 'cta', globalProgress: 0.78, velocity: 250 }
+      ];
+
+      transitions.forEach(transition => {
+        formShapeSpy.calls.reset();
+        isInTransitionSpy.calls.reset();
+
+        metricsSubject.next({
+          globalProgress: transition.globalProgress,
+          velocity: transition.velocity,
+          activeSection: { id: transition.from, progress: 0.9 },
+          sections: []
+        });
+
+        tick(100);
+
+        expect(isInTransitionSpy).toHaveBeenCalled();
+        expect(formShapeSpy).toHaveBeenCalledWith('transition');
+      });
+    }));
+
+    it('P1: should interpolate particles toward target formation positions during transitions', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      const geometry = mockThreeJS.mockObjects.mockGeometry;
+      const originalPositions = [...geometry.attributes.position.array];
+
+      // Trigger transition
+      metricsSubject.next({
+        globalProgress: 0.18,
+        velocity: 250,
+        activeSection: { id: 'hero', progress: 0.9 },
+        sections: []
+      });
+
+      tick(500); // Allow formation time
+
+      // Positions should have been modified for shape formation
+      expect(geometry.attributes.position.needsUpdate).toBe(true);
+      
+      // Some positions should have changed from original
+      let positionsChanged = false;
+      for (let i = 0; i < 30; i++) { // Check first 10 particles
+        if (Math.abs(geometry.attributes.position.array[i] - originalPositions[i]) > 0.01) {
+          positionsChanged = true;
+          break;
+        }
+      }
+      expect(positionsChanged).toBe(true);
+    }));
+
+    it('P1: should release particles back to normal behavior after transition completes', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      const formShapeSpy = spyOn<any>(particleComponent, 'formShape').and.callThrough();
+
+      // Start transition
+      metricsSubject.next({
+        globalProgress: 0.18,
+        velocity: 200,
+        activeSection: { id: 'hero', progress: 0.9 },
+        sections: []
+      });
+
+      tick(100);
+      expect(formShapeSpy).toHaveBeenCalled();
+
+      // Complete transition (move past transition zone)
+      metricsSubject.next({
+        globalProgress: 0.25,
+        velocity: 100,
+        activeSection: { id: 'filosofia', progress: 0.3 },
+        sections: []
+      });
+
+      tick(1000); // Allow particle release time
+
+      // Should no longer be in transition
+      formShapeSpy.calls.reset();
+      
+      metricsSubject.next({
+        globalProgress: 0.26,
+        velocity: 50,
+        activeSection: { id: 'filosofia', progress: 0.4 },
+        sections: []
+      });
+
+      tick(100);
+      expect(formShapeSpy).not.toHaveBeenCalled();
+    }));
+  });
+
+  describe('3. Scroll Velocity Response - Exact Amplification Behavior', () => {
+
+    it('P1: should amplify baseSpinX and baseSpinY proportionally to scroll velocity', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      const points = mockThreeJS.mockObjects.mockPoints;
+      const initialRotationY = points.rotation.y;
+
+      // Test velocity amplification with specific values
+      const velocityTests = [
+        { velocity: 100, expectedMultiplier: 0.1 },
+        { velocity: 500, expectedMultiplier: 0.5 },
+        { velocity: 1000, expectedMultiplier: 1.0 },
+        { velocity: 1500, expectedMultiplier: 1.0 } // Capped at 1.0
+      ];
+
+      velocityTests.forEach(test => {
+        metricsSubject.next({
+          globalProgress: 0.5,
+          velocity: test.velocity,
+          activeSection: { id: 'filosofia', progress: 0.5 },
+          sections: []
+        });
+
+        tick(100);
+
+        // Rotation should increase proportionally (cumulative)
+        const rotationIncrease = Math.abs(points.rotation.y - initialRotationY);
+        const expectedIncrease = test.expectedMultiplier * 0.01; // Based on implementation
+        
+        expect(rotationIncrease).toBeGreaterThanOrEqual(expectedIncrease * 0.8);
+        expect(rotationIncrease).toBeLessThanOrEqual(expectedIncrease * 1.2);
+      });
+    }));
+
+    it('P1: should boost particle opacity during high velocity (whoosh effect)', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      const material = mockThreeJS.mockObjects.mockMaterial;
+      const baseOpacity = material.opacity;
+
+      // High velocity scrolling
+      metricsSubject.next({
+        globalProgress: 0.6,
+        velocity: 1200,
+        activeSection: { id: 'trabalhos', progress: 0.4 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Opacity should be boosted for whoosh effect
+      expect(material.opacity).toBeGreaterThanOrEqual(baseOpacity);
+      expect(material.opacity).toBeLessThanOrEqual(1.0); // Not exceed maximum
+    }));
+
+    it('P1: should lerp velocity effects back to normal when scrolling stops', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      const points = mockThreeJS.mockObjects.mockPoints;
+      const material = mockThreeJS.mockObjects.mockMaterial;
+
+      // High velocity phase
+      metricsSubject.next({
+        globalProgress: 0.5,
+        velocity: 900,
+        activeSection: { id: 'servicos', progress: 0.7 },
+        sections: []
+      });
+
+      tick(200);
+      const highVelocityRotation = points.rotation.y;
+      const highVelocityOpacity = material.opacity;
+
+      // Stop scrolling
+      metricsSubject.next({
+        globalProgress: 0.5,
+        velocity: 0,
+        activeSection: { id: 'servicos', progress: 0.7 },
+        sections: []
+      });
+
+      tick(1000); // Allow lerp time
+
+      // Should lerp back toward baseline
+      expect(Math.abs(points.rotation.y)).toBeLessThan(Math.abs(highVelocityRotation) * 1.1);
+      expect(material.opacity).toBeLessThanOrEqual(highVelocityOpacity);
+    }));
+
+    it('P1: should create smooth velocity transitions without jankiness', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      const points = mockThreeJS.mockObjects.mockPoints;
+      const rotationHistory: number[] = [];
+
+      // Simulate smooth velocity ramp up and down
+      const velocityCurve = [
+        0, 50, 150, 300, 500, 800, 1000, 800, 500, 300, 150, 50, 0
+      ];
+
+      velocityCurve.forEach((velocity, index) => {
+        metricsSubject.next({
+          globalProgress: index * 0.1,
+          velocity,
+          activeSection: { id: 'test', progress: 0.5 },
+          sections: []
+        });
+
+        tick(100);
+        rotationHistory.push(points.rotation.y);
+      });
+
+      // Rotation changes should be smooth (no dramatic jumps)
+      for (let i = 1; i < rotationHistory.length; i++) {
+        const change = Math.abs(rotationHistory[i] - rotationHistory[i - 1]);
+        expect(change).toBeLessThan(0.1); // No sudden jumps
+      }
+
+      // Overall progression should follow velocity curve shape
+      const maxRotationIndex = rotationHistory.indexOf(Math.max(...rotationHistory));
+      expect(maxRotationIndex).toBeGreaterThan(4); // Peak rotation should be in middle-to-end
+      expect(maxRotationIndex).toBeLessThan(9);
+    }));
+  });
+
+  describe('4. Color Progression Through Sections', () => {
+
+    it('P1: should blend particle color from brand blue to gold across page scroll', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      const color = mockThreeJS.mockObjects.mockColor;
+      const colorProgression: number[] = [];
+
+      // Test color at different global progress points
+      const progressPoints = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0];
+      
+      progressPoints.forEach(progress => {
+        metricsSubject.next({
+          globalProgress: progress,
+          velocity: 100,
+          activeSection: { id: 'test', progress: 0.5 },
+          sections: []
+        });
+
+        tick(100);
+
+        // Capture color calls to setHex
+        const setHexCalls = color.setHex.calls.all();
+        if (setHexCalls.length > 0) {
+          const lastColor = setHexCalls[setHexCalls.length - 1].args[0];
+          colorProgression.push(lastColor);
+        }
+      });
+
+      // Should have different colors at different progress points
+      expect(new Set(colorProgression).size).toBeGreaterThan(1);
+
+      // First color should be brand blue
+      if (colorProgression[0]) {
+        expect(colorProgression[0]).toBe(0x2d5b8c);
+      }
+
+      // Last color should have gold hint (higher red/green than blue)
+      if (colorProgression[colorProgression.length - 1]) {
+        const lastColor = colorProgression[colorProgression.length - 1];
+        const r = (lastColor >> 16) & 255;
+        const g = (lastColor >> 8) & 255;
+        const b = lastColor & 255;
+        
+        expect(r + g).toBeGreaterThan(b); // Gold-ish characteristic
+      }
+    }));
+
+    it('P1: should maintain subtle color transitions (no abrupt changes)', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      const color = mockThreeJS.mockObjects.mockColor;
+      const colorHistory: number[] = [];
+
+      // Fine-grained progress sampling
+      for (let progress = 0; progress <= 1; progress += 0.05) {
+        metricsSubject.next({
+          globalProgress: progress,
+          velocity: 75,
+          activeSection: { id: 'test', progress: 0.5 },
+          sections: []
+        });
+
+        tick(50);
+
+        const setHexCalls = color.setHex.calls.all();
+        if (setHexCalls.length > 0) {
+          const lastColor = setHexCalls[setHexCalls.length - 1].args[0];
+          colorHistory.push(lastColor);
+        }
+      }
+
+      // Adjacent colors should be similar (subtle changes)
+      for (let i = 1; i < colorHistory.length; i++) {
+        const colorA = colorHistory[i - 1];
+        const colorB = colorHistory[i];
+        
+        const rgbA = [(colorA >> 16) & 255, (colorA >> 8) & 255, colorA & 255];
+        const rgbB = [(colorB >> 16) & 255, (colorB >> 8) & 255, colorB & 255];
+        
+        // Calculate color distance
+        const distance = Math.sqrt(
+          Math.pow(rgbA[0] - rgbB[0], 2) +
+          Math.pow(rgbA[1] - rgbB[1], 2) +
+          Math.pow(rgbA[2] - rgbB[2], 2)
+        );
+        
+        expect(distance).toBeLessThan(50); // Subtle changes only
+      }
+    }));
+
+    it('P1: should harmonize particle color with section themes', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      const color = mockThreeJS.mockObjects.mockColor;
+      const sectionColorTests = [
+        { section: 'hero', expectedBase: 0x2d5b8c }, // Brand blue
+        { section: 'filosofia', expectedTint: 'blue-teal' },
+        { section: 'servicos', expectedTint: 'teal' },
+        { section: 'trabalhos', expectedTint: 'green-teal' },
+        { section: 'cta', expectedTint: 'gold' }
+      ];
+
+      sectionColorTests.forEach((test, index) => {
+        metricsSubject.next({
+          globalProgress: index * 0.25,
+          velocity: 50,
+          activeSection: { id: test.section, progress: 0.5 },
+          sections: []
+        });
+
+        tick(100);
+
+        const setHexCalls = color.setHex.calls.all();
+        if (setHexCalls.length > 0) {
+          const sectionColor = setHexCalls[setHexCalls.length - 1].args[0];
+          
+          // Validate specific color expectations
+          if (test.section === 'hero') {
+            expect(sectionColor).toBe(0x2d5b8c);
+          } else if (test.section === 'cta') {
+            // CTA should have gold hint
+            const r = (sectionColor >> 16) & 255;
+            const g = (sectionColor >> 8) & 255;
+            const b = sectionColor & 255;
+            expect(r + g).toBeGreaterThan(b);
+          }
+          // Other sections should show progression
+        }
+      });
+    }));
+  });
+
+  describe('5. Pause Detection and Convergence Behavior', () => {
+
+    it('P1: should detect scroll pause after exactly 1 second of zero velocity', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      // Scroll then stop
+      metricsSubject.next({
+        globalProgress: 0.6,
+        velocity: 300,
+        activeSection: { id: 'trabalhos', progress: 0.4 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Stop scrolling
+      metricsSubject.next({
+        globalProgress: 0.6,
+        velocity: 0,
+        activeSection: { id: 'trabalhos', progress: 0.4 },
+        sections: []
+      });
+
+      // Wait less than 1 second - should not detect pause yet
+      tick(800);
+      
+      let pauseDetected = false;
+      // Check if pause behavior is triggered (simplified check)
+      const geometry = mockThreeJS.mockObjects.mockGeometry;
+      const beforePause = [...geometry.attributes.position.array.slice(0, 9)];
+
+      // Wait additional time to exceed 1 second
+      tick(300); // Total: 1100ms
+
+      const afterPause = [...geometry.attributes.position.array.slice(0, 9)];
+      
+      // Positions should change due to pause convergence behavior
+      for (let i = 0; i < beforePause.length; i++) {
+        if (Math.abs(beforePause[i] - afterPause[i]) > 0.01) {
+          pauseDetected = true;
+          break;
+        }
+      }
+
+      expect(pauseDetected).toBe(true);
+    }));
+
+    it('P1: should create gentle halo effect around screen center during pause', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      const geometry = mockThreeJS.mockObjects.mockGeometry;
+      
+      // Stop scrolling to trigger pause
+      metricsSubject.next({
+        globalProgress: 0.5,
+        velocity: 0,
+        activeSection: { id: 'filosofia', progress: 0.8 },
+        sections: []
+      });
+
+      tick(1200); // Wait for pause detection
+
+      // Check if particles are gravitating toward center
+      // This would be implemented by modifying position attributes
+      expect(geometry.attributes.position.needsUpdate).toBe(true);
+      
+      // Verify convergence behavior was triggered
+      // (In real implementation, this would check Vector3.lerp calls toward center)
+      const mockVector3 = mockThreeJS.mockObjects.mockPoints.position;
+      expect(mockVector3.lerp).toHaveBeenCalled();
+    }));
+
+    it('P1: should disperse particles outward when scrolling resumes after pause', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      // Establish pause state
+      metricsSubject.next({
+        globalProgress: 0.4,
+        velocity: 0,
+        activeSection: { id: 'servicos', progress: 0.6 },
+        sections: []
+      });
+
+      tick(1500); // Establish pause
+
+      // Resume scrolling
+      metricsSubject.next({
+        globalProgress: 0.45,
+        velocity: 400,
+        activeSection: { id: 'servicos', progress: 0.8 },
+        sections: []
+      });
+
+      tick(200);
+
+      // Should trigger dispersive behavior
+      const geometry = mockThreeJS.mockObjects.mockGeometry;
+      expect(geometry.attributes.position.needsUpdate).toBe(true);
+      
+      // Verify dispersion forces were applied
+      const mockVector3 = mockThreeJS.mockObjects.mockPoints.position;
+      expect(mockVector3.set).toHaveBeenCalled(); // Positions modified for dispersion
+    }));
+  });
+
+  describe('6. Performance Integration Under Load', () => {
+
+    it('P1: should handle 60fps scroll updates without performance degradation', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      const startTime = performance.now();
+      const frameCount = 360; // 6 seconds at 60fps
+
+      // Simulate intensive scroll session
+      for (let frame = 0; frame < frameCount; frame++) {
+        const progress = frame / frameCount;
+        const velocity = Math.sin(frame * 0.1) * 800 + 200; // Varying velocity
+        
+        metricsSubject.next({
+          globalProgress: progress,
+          velocity,
+          activeSection: { 
+            id: ['hero', 'filosofia', 'servicos', 'trabalhos', 'cta'][Math.floor(progress * 5)], 
+            progress: (progress * 5) % 1 
+          },
+          sections: []
+        });
+
+        tick(16); // 60fps frame time
+      }
+
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+
+      // Should complete efficiently
+      expect(duration).toBeLessThan(1000); // Process 6 seconds of updates in < 1 second
+
+      // Final state should be stable
+      const material = mockThreeJS.mockObjects.mockMaterial;
+      expect(material.uniforms.globalProgress.value).toBeCloseTo(1.0, 1);
+    }));
+
+    it('P1: should maintain particle system integrity under concurrent operations', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      // Simulate concurrent scroll events, section changes, and mouse interactions
+      const operations = [
+        // Scroll sequence
+        () => metricsSubject.next({ globalProgress: 0.2, velocity: 300, activeSection: { id: 'filosofia', progress: 0.1 }, sections: [] }),
+        // Mouse movement simulation
+        () => { /* Mouse move would be handled separately */ },
+        // Section transition
+        () => metricsSubject.next({ globalProgress: 0.18, velocity: 250, activeSection: { id: 'hero', progress: 0.9 }, sections: [] }),
+        // High velocity scroll
+        () => metricsSubject.next({ globalProgress: 0.25, velocity: 1000, activeSection: { id: 'filosofia', progress: 0.3 }, sections: [] }),
+        // Pause
+        () => metricsSubject.next({ globalProgress: 0.25, velocity: 0, activeSection: { id: 'filosofia', progress: 0.3 }, sections: [] })
+      ];
+
+      // Execute operations rapidly and repeatedly
+      for (let cycle = 0; cycle < 50; cycle++) {
+        operations.forEach(operation => {
+          operation();
+          tick(10); // Very rapid updates
+        });
+      }
+
+      // System should remain stable
+      const points = mockThreeJS.mockObjects.mockPoints;
+      const material = mockThreeJS.mockObjects.mockMaterial;
+      const geometry = mockThreeJS.mockObjects.mockGeometry;
+
+      expect(points.visible).toBe(true);
+      expect(material.uniforms.globalProgress.value).toBeDefined();
+      expect(geometry.attributes.position.count).toBe(120);
+    }));
+
+    it('P1: should gracefully degrade under extreme scroll velocity changes', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      // Extreme velocity changes
+      const extremeVelocities = [0, 5000, 0, -3000, 0, 8000, 0];
+      
+      extremeVelocities.forEach((velocity, index) => {
+        metricsSubject.next({
+          globalProgress: index * 0.15,
+          velocity: Math.abs(velocity), // Service provides absolute values
+          activeSection: { id: 'test', progress: 0.5 },
+          sections: []
+        });
+
+        tick(50);
+
+        // System should clamp values to reasonable ranges
+        const material = mockThreeJS.mockObjects.mockMaterial;
+        expect(material.opacity).toBeGreaterThan(0.1);
+        expect(material.opacity).toBeLessThan(1.1);
+        
+        const points = mockThreeJS.mockObjects.mockPoints;
+        expect(Math.abs(points.rotation.y)).toBeLessThan(10); // Reasonable rotation limit
+      });
+    }));
+  });
+
+  describe('7. Error Handling and Edge Cases', () => {
+
+    it('P1: should handle null/undefined scroll metrics gracefully', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      // Send invalid metrics
+      const invalidMetrics = [
+        null,
+        undefined,
+        { globalProgress: null, velocity: undefined, activeSection: null },
+        { globalProgress: NaN, velocity: Infinity, activeSection: { id: '', progress: -1 } }
+      ];
+
+      invalidMetrics.forEach(metrics => {
+        expect(() => {
+          metricsSubject.next(metrics as any);
+          tick(100);
+        }).not.toThrow();
+      });
+
+      // System should remain functional
+      const points = mockThreeJS.mockObjects.mockPoints;
+      expect(points.visible).toBe(true);
+    }));
+
+    it('P1: should handle service disconnection and reconnection', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      // Normal operation
+      metricsSubject.next({
+        globalProgress: 0.3,
+        velocity: 200,
+        activeSection: { id: 'filosofia', progress: 0.6 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Simulate service error
+      metricsSubject.error(new Error('Service connection lost'));
+
+      tick(100);
+
+      // System should not crash
+      expect(() => {
+        const material = mockThreeJS.mockObjects.mockMaterial;
+        expect(material).toBeDefined();
+      }).not.toThrow();
+
+      // Create new metrics stream (reconnection)
+      const newMetricsSubject = new BehaviorSubject<ScrollMetrics>({
+        globalProgress: 0.5,
+        velocity: 100,
+        activeSection: { id: 'servicos', progress: 0.2 },
+        sections: []
+      });
+
+      mockScrollService.metrics$ = newMetricsSubject;
+
+      // Should resume operation
+      newMetricsSubject.next({
+        globalProgress: 0.6,
+        velocity: 150,
+        activeSection: { id: 'servicos', progress: 0.4 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Verify recovery
+      const material = mockThreeJS.mockObjects.mockMaterial;
+      expect(material.uniforms.globalProgress.value).toBe(0.6);
+    }));
+
+    it('P1: should clean up subscriptions and resources on destroy', fakeAsync(() => {
+      ngZone.runOutsideAngular(() => particleComponent.ngAfterViewInit());
+      tick();
+
+      // Establish subscriptions
+      metricsSubject.next({
+        globalProgress: 0.4,
+        velocity: 200,
+        activeSection: { id: 'filosofia', progress: 0.5 },
+        sections: []
+      });
+
+      tick(100);
+
+      // Destroy component
+      particleComponent.ngOnDestroy();
+      tick();
+
+      // Verify cleanup
+      const renderer = mockThreeJS.WebGLRenderer.calls.mostRecent().returnValue;
+      const geometry = mockThreeJS.mockObjects.mockGeometry;
+      const material = mockThreeJS.mockObjects.mockMaterial;
+
+      expect(renderer.dispose).toHaveBeenCalled();
+      expect(geometry.dispose).toHaveBeenCalled();
+      expect(material.dispose).toHaveBeenCalled();
+    }));
+  });
+
+  afterEach(() => {
+    if (particleComponent) {
+      particleComponent.ngOnDestroy();
+    }
+    fixture.destroy();
+  });
+});
