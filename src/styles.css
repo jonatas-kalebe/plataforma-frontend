@@ -147,7 +147,10 @@
 
   /* Section Layout Classes */
   .section-base {
-    @apply w-full h-screen flex items-center px-6;
+    @apply w-full flex items-center px-6;
+    /* Use JavaScript-controlled viewport height for better mobile support */
+    height: calc(var(--vh, 1vh) * 100);
+    min-height: 100vh; /* Fallback for older browsers */
     /* Remove scroll snap for custom magnetic snapping */
     position: relative;
   }
