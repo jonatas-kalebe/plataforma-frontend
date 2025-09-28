@@ -32,6 +32,12 @@ const mockGsap = {
   to: jasmine.createSpy('to')
 };
 
+import { Component, NO_ERRORS_SCHEMA } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { HeroSectionComponent } from './hero-section.component';
+import { ThreeParticleBackgroundComponent } from '../../shared/three-particle-background/three-particle-background.component';
+
 @Component({
   template: `
     <app-hero-section 

@@ -124,9 +124,46 @@ test.describe('COMPREHENSIVE ADDICTIVE SCROLL EXPERIENCE VALIDATION', () => {
       const particleCanvas = page.locator('canvas').first();
       await expect(particleCanvas).toBeVisible();
       
-      // Test reactivity by moving mouse
+      // CRITICAL: Test for actual mouse reactivity, not just visibility
       const canvasBox = await particleCanvas.boundingBox();
       if (canvasBox) {
+        // Test mouse reactivity by checking for actual particle response
+        const particleReactivity = await page.evaluate(async (box) => {
+          const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+          if (!canvas) return false;
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return false;
+
+          // Sample initial state
+          const initialData = ctx.getImageData(box.x + 50, box.y + 50, 10, 10);
+          
+          // Simulate mouse movement
+          const mouseEvent = new MouseEvent('mousemove', {
+            clientX: box.x + 200,
+            clientY: box.y + 150
+          });
+          canvas.dispatchEvent(mouseEvent);
+          
+          // Wait for potential animation frame
+          await new Promise(resolve => requestAnimationFrame(resolve));
+          
+          // Sample final state
+          const finalData = ctx.getImageData(box.x + 50, box.y + 50, 10, 10);
+          
+          // Check for changes
+          for (let i = 0; i < initialData.data.length; i++) {
+            if (Math.abs(initialData.data[i] - finalData.data[i]) > 10) {
+              return true;
+            }
+          }
+          return false;
+        }, canvasBox);
+
+        if (!particleReactivity) {
+          throw new Error('Particle mouse reactivity not detected - particles should respond to mouse movement but appear static');
+        }
+
         await page.mouse.move(canvasBox.x + 100, canvasBox.y + 100);
         await page.waitForTimeout(200);
         await page.mouse.move(canvasBox.x + 300, canvasBox.y + 200);
@@ -134,6 +171,8 @@ test.describe('COMPREHENSIVE ADDICTIVE SCROLL EXPERIENCE VALIDATION', () => {
         
         // Background should remain interactive and visible
         await expect(particleCanvas).toBeVisible();
+      } else {
+        throw new Error('Particle canvas bounding box not found - interactive background may not be working');
       }
     });
 

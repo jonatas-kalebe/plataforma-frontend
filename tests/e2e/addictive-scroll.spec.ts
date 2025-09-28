@@ -47,16 +47,33 @@ test.describe('Addictive Scroll Experience - E2E Validation', () => {
       const filosofiaLocator = page.locator('#filosofia');
       const vh = page.viewportSize()!.height;
 
+      // Record initial position
+      const initialPosition = await page.evaluate(() => window.scrollY);
+
       // Scroll lento para passar do threshold de 85% da Hero section
       await page.mouse.wheel(0, vh * 0.9);
-      await page.waitForTimeout(300); // Pausa para o scroll parar e o snap ser acionado
+      await page.waitForTimeout(100); // Short wait to allow initial scroll
 
-      // A seção 'filosofia' deve ter "puxado" a tela para o seu topo.
-      await expect(async () => {
-        const filosofiaTop = await getElementTop(filosofiaLocator);
-        // O topo da seção deve estar perfeitamente alinhado com o topo do viewport
+      // Verify we actually scrolled
+      const scrolledPosition = await page.evaluate(() => window.scrollY);
+      expect(scrolledPosition).toBeGreaterThan(initialPosition);
+
+      // Check if automatic snapping occurs within reasonable time
+      await page.waitForTimeout(200); // Wait for potential snap animation
+
+      const finalPosition = await page.evaluate(() => window.scrollY);
+      const filosofiaTop = await getElementTop(filosofiaLocator);
+
+      // CRITICAL: Test should FAIL if magnetic snapping is not implemented
+      // If snapping is working, filosofia should be at top (filosofiaTop ≈ 0)
+      // If snapping is NOT working, we should be somewhere in between sections
+      if (Math.abs(filosofiaTop) > 50) {
+        // This indicates snapping is not working - test should fail
+        expect(filosofiaTop).toBeCloseTo(0, 1); // This will fail and expose the missing feature
+      } else {
+        // Verify it's genuinely snapped and not just coincidentally positioned
         expect(filosofiaTop).toBeCloseTo(0, 1);
-      }).toPass({ timeout: 2000 }); // A animação de snap leva tempo
+      }
     });
 
     test('G4, G5: should snap back to the previous section on pause before 15% scroll (upwards)', async ({ page }) => {
@@ -65,17 +82,33 @@ test.describe('Addictive Scroll Experience - E2E Validation', () => {
 
       // Vai para a seção 'filosofia'
       await filosofiaLocator.scrollIntoViewIfNeeded();
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500);
+
+      // Record position after navigation
+      const afterNavigationPosition = await page.evaluate(() => window.scrollY);
 
       // Scroll pequeno para cima, para ficar com menos de 15% da seção visível
       await page.mouse.wheel(0, -page.viewportSize()!.height * 0.2);
-      await page.waitForTimeout(300); // Pausa para acionar o snap reverso
+      await page.waitForTimeout(100); // Short wait to allow scroll
 
-      // A seção 'hero' deve ter "puxado" a tela de volta.
-      await expect(async () => {
-        const heroTop = await getElementTop(heroLocator);
+      // Verify we actually scrolled up
+      const scrolledUpPosition = await page.evaluate(() => window.scrollY);
+      expect(scrolledUpPosition).toBeLessThan(afterNavigationPosition);
+
+      await page.waitForTimeout(200); // Wait for potential snap animation
+
+      const heroTop = await getElementTop(heroLocator);
+
+      // CRITICAL: Test should FAIL if reverse magnetic snapping is not implemented
+      // If reverse snapping is working, hero should be at top (heroTop ≈ 0)
+      // If reverse snapping is NOT working, we should be somewhere between sections
+      if (Math.abs(heroTop) > 50) {
+        // This indicates reverse snapping is not working - test should fail
+        expect(heroTop).toBeCloseTo(0, 1); // This will fail and expose the missing feature
+      } else {
+        // Verify it's genuinely reverse snapped
         expect(heroTop).toBeCloseTo(0, 1);
-      }).toPass({ timeout: 2000 });
+      }
     });
 
     test('G8: Mobile: should have a delay before snapping to allow kinetic scroll', async ({ page, isMobile }) => {
@@ -105,16 +138,31 @@ test.describe('Addictive Scroll Experience - E2E Validation', () => {
   test.describe('Section: Hero', () => {
 
     test('H2: should have gentle "elastic" resistance on initial scroll (0-20%)', async ({ page }) => {
+      await page.locator('#hero').scrollIntoViewIfNeeded();
+      await page.waitForTimeout(500);
+
       const heroTitle = page.locator('#hero h1');
       const { opacity: initialOpacity } = await getOpacityAndTransform(heroTitle);
       const initialTop = await getElementTop(heroTitle);
 
       // Scroll pequeno, correspondendo a ~10% da altura da viewport
-      await page.mouse.wheel(0, page.viewportSize()!.height * 0.1);
+      const scrollAmount = page.viewportSize()!.height * 0.1;
+      await page.mouse.wheel(0, scrollAmount);
       await page.waitForTimeout(200);
 
       const { opacity: newOpacity } = await getOpacityAndTransform(heroTitle);
       const newTop = await getElementTop(heroTitle);
+
+      // CRITICAL: Test should detect if resistance behavior is missing
+      const opacityChange = Math.abs(newOpacity - initialOpacity);
+      const positionChange = Math.abs(newTop - initialTop);
+
+      // If resistance is implemented, changes should be small/gradual
+      // If resistance is NOT implemented, elements move normally with scroll
+      if (opacityChange > 0.4 || positionChange > 80) {
+        // This indicates normal scroll behavior (no resistance) - test should fail
+        throw new Error(`Missing elastic resistance in 0-20% zone: opacity changed by ${opacityChange.toFixed(3)}, position changed by ${positionChange.toFixed(1)}px. Expected minimal changes due to resistance.`);
+      }
 
       // A opacidade deve diminuir apenas um pouco
       expect(newOpacity).toBeGreaterThan(initialOpacity - 0.2);
@@ -265,13 +313,56 @@ test.describe('Addictive Scroll Experience - E2E Validation', () => {
     });
 
     test('P1: should react to mouse movement (parallax)', async ({ page }) => {
+        await page.locator('#hero').scrollIntoViewIfNeeded();
         const canvas = page.locator('app-three-particle-background canvas');
-        // A validação exata do parallax é complexa. A abordagem E2E é garantir que a interação
-        // não cause erros e que o canvas permaneça visível e renderizando.
+        await expect(canvas).toBeVisible();
+
+        // Capture initial particle state by checking canvas changes
+        const initialCanvasState = await page.evaluate(() => {
+          const canvas = document.querySelector('app-three-particle-background canvas') as HTMLCanvasElement;
+          if (!canvas) return null;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return null;
+          
+          // Sample pixel data to detect changes
+          const imageData = ctx.getImageData(0, 0, 50, 50);
+          return Array.from(imageData.data.slice(0, 50));
+        });
+
+        // Move mouse to trigger parallax
         await page.mouse.move(100, 100);
         await page.waitForTimeout(200);
         await page.mouse.move(page.viewportSize()!.width - 100, page.viewportSize()!.height - 100);
         await page.waitForTimeout(200);
+
+        // Capture state after mouse movement
+        const finalCanvasState = await page.evaluate(() => {
+          const canvas = document.querySelector('app-three-particle-background canvas') as HTMLCanvasElement;
+          if (!canvas) return null;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return null;
+          
+          const imageData = ctx.getImageData(0, 0, 50, 50);
+          return Array.from(imageData.data.slice(0, 50));
+        });
+
+        // CRITICAL: Test should FAIL if mouse parallax is not implemented
+        if (!initialCanvasState || !finalCanvasState) {
+          throw new Error('Particle system canvas not detectable - parallax cannot be validated');
+        }
+
+        // Compare states to detect mouse reactivity
+        let changes = 0;
+        for (let i = 0; i < Math.min(initialCanvasState.length, finalCanvasState.length); i++) {
+          if (Math.abs(initialCanvasState[i] - finalCanvasState[i]) > 15) {
+            changes++;
+          }
+        }
+
+        // If particles don't react to mouse movement, this should fail
+        if (changes < 3) {
+          throw new Error(`Particle mouse parallax not working: only ${changes} significant pixel changes detected. Expected particles to respond to mouse movement with visible changes.`);
+        }
 
         await expect(canvas).toBeVisible();
     });

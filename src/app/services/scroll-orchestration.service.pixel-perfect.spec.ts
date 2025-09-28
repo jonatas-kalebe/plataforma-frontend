@@ -104,9 +104,9 @@ describe('ScrollOrchestrationService - COMPREHENSIVE PIXEL-PERFECT VALIDATION', 
       userAgent: 'Mozilla/5.0 Test Browser'
     };
 
-    // Mock GSAP globals
-    (global as any).gsap = mockGsap;
-    (global as any).ScrollTrigger = mockScrollTrigger;
+    // Mock GSAP globals  
+    (window as any).gsap = mockGsap;
+    (window as any).ScrollTrigger = mockScrollTrigger;
     (window as any).gsap = mockGsap;
     (window as any).ScrollTrigger = mockScrollTrigger;
 
@@ -146,7 +146,7 @@ describe('ScrollOrchestrationService - COMPREHENSIVE PIXEL-PERFECT VALIDATION', 
 
     it('should detect EXACTLY mobile device capabilities', () => {
       // Service should detect mobile for optimized behavior
-      expect((global as any).navigator.userAgent).toBeTruthy();
+      expect((window as any).navigator.userAgent).toBeTruthy();
     });
   });
 
@@ -158,9 +158,15 @@ describe('ScrollOrchestrationService - COMPREHENSIVE PIXEL-PERFECT VALIDATION', 
     it('should create EXACTLY 5 section triggers as specified', () => {
       service.initialize();
       
-      // Should create triggers for all 5 sections
-      expect(mockScrollTrigger.create).toHaveBeenCalledTimes(jasmine.any(Number));
-      expect(mockScrollTrigger.create.calls.count()).toBeGreaterThanOrEqual(5);
+      // Should create triggers for all 5 sections - no more, no less
+      expect(mockScrollTrigger.create).toHaveBeenCalledTimes(6); // 5 sections + 1 global
+      
+      // Verify each section has its trigger
+      const calls = mockScrollTrigger.create.calls.all();
+      const sectionTriggers = calls.filter(call => 
+        ['#hero', '#filosofia', '#servicos', '#trabalhos', '#cta'].includes(call.args[0].trigger)
+      );
+      expect(sectionTriggers.length).toBe(5);
     });
 
     it('should configure EXACTLY the hero scroll resistance animation', () => {
@@ -218,12 +224,22 @@ describe('ScrollOrchestrationService - COMPREHENSIVE PIXEL-PERFECT VALIDATION', 
       (service as any).checkMagneticSnap();
       tick(100);
 
-      // Should trigger scroll to next section
-      expect(mockGsap.to).toHaveBeenCalledWith(window, jasmine.objectContaining({
+      // CRITICAL: Must validate actual snapping call was made
+      expect(mockGsap.to).toHaveBeenCalled();
+      
+      // Validate specific snapping parameters
+      const snapCall = mockGsap.to.calls.mostRecent();
+      expect(snapCall.args[0]).toBe(window);
+      expect(snapCall.args[1]).toEqual(jasmine.objectContaining({
         scrollTo: jasmine.anything(),
         ease: 'power2.inOut',
         duration: 0.8
       }));
+      
+      // CRITICAL: If this test passes but snapping doesn't work, the mock setup is wrong
+      if (!mockGsap.to.calls.count()) {
+        throw new Error('Magnetic snapping not implemented: checkMagneticSnap() did not trigger GSAP animation');
+      }
     }));
 
     it('should implement EXACTLY 15% backward snap threshold', fakeAsync(() => {
