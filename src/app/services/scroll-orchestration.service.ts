@@ -133,6 +133,7 @@ export class ScrollOrchestrationService {
       
       this.lastScrollY = window.scrollY || 0;
       this.setupSections();
+      this.setupScrollEventListener(); // Add direct scroll event listener as backup
       this.isInitialized = true;
       
       console.log('ScrollOrchestrationService: Successfully initialized');
@@ -413,6 +414,8 @@ export class ScrollOrchestrationService {
       trigger: document.body,
       start: 'top top',
       end: 'bottom bottom',
+      invalidateOnRefresh: true,
+      refreshPriority: -1,
       onUpdate: (self: any) => {
         const currentTime = performance.now();
         const currentScrollY = window.scrollY || 0;
@@ -453,20 +456,68 @@ export class ScrollOrchestrationService {
 
         this.updateActiveSectionTrigger(currentScrollY);
         this.detectScrollIntention();
-        this.checkMagneticSnap(); // mantém chamada
+        this.checkMagneticSnap();
         
         // Start checking for when scrolling stops
         this.startScrollStopCheck();
         
         // Debug: Log every few updates to monitor activity
-        if (Math.random() < 0.3) { // Increase log frequency for debugging
+        if (Math.random() < 0.5) { // Increase log frequency for debugging
           console.log(`Global trigger update: scrollY=${currentScrollY}, velocity=${Math.abs(smoothedVelocity).toFixed(1)}, direction=${this.scrollDirection}`);
         }
+      },
+      onRefresh: () => {
+        console.log('Global trigger refreshed');
       }
     });
 
     console.log('Global progress trigger created:', globalTrigger);
     this.scrollTriggers.push(globalTrigger);
+    
+    // Force immediate refresh to ensure trigger is active
+    ScrollTriggerInstance.refresh();
+    console.log('ScrollTrigger refreshed after creation');
+  }
+  
+  private setupScrollEventListener(): void {
+    console.log('Setting up direct scroll event listener as backup...');
+    
+    let throttleTimeout: number | null = null;
+    
+    const handleScroll = () => {
+      if (throttleTimeout) return;
+      
+      throttleTimeout = window.setTimeout(() => {
+        const currentScrollY = window.scrollY || 0;
+        
+        // Update direction
+        if (currentScrollY > this.lastScrollY + 5) {
+          this.scrollDirection = 'down';
+        } else if (currentScrollY < this.lastScrollY - 5) {
+          this.scrollDirection = 'up';
+        }
+        
+        this.lastScrollY = currentScrollY;
+        this.lastScrollTime = performance.now();
+        
+        // Update active section and check magnetic snap
+        this.updateActiveSectionTrigger(currentScrollY);
+        this.detectScrollIntention();
+        this.checkMagneticSnap();
+        
+        // Start scroll stop detection
+        this.startScrollStopCheck();
+        
+        // Debug log occasionally
+        if (Math.random() < 0.2) {
+          console.log(`Direct scroll event: scrollY=${currentScrollY}, direction=${this.scrollDirection}`);
+        }
+        
+        throttleTimeout = null;
+      }, 16); // ~60fps throttling
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
   }
   
   private startScrollStopCheck(): void {
