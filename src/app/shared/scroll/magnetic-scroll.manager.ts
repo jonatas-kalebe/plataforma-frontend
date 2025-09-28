@@ -16,12 +16,18 @@ export class MagneticScrollManager {
   private prevScrollBehaviorHtml: string | null = null;
   private prevScrollBehaviorBody: string | null = null;
 
+  // Novos controles de direção
+  private directionLock: { dir: Dir; until: number } = { dir: null, until: 0 };
+  private pendingSnapDirection: Dir | null = null;
+
   private readonly SCROLL_STOP_DELAY = 150;
   private readonly INTENT_THRESHOLD = 0.2;
   private readonly SNAP_FWD_THRESHOLD = 0.85;
   private readonly SNAP_BACK_THRESHOLD = 0.15;
   private readonly SNAP_DURATION_MS = 800;
   private readonly TOUCH_SNAP_DELAY_MS = 280;
+  // Duração do lock de direção quando detecta mudança
+  private readonly DIRECTION_LOCK_MS = 350;
 
   constructor(private prefersReducedMotion: boolean = false) {}
 
@@ -38,6 +44,7 @@ export class MagneticScrollManager {
     if (this.snapTimeoutId) {
       clearTimeout(this.snapTimeoutId);
       this.snapTimeoutId = null;
+      this.pendingSnapDirection = null;
     }
     if (this.isAnimating) this.cancelAnimation();
   }
@@ -59,46 +66,64 @@ export class MagneticScrollManager {
     }
   }
 
+  // Atualiza intenção SEM manter direção grudada e cria um lock curto ao mudar de direção.
   detectScrollIntention(velocity: number): void {
     if (this.prefersReducedMotion) return;
     const now = Date.now();
     const v = velocity || 0;
-    const thr = 2;
-    if (Math.abs(v) > thr) {
-      this.intention = { direction: v > 0 ? 'forward' : 'backward', at: now, velocity: v };
-    } else {
-      this.intention.velocity = v;
-    }
+
+    const newDir: Dir = v === 0 ? null : (v > 0 ? 'forward' : 'backward');
+    const prevDir = this.intention.direction;
+
+    this.intention.velocity = v;
+    this.intention.direction = newDir;
+    this.intention.at = now;
     this.lastScrollTime = now;
+
+    if (newDir && newDir !== prevDir) {
+      // Aplica lock para a nova direção
+      this.directionLock = { dir: newDir, until: now + this.DIRECTION_LOCK_MS };
+
+      // Se havia snap pendente no sentido oposto, cancela
+      if (this.pendingSnapDirection && this.pendingSnapDirection !== newDir && this.snapTimeoutId) {
+        clearTimeout(this.snapTimeoutId);
+        this.snapTimeoutId = null;
+        this.pendingSnapDirection = null;
+      }
+    }
   }
 
   checkMagneticSnap(sections: ScrollSection[], _globalProgress: number): boolean {
     if (this.prefersReducedMotion || this.snapTimeoutId || this.isAnimating) return false;
+
     const idx = this.findActiveIndex(sections);
     if (idx === -1) return false;
+
     const active = sections[idx];
     const next = this.getNext(sections, idx);
     const prev = this.getPrev(sections, idx);
+
     const dir = this.deriveDirection(idx, active.progress);
     const lowSpeed = Math.abs(this.intention.velocity) < 0.25;
 
-    if (active.progress >= this.SNAP_FWD_THRESHOLD && next) {
-      this.scheduleSnapTo(next, this.delayForInput());
+    // Nunca snap contra a direção corrente
+    // Regras "duras" só disparam se a direção NÃO for contrária
+    if (active.progress >= this.SNAP_FWD_THRESHOLD && next && dir !== 'backward' && this.isDirectionAllowed('forward')) {
+      this.scheduleSnapTo(next, this.delayForInput(), 'forward');
+      return true;
+    }
+    if (active.progress <= this.SNAP_BACK_THRESHOLD && prev && dir !== 'forward' && this.isDirectionAllowed('backward')) {
+      this.scheduleSnapTo(prev, this.delayForInput(), 'backward');
       return true;
     }
 
-    if (active.progress <= this.SNAP_BACK_THRESHOLD && prev) {
-      this.scheduleSnapTo(prev, this.delayForInput());
+    // Regras de intenção (simétricas e respeitando direção)
+    if (dir === 'forward' && next && lowSpeed && active.progress >= (1 - this.INTENT_THRESHOLD) && this.isDirectionAllowed('forward')) {
+      this.scheduleSnapTo(next, this.delayForInput(), 'forward');
       return true;
     }
-
-    if (dir === 'forward' && active.progress >= this.INTENT_THRESHOLD && next && lowSpeed) {
-      this.scheduleSnapTo(next, this.delayForInput());
-      return true;
-    }
-
-    if (dir === 'backward' && prev && prev.progress >= this.INTENT_THRESHOLD && lowSpeed) {
-      this.scheduleSnapTo(prev, this.delayForInput());
+    if (dir === 'backward' && prev && lowSpeed && active.progress <= this.INTENT_THRESHOLD && this.isDirectionAllowed('backward')) {
+      this.scheduleSnapTo(prev, this.delayForInput(), 'backward');
       return true;
     }
 
@@ -109,19 +134,30 @@ export class MagneticScrollManager {
     this.clearScrollStopCheck();
     if (this.prefersReducedMotion || this.snapTimeoutId || this.isAnimating) return;
     if (!this.lastSectionsSnapshot || !this.lastSectionsSnapshot.length) return;
+
     const idx = this.findActiveIndex(this.lastSectionsSnapshot);
     if (idx === -1) return;
+
     const active = this.lastSectionsSnapshot[idx];
     const next = this.getNext(this.lastSectionsSnapshot, idx);
     const prev = this.getPrev(this.lastSectionsSnapshot, idx);
-    if (active.progress >= this.SNAP_FWD_THRESHOLD && next) {
-      this.scheduleSnapTo(next, this.delayForInput());
+
+    const dir = this.deriveDirection(idx, active.progress);
+
+    // Ao parar, só snappa a favor da direção detectada
+    if (dir === 'forward' && active.progress >= this.SNAP_FWD_THRESHOLD && next && this.isDirectionAllowed('forward')) {
+      this.scheduleSnapTo(next, this.delayForInput(), 'forward');
       return;
     }
-    if (active.progress <= this.SNAP_BACK_THRESHOLD && prev) {
-      this.scheduleSnapTo(prev, this.delayForInput());
+    if (dir === 'backward' && active.progress <= this.SNAP_BACK_THRESHOLD && prev && this.isDirectionAllowed('backward')) {
+      this.scheduleSnapTo(prev, this.delayForInput(), 'backward');
       return;
     }
+
+    // Opcional: se quiser “preferência” direcional mesmo sem atingir os extremos
+    // você pode ativar um snap suave para o lado da direção se estiver perto do meio.
+    // Ex.: if (dir === 'forward' && next && active.progress > 0.55) { ... }
+    // Mantive conservador para não ir contra a intenção do usuário.
   }
 
   scrollToSection(sectionId: string, durationSec: number = 1): void {
@@ -143,20 +179,61 @@ export class MagneticScrollManager {
       clearTimeout(this.snapTimeoutId);
       this.snapTimeoutId = null;
     }
+    this.pendingSnapDirection = null;
+    this.directionLock = { dir: null, until: 0 };
   }
 
   private delayForInput(): number {
     return this.inputMode === 'touch' ? this.TOUCH_SNAP_DELAY_MS : 0;
   }
 
-  private scheduleSnapTo(section: ScrollSection, extraDelayMs: number): void {
+  private scheduleSnapTo(section: ScrollSection, extraDelayMs: number, dir: Exclude<Dir, null>): void {
     if (!section.element) return;
-    if (this.snapTimeoutId) clearTimeout(this.snapTimeoutId);
+
+    // Não agendar se direção não for permitida
+    if (!this.isDirectionAllowed(dir)) return;
+
+    // Se já existe um snap pendente e for de direção diferente, cancela
+    if (this.snapTimeoutId && this.pendingSnapDirection && this.pendingSnapDirection !== dir) {
+      clearTimeout(this.snapTimeoutId);
+      this.snapTimeoutId = null;
+      this.pendingSnapDirection = null;
+    }
+
+    if (this.snapTimeoutId) {
+      // Já tem um snap pendente no mesmo sentido; não reagende
+      return;
+    }
+
     const delay = 200 + extraDelayMs;
+    this.pendingSnapDirection = dir;
     this.snapTimeoutId = window.setTimeout(() => {
       this.snapTimeoutId = null;
+      const allowed = this.isDirectionAllowed(dir);
+      if (!allowed) {
+        this.pendingSnapDirection = null;
+        return;
+      }
       this.performSnap(section);
+      this.pendingSnapDirection = null;
     }, delay);
+  }
+
+  private isDirectionAllowed(targetDir: Exclude<Dir, null>): boolean {
+    const now = Date.now();
+
+    // Lock explícito de direção tem prioridade
+    if (this.directionLock.dir && now < this.directionLock.until) {
+      return this.directionLock.dir === targetDir;
+    }
+
+    // Se há direção de intenção atual, só permite o mesmo sentido
+    if (this.intention.direction) {
+      return this.intention.direction === targetDir;
+    }
+
+    // Sem direção definida: permitido (não é "contra" porque não há direção)
+    return true;
   }
 
   private performSnap(section: ScrollSection): void {
