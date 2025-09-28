@@ -175,24 +175,25 @@ export class ServicosAnimationService {
         });
       });
 
-      // Mouse move for subtle magnetic effect
-      card.addEventListener('mousemove', (e: Event) => {
+      // Mouse move for subtle magnetic effect - simplified to avoid TypeScript issues
+      card.addEventListener('mousemove', (e: any) => {
         if (this.prefersReducedMotion) return;
         
-        const mouseEvent = e as MouseEvent;
-        const rect = card.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        
-        const deltaX = (mouseEvent.clientX - centerX) / (rect.width / 2);
-        const deltaY = (mouseEvent.clientY - centerY) / (rect.height / 2);
-        
-        gsap.to(card, {
-          rotateX: deltaY * -5,
-          rotateY: deltaX * 5,
-          duration: 0.3,
-          ease: 'power1.out'
-        });
+        if (e.clientX && e.clientY) {
+          const rect = card.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          
+          const deltaX = (e.clientX - centerX) / (rect.width / 2);
+          const deltaY = (e.clientY - centerY) / (rect.height / 2);
+          
+          gsap.to(card, {
+            rotateX: deltaY * -5,
+            rotateY: deltaX * 5,
+            duration: 0.3,
+            ease: 'power1.out'
+          });
+        }
       });
     });
   }
