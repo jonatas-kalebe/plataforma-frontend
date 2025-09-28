@@ -204,19 +204,18 @@ export class SectionAnimationService {
    * Create specific animation for trabalhos section
    */
   createTrabalhosAnimation(elements: SectionElements): void {
+    // Simplified animation without problematic scaling/opacity changes
     const timeline = this.gsapUtils.createTimeline({ paused: true });
 
-    // Animate work showcase with rotation
+    // Simple fade-in entrance only
     timeline.fromTo('.trabalhos-showcase', {
       opacity: 0,
-      rotationY: -45,
-      scale: 0.8
+      y: 20
     }, {
       opacity: 1,
-      rotationY: 0,
-      scale: 1,
-      duration: this.motionService.getAnimationDuration(1),
-      ease: ANIMATION_EASING.ELASTIC
+      y: 0,
+      duration: this.motionService.getAnimationDuration(0.8),
+      ease: 'power2.out'
     });
 
     this.sectionTimelines.set(SECTION_IDS.TRABALHOS, timeline);

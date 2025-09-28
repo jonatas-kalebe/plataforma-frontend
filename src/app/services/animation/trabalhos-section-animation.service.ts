@@ -104,23 +104,21 @@ export class TrabalhosSectionAnimationService {
 
     if (!ringContainer || !title) return;
 
-    // Initial state - ring hidden and scaled down
+    // Simplified initial state - just fade in, no complex scaling
     gsap.set(ringContainer, {
-      scale: 0.3,
       opacity: 0,
-      rotateX: 45,
-      y: 100
+      y: 30
     });
 
     gsap.set(title, {
       opacity: 0,
-      y: -30
+      y: -20
     });
 
     if (hint) {
       gsap.set(hint, {
         opacity: 0,
-        y: 20
+        y: 15
       });
     }
 
@@ -132,28 +130,26 @@ export class TrabalhosSectionAnimationService {
     entranceTimeline.to(title, {
       opacity: 1,
       y: 0,
-      duration: 0.8,
+      duration: 0.6,
       ease: 'power2.out'
     });
 
-    // Then animate ring with dramatic entrance
+    // Then animate ring with simple fade-in
     entranceTimeline.to(ringContainer, {
-      scale: 1,
       opacity: 1,
-      rotateX: 0,
       y: 0,
-      duration: 1.2,
+      duration: 0.8,
       ease: 'power2.out'
-    }, '-=0.4');
+    }, '-=0.3');
 
     // Finally show hint
     if (hint) {
       entranceTimeline.to(hint, {
         opacity: 0.7,
         y: 0,
-        duration: 0.6,
+        duration: 0.5,
         ease: 'power2.out'
-      }, '-=0.6');
+      }, '-=0.4');
     }
 
     // Trigger animation when section becomes visible
@@ -279,16 +275,8 @@ export class TrabalhosSectionAnimationService {
    * Prepare for transition to next section
    */
   private prepareForTransition(): void {
-    const ringContainer = document.querySelector('#trabalhos .ring-container');
-    if (ringContainer) {
-      // Subtle visual feedback that we're about to leave
-      gsap.to(ringContainer, {
-        scale: 0.95,
-        opacity: 0.8,
-        duration: 0.5,
-        ease: 'power2.out'
-      });
-    }
+    // Remove problematic scale/opacity changes that cause visual artifacts
+    console.log('Preparing trabalhos section for transition');
   }
 
   /**
@@ -301,30 +289,12 @@ export class TrabalhosSectionAnimationService {
       trigger: '#trabalhos',
       start: 'bottom 50%',
       onLeave: () => {
-        const ringContainer = document.querySelector('#trabalhos .ring-container');
-        if (ringContainer) {
-          gsap.to(ringContainer, {
-            scale: 0.8,
-            opacity: 0.6,
-            rotateX: -15,
-            y: -50,
-            duration: 0.8,
-            ease: 'power2.in'
-          });
-        }
+        // Remove problematic scaling animations 
+        console.log('Trabalhos section exiting');
       },
       onEnterBack: () => {
-        const ringContainer = document.querySelector('#trabalhos .ring-container');
-        if (ringContainer) {
-          gsap.to(ringContainer, {
-            scale: 1,
-            opacity: 1,
-            rotateX: 0,
-            y: 0,
-            duration: 0.8,
-            ease: 'power2.out'
-          });
-        }
+        // Simple re-entry without scaling
+        console.log('Trabalhos section re-entering');
       }
     });
 
