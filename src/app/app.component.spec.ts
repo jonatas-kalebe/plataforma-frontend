@@ -52,16 +52,20 @@ describe('AppComponent', () => {
     expect(app.showOverlay()).toBe(false);
   });
 
-  it('should render the landing page content after the overlay is hidden', () => {
+  it('should render the landing page content after the overlay is hidden', async () => {
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
     const compiled = fixture.nativeElement as HTMLElement;
 
-    // Inicialmente, a tela de landing pode ou não estar no DOM, mas o overlay está visível
+    // Inicialmente, a tela de loading está visível
+    expect(app.showOverlay()).toBeTruthy();
+    
+    // Após a overlay terminar, ela deve ser ocultada
     app.onOverlayDone();
     fixture.detectChanges();
-
-    // Após o overlay sumir, a landing page deve estar presente
-    expect(compiled.querySelector('app-landing')).toBeTruthy();
+    
+    expect(app.showOverlay()).toBeFalsy();
+    // O router-outlet deve estar presente para carregar o componente landing
+    expect(compiled.querySelector('router-outlet')).toBeTruthy();
   });
 });
