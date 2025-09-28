@@ -1,9 +1,16 @@
+// Angular Core and Common Imports
 import { Injectable, NgZone, PLATFORM_ID, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
+
+// RxJS Imports
 import { BehaviorSubject, Observable } from 'rxjs';
+
+// GSAP Animation Library Imports
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
+
+// Application Configuration and Services
 import { SCROLL_CONFIG, SECTION_SCROLL_CONFIG } from '../shared/constants/scroll-config.constants';
 import { ScrollTelemetryService } from './scroll-telemetry.service';
 
