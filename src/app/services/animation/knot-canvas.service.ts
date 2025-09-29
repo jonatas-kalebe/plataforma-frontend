@@ -27,6 +27,8 @@ export interface KnotConfig {
   knotFalloff?: number;
   waveFalloff?: number;
 
+  boundsPadding?: number;
+
   // Novo: manter ondas latched quando o usuário para de rolar
   freezeOnIdle?: boolean;
 }
@@ -68,6 +70,8 @@ export class KnotCanvasService {
     waveFalloff: 1.6,
 
     freezeOnIdle: true,
+
+    boundsPadding: 16
   };
 
   private readonly platformId = inject(PLATFORM_ID);
@@ -358,9 +362,21 @@ export class KnotCanvasService {
     const endX = width * 0.94;
     const lengthX = endX - startX;
 
-    // Fator de “bagunça” (continua igual; só não vamos usar para mudar estilo)
+    // Retângulo seguro interno para garantir que o traço não saia
+    const padCfg = Math.max(0, this.cfg.boundsPadding ?? 16);
+    // Garante que haja espaço suficiente entre start/end
+    const effectivePad = Math.min(padCfg, Math.max(0, (lengthX / 2) - 4));
+    const minX = startX + effectivePad;
+    const maxX = endX - effectivePad;
+    const minY = effectivePad;
+    const maxY = height - effectivePad;
+
+    // Fator de “bagunça” com decaimento. Snap em progress ~1 para linha perfeita
     const fall = Math.max(0.6, this.cfg.globalFalloff ?? 1.0);
-    const wave = Math.pow(1 - this.progress, fall);
+    let wave = Math.pow(1 - this.progress, fall);
+    if (this.progress >= 0.999) {
+      wave = 0; // linha 100% reta ao chegar no fim
+    }
 
     const segments = Math.min(this.offsetsX.length - 1, Math.max(2, this.cfg.segments | 0));
     const path: { x: number; y: number }[] = new Array(segments + 1);
@@ -370,9 +386,29 @@ export class KnotCanvasService {
       const baseX = startX + t * lengthX;
       const baseY = centerY;
 
-      // Importante: só a geometria depende do wave; a aparência não
-      const x = baseX + this.offsetsX[i] * wave;
-      const y = baseY + this.offsetsY[i] * wave;
+      // Offsets calculados
+      const ox0 = this.offsetsX[i] * wave;
+      const oy0 = this.offsetsY[i] * wave;
+
+      // Limites permitidos a partir do ponto base
+      const allowNegX = baseX - minX;
+      const allowPosX = maxX - baseX;
+      const allowNegY = baseY - minY;
+      const allowPosY = maxY - baseY;
+
+      // Fatores de escala para manter dentro da caixa
+      let sX = 1;
+      if (ox0 < 0 && allowNegX < Math.abs(ox0)) sX = allowNegX / Math.max(1e-6, Math.abs(ox0));
+      else if (ox0 > 0 && allowPosX < Math.abs(ox0)) sX = allowPosX / Math.max(1e-6, Math.abs(ox0));
+
+      let sY = 1;
+      if (oy0 < 0 && allowNegY < Math.abs(oy0)) sY = allowNegY / Math.max(1e-6, Math.abs(oy0));
+      else if (oy0 > 0 && allowPosY < Math.abs(oy0)) sY = allowPosY / Math.max(1e-6, Math.abs(oy0));
+
+      const s = Math.max(0, Math.min(1, Math.min(sX, sY)));
+
+      const x = baseX + ox0 * s;
+      const y = baseY + oy0 * s;
 
       path[i] = { x, y };
     }
@@ -407,38 +443,6 @@ export class KnotCanvasService {
     ctx.stroke();
   }
 
-// --- Opcional: mantenha a strokePathSmooth original no arquivo, mas não a chame em draw() ---
-  private pathHasBacktracking(path: { x: number; y: number }[], baseStep: number): boolean {
-    const tol = Math.max(0.4, baseStep * 0.15);
-    for (let i = 0; i < path.length - 1; i++) {
-      if (path[i + 1].x < path[i].x - tol) return true;
-    }
-    return false;
-  }
-
-  private strokePath(ctx: CanvasRenderingContext2D, path: { x: number; y: number }[], smooth: boolean) {
-    const n = path.length;
-    if (n < 2) return;
-
-    if (!smooth) {
-      ctx.beginPath();
-      ctx.moveTo(path[0].x, path[0].y);
-      for (let i = 1; i < n; i++) ctx.lineTo(path[i].x, path[i].y);
-      ctx.stroke();
-      return;
-    }
-
-    ctx.beginPath();
-    ctx.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i < n - 2; i++) {
-      const xc = (path[i].x + path[i + 1].x) / 2;
-      const yc = (path[i].y + path[i + 1].y) / 2;
-      ctx.quadraticCurveTo(path[i].x, path[i].y, xc, yc);
-    }
-    ctx.quadraticCurveTo(path[n - 2].x, path[n - 2].y, path[n - 1].x, path[n - 1].y);
-    ctx.stroke();
-  }
-
   // --- utils determinísticos ---
 
   private jittered(rnd: () => number, base: number, amount: number): number {
@@ -469,9 +473,4 @@ export class KnotCanvasService {
   private clamp01(v: number): number {
     return Math.max(0, Math.min(1, v));
   }
-
-  private smoothstep(edge0: number, edge1: number, x: number): number {
-    const t = this.clamp01((x - edge0) / (edge1 - edge0));
-    return t * t * (3 - 2 * t);
   }
-}
