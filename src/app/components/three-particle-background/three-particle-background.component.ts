@@ -52,6 +52,9 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   private accumPitch = 0;
   private baseSpinX = 0;
   private baseSpinY = 0;
+  private readonly baseParticleColor = new THREE.Color(0x64ffda);
+  private particleColor = new THREE.Color(0x64ffda);
+  private targetParticleColor = new THREE.Color(0x64ffda);
   private animationFrameId = 0;
   private lastTime = 0;
   private accumulator = 0;
@@ -144,10 +147,9 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     const velocityFactor = Math.min(metrics.velocity / 1000, 1);
     this.spin.y += velocityFactor * 0.01;
 
-    // Update particle color based on global progress
-    if (this.particles.material && (this.particles.material as any).color) {
-      const color = this.interpolateColor(metrics.globalProgress);
-      (this.particles.material as any).color.set(color);
+    this.targetParticleColor.copy(this.computeColor(metrics.globalProgress));
+    if (this.prefersReducedMotion) {
+      this.applyParticleColor(1);
     }
 
     // Check for transitions and trigger particle formations
@@ -172,12 +174,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
     // Update particle material color based on scroll progress
     if (this.particles && this.particles.material && this.scrollState) {
-      const color = this.interpolateColor(this.scrollState.globalProgress || 0);
-      // For test compatibility, call set method if available
-      const material = this.particles.material as any;
-      if (material.color && typeof material.color.set === 'function') {
-        material.color.set(color);
-      }
+      this.targetParticleColor.copy(this.computeColor(this.scrollState.globalProgress || 0));
+      this.applyParticleColor(0.35);
     }
 
     // Check for transitions and trigger shape formation (test expects this)
@@ -188,13 +186,35 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   }
 
   // Interpolate color based on scroll progress
-  private interpolateColor(progress: number): number {
-    // Simple color interpolation - can be enhanced
-    const startColor = 0x2d5b8c; // Blue
-    const endColor = 0x8c2d5b;   // Purple
+  private computeColor(progress: number): THREE.Color {
+    const color = this.baseParticleColor.clone();
+    const hsl = { h: 0, s: 0, l: 0 };
+    color.getHSL(hsl);
+    const centered = THREE.MathUtils.clamp(progress, 0, 1) - 0.5;
+    const hueOffset = THREE.MathUtils.clamp(centered * 0.08, -0.08, 0.08);
+    const saturationOffset = THREE.MathUtils.clamp(centered * 0.12, -0.12, 0.12);
+    const lightnessOffset = THREE.MathUtils.clamp(centered * 0.18, -0.18, 0.18);
+    color.setHSL(
+      THREE.MathUtils.euclideanModulo(hsl.h + hueOffset, 1),
+      THREE.MathUtils.clamp(hsl.s + saturationOffset, 0.25, 1),
+      THREE.MathUtils.clamp(hsl.l + lightnessOffset, 0, 1)
+    );
+    return color;
+  }
 
-    // Simple linear interpolation for demonstration
-    return Math.floor(startColor + (endColor - startColor) * progress);
+  private applyParticleColor(lerpFactor: number): void {
+    if (!this.particles?.material) return;
+    const material = this.particles.material as any;
+    if (!material.color) return;
+
+    this.particleColor.lerp(this.targetParticleColor, THREE.MathUtils.clamp(lerpFactor, 0, 1));
+    if (typeof material.color.copy === 'function') {
+      material.color.copy(this.particleColor);
+    } else if (typeof material.color.set === 'function') {
+      material.color.set(this.particleColor.getHex());
+    } else {
+      material.color = this.particleColor.getHex();
+    }
   }
 
   @HostListener('window:resize')
@@ -284,11 +304,13 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       opacity: 0.6,
       blending: ThreeInstance.NormalBlending,
       depthWrite: false,
-      color: 0x2d5b8c
+      color: this.baseParticleColor.getHex()
     });
     this.particles = new ThreeInstance.Points(geometry, material);
     this.particles.frustumCulled = false;
     this.scene.add(this.particles);
+    this.particleColor.copy(this.baseParticleColor);
+    this.targetParticleColor.copy(this.baseParticleColor);
     if (this.prefersReducedMotion) this.renderer.render(this.scene, this.camera);
   }
 
@@ -394,6 +416,11 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       const baseOpacity = 0.6;
       const scrollOpacityBoost = progressModulator * 0.2;
       (this.particles.material as any).opacity = Math.min(baseOpacity + scrollOpacityBoost, 0.8);
+    }
+
+    if (this.particles.material) {
+      this.targetParticleColor.copy(this.computeColor(progressModulator));
+      this.applyParticleColor(0.08);
     }
 
     this.accumulator += dt;
