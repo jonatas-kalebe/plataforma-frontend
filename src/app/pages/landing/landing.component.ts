@@ -1,10 +1,11 @@
-import {AfterViewInit, Component, ElementRef, inject, NgZone, OnDestroy, PLATFORM_ID, ViewChild} from '@angular/core';
+import {AfterViewInit, Component, ElementRef, inject, NgZone, OnDestroy, PLATFORM_ID, ViewChild, OnInit} from '@angular/core';
 import {CommonModule, isPlatformBrowser} from '@angular/common';
 import gsap from 'gsap';
 import {ScrollTrigger} from 'gsap/ScrollTrigger';
 import {ScrollToPlugin} from 'gsap/ScrollToPlugin';
 import {ScrollOrchestrationService, ScrollState} from '../../services/scroll-orchestration.service';
 import {Subject, takeUntil} from 'rxjs';
+import { PreloadService, PreloadStatus } from '../../services/preload.service';
 
 // Import section components
 import {HeroSectionComponent} from '../../components/sections/hero-section/hero-section.component';
@@ -31,7 +32,7 @@ gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
   templateUrl: './landing.component.html',
   styleUrls: ['./landing.component.css']
 })
-export class LandingComponent implements AfterViewInit, OnDestroy {
+export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('knotCanvas', {static: true}) knotCanvas!: ElementRef<HTMLCanvasElement>;
 
   // Estado público para template
@@ -54,8 +55,46 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   // Configurações de acessibilidade
   private prefersReducedMotion = false;
 
+  // Preload service injection
+  private preloadService = inject(PreloadService);
+  public preloadStatus: PreloadStatus = {};
+
   constructor(private scrollService: ScrollOrchestrationService) {
     this.checkReducedMotion();
+  }
+
+  ngOnInit(): void {
+    // Subscribe to preload status updates
+    this.preloadService.status$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(status => {
+        this.preloadStatus = status;
+        console.log('📊 Preload status updated:', status);
+      });
+  }
+
+  /**
+   * Determines if a section should show loading state
+   * Only shows loading for non-critical sections when they haven't been preloaded
+   * and the user came from search (to avoid showing loading after owl animation)
+   */
+  shouldShowLoadingState(sectionName: string): boolean {
+    // Never show loading state for critical sections (hero, filosofia)
+    if (sectionName === 'hero-section' || sectionName === 'filosofia-section') {
+      return false;
+    }
+
+    // Only show loading states for search users and when component is not loaded
+    const isFromSearch = this.preloadService.isFromSearchSource();
+    const componentStatus = this.preloadStatus[sectionName];
+    
+    // Show loading state if:
+    // 1. User came from search (to minimize visible loading)
+    // 2. Component is not loaded yet
+    // 3. Preloading service is still active
+    return isFromSearch && 
+           (!componentStatus || !componentStatus.loaded) && 
+           this.preloadService.isPreloadingActive;
   }
 
   /**

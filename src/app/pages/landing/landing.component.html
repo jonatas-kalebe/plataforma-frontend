@@ -11,21 +11,57 @@
   (sectionReady)="onFilosofiaSectionReady($event)">
 </app-filosofia-section>
 
+<!-- Loading state indicator for non-critical sections when needed -->
+<div *ngIf="shouldShowLoadingState('servicos-section')" 
+     class="section-loading-indicator min-h-screen flex items-center justify-center bg-gray-50">
+  <div class="text-center">
+    <div class="animate-pulse">
+      <div class="h-8 bg-gray-300 rounded w-48 mx-auto mb-4"></div>
+      <div class="h-4 bg-gray-200 rounded w-32 mx-auto"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Serviços Section Component -->
 <app-servicos-section
+  *ngIf="!shouldShowLoadingState('servicos-section')"
   (sectionReady)="onServicosSectionReady($event)"
   (serviceClicked)="onServiceClicked($event)">
 </app-servicos-section>
 
+<!-- Loading state indicator for trabalhos section -->
+<div *ngIf="shouldShowLoadingState('trabalhos-section')" 
+     class="section-loading-indicator min-h-screen flex items-center justify-center bg-gray-50">
+  <div class="text-center">
+    <div class="animate-pulse">
+      <div class="h-8 bg-gray-300 rounded w-48 mx-auto mb-4"></div>
+      <div class="h-4 bg-gray-200 rounded w-32 mx-auto"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Trabalhos Section Component -->
 <app-trabalhos-section
+  *ngIf="!shouldShowLoadingState('trabalhos-section')"
   (ringReady)="onRingReady($event)"
   (cardSelected)="onCardSelected($event)"
   (sectionReady)="onTrabalhosSectionReady($event)">
 </app-trabalhos-section>
 
+<!-- Loading state indicator for CTA section -->
+<div *ngIf="shouldShowLoadingState('cta-section')" 
+     class="section-loading-indicator min-h-screen flex items-center justify-center bg-gray-50">
+  <div class="text-center">
+    <div class="animate-pulse">
+      <div class="h-6 bg-gray-300 rounded w-32 mx-auto mb-4"></div>
+      <div class="h-12 bg-gray-200 rounded w-48 mx-auto"></div>
+    </div>
+  </div>
+</div>
+
 <!-- CTA Section Component -->
 <app-cta-section
+  *ngIf="!shouldShowLoadingState('cta-section')"
   (primaryCtaClicked)="onPrimaryCtaClicked($event)"
   (sectionReady)="onCtaSectionReady($event)">
 </app-cta-section>
