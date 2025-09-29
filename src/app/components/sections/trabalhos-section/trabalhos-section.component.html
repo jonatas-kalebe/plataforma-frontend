@@ -3,15 +3,19 @@
   [attr.data-testid]="testId"
   class="section-base"
   id="trabalhos">
-  <div class="section-content pin-container">
-    <h3 class="trabalhos-title">{{ sectionTitle }}</h3>
+  <div class="section-content pin-container px-4 sm:px-6 lg:px-8">
+    <h3 class="trabalhos-title text-fluid-4xl sm:text-fluid-5xl font-extrabold text-center text-athenity-text-title font-heading mb-6 sm:mb-8">
+      {{ sectionTitle }}
+    </h3>
     <div [attr.data-testid]="'work-showcase'" class="trabalhos-showcase ring-container">
       <app-work-card-ring #workCardRing></app-work-card-ring>
     </div>
-    <div class="mt-6 text-center">
-      <div [style.opacity]="hintOpacity" class="drag-hint">{{ hintText }}</div>
+    <div class="mt-4 sm:mt-6 text-center">
+      <div [style.opacity]="hintOpacity" class="drag-hint text-fluid-sm text-athenity-text-body/70">
+        {{ hintText }}
+      </div>
     </div>
-    <div *ngIf="showAdditionalContent" class="mt-8 text-center">
+    <div *ngIf="showAdditionalContent" class="mt-6 sm:mt-8 text-center">
       <ng-content select="[slot=additional-content]"></ng-content>
     </div>
   </div>

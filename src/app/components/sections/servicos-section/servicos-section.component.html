@@ -5,32 +5,32 @@
   [ngClass]="getSectionClasses()"
   [attr.data-testid]="testId">
   <div class="section-content">
-    <h3 class="text-3xl md:text-4xl font-extrabold text-center text-athenity-text-title font-heading">
+    <h3 class="text-fluid-4xl sm:text-fluid-5xl font-extrabold text-center text-athenity-text-title font-heading mb-4">
       {{ sectionTitle }}
     </h3>
-    <p *ngIf="sectionSubtitle" class="mt-4 text-center text-athenity-text-body">
+    <p *ngIf="sectionSubtitle" class="mt-4 text-center text-athenity-text-body text-fluid-lg max-w-3xl mx-auto px-4 leading-relaxed">
       {{ sectionSubtitle }}
     </p>
-    <div class="mt-14 grid servicos-grid" [ngClass]="getGridClasses()">
+    <div class="mt-10 sm:mt-14 grid-services" [ngClass]="getGridClasses()">
       <div
         *ngFor="let service of services; let i = index; trackBy: trackByService"
         [ngClass]="getCardClass(i)"
-        class="service-card bg-athenity-blue-card p-8 rounded-2xl transition-transform border border-transparent hover:-translate-y-2 hover:shadow-glow hover:border-athenity-green-circuit/60"
+        class="service-card card-base p-6 sm:p-8 transition-transform border border-transparent hover:-translate-y-2 hover:shadow-glow hover:border-athenity-green-circuit/60 touch-target-comfortable cursor-pointer"
         [attr.data-testid]="'service-card-' + i"
         [style.transitionDelay.s]="getCardAnimationDelay(i)"
         (click)="onServiceClick(service, i, $event)">
-        <h4 class="text-2xl text-athenity-green-circuit font-heading font-bold">
+        <h4 class="text-fluid-xl sm:text-fluid-2xl text-athenity-green-circuit font-heading font-bold mb-3">
           {{ service.title }}
         </h4>
-        <p class="mt-4 text-athenity-text-body leading-relaxed">
+        <p class="text-athenity-text-body leading-relaxed text-fluid-sm sm:text-fluid-base">
           {{ service.description }}
         </p>
-        <div *ngIf="service.icon" class="mt-6">
-          <i [ngClass]="service.icon" class="text-3xl text-athenity-green-circuit"></i>
+        <div *ngIf="service.icon" class="mt-4 sm:mt-6">
+          <i [ngClass]="service.icon" class="text-2xl sm:text-3xl text-athenity-green-circuit"></i>
         </div>
       </div>
     </div>
-    <div *ngIf="showAdditionalContent" class="mt-12 text-center">
+    <div *ngIf="showAdditionalContent" class="mt-10 sm:mt-12 text-center">
       <ng-content select="[slot=additional-content]"></ng-content>
     </div>
   </div>

@@ -21,11 +21,25 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   position: relative;
+  
+  /* Ensure touch targets are adequate */
+  min-height: var(--touch-target-comfortable);
+  
+  /* Better touch interaction */
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .service-card:hover {
   /* Base hover state - enhanced by JavaScript */
   transition: all 0.4s ease;
+}
+
+.service-card:active {
+  transform: translateY(0) scale(0.98);
+  transition: transform 0.1s ease;
 }
 
 /* Enhanced magnetic hover effect */
@@ -51,20 +65,44 @@
 @media (max-width: 768px) {
   .service-card {
     transform-style: flat; /* Disable 3D on mobile for performance */
+    padding: var(--spacing-lg) !important;
+    border-radius: var(--radius-lg);
   }
   
   .service-card:active {
     transform: scale(0.98);
     transition: transform 0.1s ease;
   }
+
+  .service-card:hover {
+    transform: translateY(-1px);
+  }
+}
+
+@media (max-width: 480px) {
+  .service-card {
+    padding: var(--spacing-md) !important;
+    min-height: auto;
+  }
 }
 
 .grid-compact {
-  gap: 1rem;
+  gap: var(--spacing-md);
 }
 
 .grid-spacious {
-  gap: 2rem;
+  gap: var(--spacing-lg);
+}
+
+/* Mobile grid adjustments */
+@media (max-width: 768px) {
+  .grid-compact {
+    gap: var(--spacing-sm);
+  }
+  
+  .grid-spacious {
+    gap: var(--spacing-md);
+  }
 }
 
 /* Animation enhancement classes */
@@ -72,6 +110,13 @@
   transform: translateY(-8px) scale(1.05) rotateY(2deg);
   box-shadow: 0 20px 40px rgba(64, 224, 208, 0.3);
   border-color: rgba(64, 224, 208, 0.6);
+}
+
+@media (max-width: 768px) {
+  .service-card.magnetic-hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 10px 20px rgba(64, 224, 208, 0.2);
+  }
 }
 
 /* Reduced motion fallbacks */
@@ -83,6 +128,11 @@
   
   .service-card:hover {
     opacity: 0.9;
+    transform: none !important;
+  }
+  
+  .service-card:active {
+    opacity: 0.8;
     transform: none !important;
   }
 }

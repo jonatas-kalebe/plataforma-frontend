@@ -26,6 +26,12 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform;
   transform-origin: center center;
+  
+  /* Better touch interactions */
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Primary button pulse animation */
@@ -41,6 +47,22 @@
 .cta-buttons a:active {
   transform: scale(0.98) translateY(1px);
   transition: all 0.1s ease;
+}
+
+/* Mobile-specific optimizations */
+@media (max-width: 768px) {
+  .cta-buttons a {
+    /* Reduce 3D effects on mobile */
+    transform-style: flat;
+  }
+  
+  .cta-buttons a:hover {
+    transform: scale(1.02) translateY(-1px);
+  }
+  
+  .cta-buttons a:active {
+    transform: scale(0.98);
+  }
 }
 
 /* Hover magnetic effect for touch devices */
@@ -66,6 +88,18 @@
   }
 }
 
+/* Reduced pulse on mobile for performance */
+@media (max-width: 768px) {
+  @keyframes subtlePulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.9;
+    }
+  }
+}
+
 /* Fade in up animation */
 @keyframes fadeInUp {
   from {
@@ -87,6 +121,41 @@
   flex-direction: row;
 }
 
+/* Mobile responsive layouts */
+@media (max-width: 640px) {
+  .cta-buttons {
+    flex-direction: column !important;
+    gap: var(--spacing-md);
+    width: 100%;
+  }
+  
+  .cta-buttons a {
+    width: 100%;
+    min-width: auto;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .cta-buttons {
+    gap: var(--spacing-sm);
+  }
+}
+
+/* Landscape mobile optimization */
+@media (max-width: 896px) and (orientation: landscape) {
+  .cta-buttons {
+    flex-direction: row !important;
+    gap: var(--spacing-md);
+    justify-content: center;
+  }
+  
+  .cta-buttons a {
+    flex: 1;
+    max-width: 200px;
+  }
+}
+
 /* Reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
   .cta-title, .cta-subtitle, .cta-buttons {
@@ -103,10 +172,9 @@
     transform: none;
     opacity: 0.9;
   }
-}
-
-@media (max-width: 640px) {
-  .cta-buttons {
-    flex-direction: column !important;
+  
+  .cta-buttons a:active {
+    transform: none;
+    opacity: 0.8;
   }
 }

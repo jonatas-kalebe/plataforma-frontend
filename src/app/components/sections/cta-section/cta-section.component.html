@@ -4,50 +4,50 @@
   class="section-base"
   [attr.data-testid]="testId">
   
-  <div class="section-content text-center">
+  <div class="section-content text-center px-4 sm:px-6 lg:px-8">
     
     <!-- Main CTA Title -->
     <h2 
-      class="text-4xl md:text-5xl font-extrabold text-athenity-text-title font-heading cta-title"
+      class="text-fluid-4xl sm:text-fluid-5xl font-extrabold text-athenity-text-title font-heading cta-title"
       [attr.data-testid]="'cta-title'">
       {{ title }}
     </h2>
 
     <!-- Optional Subtitle -->
     <p *ngIf="subtitle" 
-       class="mt-6 text-lg md:text-xl text-athenity-text-body leading-relaxed cta-subtitle"
+       class="mt-4 sm:mt-6 text-fluid-lg sm:text-fluid-xl text-athenity-text-body leading-relaxed cta-subtitle max-w-3xl mx-auto"
        [attr.data-testid]="'cta-subtitle'">
       {{ subtitle }}
     </p>
 
     <!-- CTA Buttons Container -->
-    <div class="cta-buttons mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center"
+    <div class="cta-buttons mt-8 sm:mt-10 flex flex-col sm:flex-row gap-4 justify-center items-stretch sm:items-center max-w-lg mx-auto"
          [attr.data-testid]="'cta-buttons'">
       
       <!-- Primary CTA Button -->
       <a 
         [href]="primaryCta.href"
-        class="bg-athenity-gold text-athenity-blue-deep font-bold py-4 px-8 rounded-xl text-lg hover:opacity-90 transition transform hover:scale-[1.03] shadow-glow"
+        class="btn-primary touch-target-comfortable text-fluid-base sm:text-fluid-lg font-bold py-3 px-6 sm:py-4 sm:px-8 rounded-xl shadow-glow inline-flex items-center justify-center flex-1 sm:flex-initial min-w-[240px]"
         (click)="onPrimaryCtaClick($event)">
-        {{ primaryCta.label }}
+        <span>{{ primaryCta.label }}</span>
       </a>
 
       <!-- Secondary CTA Button (optional) -->
       <a *ngIf="secondaryCta"
         [href]="secondaryCta.href"
-        class="border border-athenity-green-circuit text-athenity-green-circuit font-bold py-4 px-8 rounded-xl text-lg hover:bg-athenity-green-circuit hover:text-athenity-blue-deep transition transform hover:scale-[1.03]"
+        class="btn-secondary touch-target-comfortable text-fluid-base sm:text-fluid-lg font-bold py-3 px-6 sm:py-4 sm:px-8 rounded-xl inline-flex items-center justify-center flex-1 sm:flex-initial min-w-[240px]"
         (click)="onSecondaryCtaClick($event)">
-        {{ secondaryCta.label }}
+        <span>{{ secondaryCta.label }}</span>
       </a>
     </div>
 
     <!-- Optional Additional Content -->
-    <div *ngIf="showAdditionalContent" class="mt-12">
+    <div *ngIf="showAdditionalContent" class="mt-10 sm:mt-12">
       <ng-content select="[slot=additional-content]"></ng-content>
     </div>
 
     <!-- Optional Footer Content -->
-    <div *ngIf="showFooterContent" class="mt-16 pt-8 border-t border-athenity-text-body/20">
+    <div *ngIf="showFooterContent" class="mt-12 sm:mt-16 pt-6 sm:pt-8 border-t border-athenity-text-body/20">
       <ng-content select="[slot=footer-content]"></ng-content>
     </div>
   </div>
