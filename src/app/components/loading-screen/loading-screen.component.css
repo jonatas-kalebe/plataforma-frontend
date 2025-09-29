@@ -33,8 +33,58 @@
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+/* SVG draw animation */
+.svg-container path.svg-draw,
+.svg-container ellipse.svg-draw {
+  animation: drawPath 1s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+}
+
+@keyframes drawPath {
+  from {
+    stroke-dashoffset: 1000;
+    opacity: 0;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
 }
 .svg-container .owl-right-eye path[d*="Z"],
+.svg-container .owl-left-pupil path[d*="Z"] { 
+  stroke: #FFD700 !important; 
+}
 
-.svg-container .owl-left-pupil path[d*="Z"] { stroke: #FFD700 !important; }
+/* Staggered animation delays for SVG elements */
+.svg-container .svg-draw-stagger:nth-child(1) { animation-delay: 0s; }
+.svg-container .svg-draw-stagger:nth-child(2) { animation-delay: 0.1s; }
+.svg-container .svg-draw-stagger:nth-child(3) { animation-delay: 0.2s; }
+.svg-container .svg-draw-stagger:nth-child(4) { animation-delay: 0.3s; }
+.svg-container .svg-draw-stagger:nth-child(5) { animation-delay: 0.4s; }
+.svg-container .svg-draw-stagger:nth-child(6) { animation-delay: 0.5s; }
+.svg-container .svg-draw-stagger:nth-child(7) { animation-delay: 0.6s; }
+.svg-container .svg-draw-stagger:nth-child(8) { animation-delay: 0.7s; }
+.svg-container .svg-draw-stagger:nth-child(9) { animation-delay: 0.8s; }
+.svg-container .svg-draw-stagger:nth-child(10) { animation-delay: 0.9s; }
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .svg-container path.svg-draw,
+  .svg-container ellipse.svg-draw,
+  .svg-container .svg-draw-stagger {
+    animation: none !important;
+    opacity: 1 !important;
+    stroke-dasharray: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+  
+  .loading-overlay {
+    animation: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+}
 

@@ -16,7 +16,6 @@ import {
 import {CommonModule, isPlatformBrowser} from '@angular/common';
 import {HttpClient} from '@angular/common/http';
 import {DomSanitizer, SafeHtml} from '@angular/platform-browser';
-import gsap from 'gsap';
 import {finalize, first} from 'rxjs/operators';
 
 @Component({
@@ -40,7 +39,7 @@ export class LoadingScreenComponent implements OnInit, AfterViewInit, OnDestroy 
   private cdr = inject(ChangeDetectorRef);
   private zone = inject(NgZone);
   private platformId = inject(PLATFORM_ID);
-  private tl: gsap.core.Timeline | null = null;
+  private animationTimeout: number | null = null;
   private isDone = false;
   private onSkip = () => this.skipAnimation();
   private startTime: number = 0;
@@ -88,7 +87,9 @@ export class LoadingScreenComponent implements OnInit, AfterViewInit, OnDestroy 
     if (isPlatformBrowser(this.platformId)) {
       this.hostRef.nativeElement.removeEventListener('click', this.onSkip);
     }
-    this.tl?.kill();
+    if (this.animationTimeout) {
+      clearTimeout(this.animationTimeout);
+    }
   }
 
   private processSvgIds(svgData: string): string {
@@ -117,33 +118,70 @@ export class LoadingScreenComponent implements OnInit, AfterViewInit, OnDestroy 
       return;
     }
 
-    // Use window.gsap if available (for tests), otherwise use imported gsap
-    const gsapInstance = (window as any).gsap || gsap;
+    // Check if user prefers reduced motion
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    gsapInstance.set([svgPaths], {opacity: 0});
-    gsapInstance.set(svgPaths, {
-      strokeDasharray: (i: number, el: any) => this.getPathLength(el),
-      strokeDashoffset: (i: number, el: any) => this.getPathLength(el),
+    if (prefersReducedMotion) {
+      // Skip animation and show content immediately
+      this.showFinalState(svgPaths, overlay);
+      this.finish();
+      return;
+    }
+
+    // Set initial state for all SVG elements
+    svgPaths.forEach((path: Element, index: number) => {
+      const element = path as SVGPathElement | SVGEllipseElement;
+      const pathLength = this.getPathLength(element);
+      
+      // Set initial stroke properties
+      element.style.strokeDasharray = pathLength.toString();
+      element.style.strokeDashoffset = pathLength.toString();
+      element.style.opacity = '0';
+      
+      // Add staggered animation class
+      element.classList.add('svg-draw-stagger');
+      
+      // Set up individual animation timing
+      const delay = index * 100; // 0.1s stagger
+      element.style.animationDelay = `${delay}ms`;
     });
 
-    this.tl = gsapInstance.timeline({onComplete: () => this.finish()});
+    // Start the animation sequence
+    this.startAnimationSequence(overlay, svgPaths);
+  }
 
-    if (this.tl) {
-      this.tl
-        .to(svgPaths, {
-          strokeDashoffset: 0,
-          opacity: 1,
-          duration: 1,
-          ease: 'power2.inOut',
-          stagger: 0.1,
-        })
-        .to({}, {duration: 1.3})
-        .to(overlay, {
-          opacity: 0,
-          duration: 0.5,
-          ease: 'power2.in',
-        });
-    }
+  private startAnimationSequence(overlay: HTMLElement, svgPaths: NodeListOf<Element>): void {
+    // Trigger CSS animations by adding the draw class
+    svgPaths.forEach((path: Element) => {
+      path.classList.add('svg-draw');
+    });
+
+    // Calculate total animation duration (stagger + animation + pause + fade)
+    const staggerTime = svgPaths.length * 100; // 0.1s per element
+    const animationTime = 1000; // 1s animation duration
+    const pauseTime = 1300; // 1.3s pause
+    const totalTime = staggerTime + animationTime + pauseTime;
+
+    // Schedule overlay fade out
+    this.animationTimeout = window.setTimeout(() => {
+      overlay.style.transition = 'opacity 0.5s cubic-bezier(0.4, 0.0, 0.2, 1)';
+      overlay.style.opacity = '0';
+      
+      // Finish after fade completes
+      setTimeout(() => this.finish(), 500);
+    }, totalTime);
+  }
+
+  private showFinalState(svgPaths: NodeListOf<Element>, overlay: HTMLElement): void {
+    svgPaths.forEach((path: Element) => {
+      const element = path as SVGPathElement | SVGEllipseElement;
+      element.style.strokeDasharray = 'none';
+      element.style.strokeDashoffset = '0';
+      element.style.opacity = '1';
+    });
+    
+    overlay.style.opacity = '0';
+    overlay.style.pointerEvents = 'none';
   }
 
   private getPathLength(el: SVGElement): number {
@@ -158,18 +196,17 @@ export class LoadingScreenComponent implements OnInit, AfterViewInit, OnDestroy 
     const overlay = this.hostRef.nativeElement.querySelector('.loading-overlay') as HTMLElement | null;
     const svgPaths = this.hostRef.nativeElement.querySelectorAll('path, ellipse');
     
-    // Use window.gsap if available (for tests), otherwise use imported gsap
-    const gsapInstance = (window as any).gsap || gsap;
-    
-    this.tl?.kill();
+    // Cancel any running animations
+    if (this.animationTimeout) {
+      clearTimeout(this.animationTimeout);
+      this.animationTimeout = null;
+    }
+
+    // Show final state immediately
     if (svgPaths.length > 0) {
-      gsapInstance.killTweensOf(svgPaths);
-      gsapInstance.set(svgPaths, {strokeDashoffset: 0, opacity: 1});
+      this.showFinalState(svgPaths, overlay!);
     }
-    if (overlay) {
-      gsapInstance.killTweensOf(overlay);
-      gsapInstance.set(overlay, {opacity: 0, pointerEvents: 'none'});
-    }
+    
     this.finish();
   }
 
