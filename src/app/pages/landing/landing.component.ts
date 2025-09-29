@@ -69,7 +69,11 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(status => {
         this.preloadStatus = status;
-        console.log('📊 Preload status updated:', status);
+        const loadedCount = Object.values(status).filter(s => s.loaded).length;
+        const totalCount = Object.keys(status).length;
+        if (totalCount > 0) {
+          console.log(`📊 Landing: ${loadedCount}/${totalCount} components loaded`, status);
+        }
       });
   }
 
@@ -84,17 +88,16 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
       return false;
     }
 
-    // Only show loading states for search users and when component is not loaded
     const isFromSearch = this.preloadService.isFromSearchSource();
     const componentStatus = this.preloadStatus[sectionName];
     
-    // Show loading state if:
-    // 1. User came from search (to minimize visible loading)
+    // Only show loading states if:
+    // 1. User came from search (they only get critical components preloaded)
     // 2. Component is not loaded yet
-    // 3. Preloading service is still active
+    // 3. We have preload status data (indicates preloading system is active)
     return isFromSearch && 
            (!componentStatus || !componentStatus.loaded) && 
-           this.preloadService.isPreloadingActive;
+           Object.keys(this.preloadStatus).length > 0;
   }
 
   /**
