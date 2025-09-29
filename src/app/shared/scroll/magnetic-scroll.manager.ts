@@ -106,23 +106,45 @@ export class MagneticScrollManager {
 
     const dir = this.deriveDirection(idx, active.progress);
     const lowSpeed = Math.abs(this.intention.velocity) < 0.25;
+    const veryLowSpeed = Math.abs(this.intention.velocity) < 0.1;
 
-    if (active.progress >= this.SNAP_FWD_THRESHOLD && next && dir !== 'backward') {
+    // Primary snap conditions - more lenient direction checking for better snap behavior
+    if (active.progress >= this.SNAP_FWD_THRESHOLD && next) {
+      // Allow snap if direction is forward or null (stopped), or if we're very close to edge
+      if (dir === 'forward' || dir === null || active.progress >= 0.95) {
+        this.triggerSnap(next, 'forward');
+        return true;
+      }
+    }
+    
+    if (active.progress <= this.SNAP_BACK_THRESHOLD && prev) {
+      // Allow snap if direction is backward or null (stopped), or if we're very close to edge  
+      if (dir === 'backward' || dir === null || active.progress <= 0.05) {
+        this.triggerSnap(prev, 'backward');
+        return true;
+      }
+    }
+
+    // Secondary snap conditions for low speed situations with wider thresholds
+    if (lowSpeed && next && active.progress >= 0.7 && (dir === 'forward' || veryLowSpeed)) {
       this.triggerSnap(next, 'forward');
       return true;
     }
-    if (active.progress <= this.SNAP_BACK_THRESHOLD && prev && dir !== 'forward') {
+    if (lowSpeed && prev && active.progress <= 0.3 && (dir === 'backward' || veryLowSpeed)) {
       this.triggerSnap(prev, 'backward');
       return true;
     }
 
-    if (dir === 'forward' && next && lowSpeed && active.progress >= 1 - this.INTENT_THRESHOLD) {
-      this.triggerSnap(next, 'forward');
-      return true;
-    }
-    if (dir === 'backward' && prev && lowSpeed && active.progress <= this.INTENT_THRESHOLD) {
-      this.triggerSnap(prev, 'backward');
-      return true;
+    // Edge case handling - snap when very close to boundaries regardless of direction
+    if (veryLowSpeed) {
+      if (active.progress >= 1 - this.INTENT_THRESHOLD && next) {
+        this.triggerSnap(next, 'forward');
+        return true;
+      }
+      if (active.progress <= this.INTENT_THRESHOLD && prev) {
+        this.triggerSnap(prev, 'backward');
+        return true;
+      }
     }
 
     return false;
@@ -144,15 +166,18 @@ export class MagneticScrollManager {
 
     const dir = this.deriveDirection(idx, active.progress);
 
-    if (dir === 'forward' && active.progress >= 0.5 && next) {
+    // Use consistent thresholds with the main snap logic
+    // First check for definitive direction-based snapping
+    if (dir === 'forward' && active.progress >= 0.6 && next) {
       this.triggerSnap(next, 'forward');
       return;
     }
-    if (dir === 'backward' && active.progress < 0.5 && prev) {
+    if (dir === 'backward' && active.progress <= 0.4 && prev) {
       this.triggerSnap(prev, 'backward');
       return;
     }
 
+    // Fallback to simple midpoint logic when direction is unclear
     if (active.progress > 0.5 && next) {
       this.triggerSnap(next, 'forward');
     } else if (active.progress <= 0.5 && prev) {

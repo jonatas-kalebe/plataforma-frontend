@@ -245,6 +245,9 @@ export class ScrollOrchestrationService {
     const activeSection = this.metricsManager.findActiveSection(sections);
     const velocity = Math.abs(this.lastScrollY - (window.scrollY || 0));
 
+    // Atualiza snapshot das seções no magnetic scroll manager
+    this.magneticScrollManager.updateSectionsSnapshot(sections);
+
     // Atualiza através do manager
     this.metricsManager.updateMetrics(
       globalProgress,
