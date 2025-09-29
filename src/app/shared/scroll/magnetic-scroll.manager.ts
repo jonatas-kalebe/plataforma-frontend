@@ -15,6 +15,7 @@ export class MagneticScrollManager {
   private lastSectionsSnapshot: ScrollSection[] = [];
   private prevScrollBehaviorHtml: string | null = null;
   private prevScrollBehaviorBody: string | null = null;
+  private lastHighVelocityTime = 0;
 
   // Novos controles de direção
   private directionLock: { dir: Dir; until: number } = { dir: null, until: 0 };
@@ -28,6 +29,8 @@ export class MagneticScrollManager {
   private readonly TOUCH_SNAP_DELAY_MS = 280;
   // Duração do lock de direção quando detecta mudança
   private readonly DIRECTION_LOCK_MS = 350;
+  private readonly HIGH_VELOCITY_THRESHOLD = 45;
+  private readonly HIGH_VELOCITY_GRACE_MS = 400;
 
   constructor(private prefersReducedMotion: boolean = false) {}
 
@@ -80,6 +83,10 @@ export class MagneticScrollManager {
     this.intention.at = now;
     this.lastScrollTime = now;
 
+    if (Math.abs(v) >= this.HIGH_VELOCITY_THRESHOLD) {
+      this.lastHighVelocityTime = now;
+    }
+
     if (newDir && newDir !== prevDir) {
       // Aplica lock para a nova direção
       this.directionLock = { dir: newDir, until: now + this.DIRECTION_LOCK_MS };
@@ -95,6 +102,7 @@ export class MagneticScrollManager {
 
   checkMagneticSnap(sections: ScrollSection[], _globalProgress: number): boolean {
     if (this.prefersReducedMotion || this.snapTimeoutId || this.isAnimating) return false;
+    if (this.shouldSkipSnapDueToVelocity()) return false;
 
     const idx = this.findActiveIndex(sections);
     if (idx === -1) return false;
@@ -133,6 +141,7 @@ export class MagneticScrollManager {
   private onScrollingStopped(): void {
     this.clearScrollStopCheck();
     if (this.prefersReducedMotion || this.snapTimeoutId || this.isAnimating) return;
+    if (this.shouldSkipSnapDueToVelocity()) return;
     if (!this.lastSectionsSnapshot || !this.lastSectionsSnapshot.length) return;
 
     const idx = this.findActiveIndex(this.lastSectionsSnapshot);
@@ -181,10 +190,23 @@ export class MagneticScrollManager {
     }
     this.pendingSnapDirection = null;
     this.directionLock = { dir: null, until: 0 };
+    this.lastHighVelocityTime = 0;
   }
 
   private delayForInput(): number {
     return this.inputMode === 'touch' ? this.TOUCH_SNAP_DELAY_MS : 0;
+  }
+
+  private shouldSkipSnapDueToVelocity(): boolean {
+    if (!this.lastHighVelocityTime) return false;
+
+    const now = Date.now();
+    if (now - this.lastHighVelocityTime > this.HIGH_VELOCITY_GRACE_MS) {
+      this.lastHighVelocityTime = 0;
+      return false;
+    }
+
+    return true;
   }
 
   private scheduleSnapTo(section: ScrollSection, extraDelayMs: number, dir: Exclude<Dir, null>): void {
@@ -192,6 +214,8 @@ export class MagneticScrollManager {
 
     // Não agendar se direção não for permitida
     if (!this.isDirectionAllowed(dir)) return;
+
+    if (this.shouldSkipSnapDueToVelocity()) return;
 
     // Se já existe um snap pendente e for de direção diferente, cancela
     if (this.snapTimeoutId && this.pendingSnapDirection && this.pendingSnapDirection !== dir) {
