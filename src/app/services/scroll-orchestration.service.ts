@@ -67,6 +67,7 @@ export class ScrollOrchestrationService {
     this.metrics$ = this.metricsManager.metrics$;
     this.scrollState$ = this.metricsManager.scrollState$;
 
+
     if (isPlatformBrowser(this.platformId)) {
       this.checkReducedMotion();
       this.detectMobile();
