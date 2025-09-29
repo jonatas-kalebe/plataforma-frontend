@@ -57,6 +57,12 @@ export class ScrollOrchestrationService {
   public readonly metrics$: Observable<ScrollMetrics>;
   public readonly scrollState$: Observable<ScrollState>;
 
+  // Input detection listeners
+  private pointerDownListener?: (event: PointerEvent) => void;
+  private touchStartListener?: (event: TouchEvent) => void;
+  private wheelListener?: (event: WheelEvent) => void;
+  private inputDetectionConfigured = false;
+
   constructor() {
     // Inicializa managers
     this.metricsManager = new ScrollMetricsManager(this.telemetryService);
@@ -117,6 +123,7 @@ export class ScrollOrchestrationService {
     try {
       this.initializeGsap();
       this.setupSections();
+      this.setupInputModeDetection();
       this.setupScrollEventListener();
 
       this.isInitialized = true;
@@ -231,6 +238,7 @@ export class ScrollOrchestrationService {
     this.scrollDirection = velocity > 0 ? 'down' : velocity < 0 ? 'up' : 'none';
     this.lastScrollY = currentScrollY;
 
+    this.magneticScrollManager.notifyScrollActivity();
     // Detecta intenção e verifica snap magnético
     this.magneticScrollManager.detectScrollIntention(velocity);
     this.magneticScrollManager.startScrollStopCheck();
@@ -251,6 +259,11 @@ export class ScrollOrchestrationService {
       activeSection,
       sections,
       this.scrollDirection
+    );
+
+    // Mantém um snapshot para checagem de snap quando o scroll para
+    this.magneticScrollManager.updateSectionsSnapshot(
+      sections.map(section => ({ ...section }))
     );
 
     // Verifica snap magnético
@@ -286,7 +299,61 @@ export class ScrollOrchestrationService {
       this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
         navigator.userAgent
       );
+      if (this.isMobile) {
+        this.magneticScrollManager.setInputMode('touch');
+      }
     }
+  }
+
+  /**
+   * Detecta o tipo de input predominante (mouse x toque) para calibrar atrasos magnéticos
+   */
+  private setupInputModeDetection(): void {
+    if (this.inputDetectionConfigured) return;
+
+    const updateFromPointer = (event: PointerEvent) => {
+      const pointerType = event.pointerType === 'touch' ? 'touch' : 'mouse';
+      this.magneticScrollManager.setInputMode(pointerType);
+      this.magneticScrollManager.notifyScrollActivity();
+    };
+
+    const updateFromTouch = (_event: TouchEvent) => {
+      this.magneticScrollManager.setInputMode('touch');
+      this.magneticScrollManager.notifyScrollActivity();
+    };
+
+    const updateFromWheel = (_event: WheelEvent) => {
+      this.magneticScrollManager.setInputMode('mouse');
+      this.magneticScrollManager.notifyScrollActivity();
+    };
+
+    window.addEventListener('pointerdown', updateFromPointer, { passive: true });
+    window.addEventListener('touchstart', updateFromTouch, { passive: true });
+    window.addEventListener('wheel', updateFromWheel, { passive: true });
+
+    this.pointerDownListener = updateFromPointer;
+    this.touchStartListener = updateFromTouch;
+    this.wheelListener = updateFromWheel;
+    this.inputDetectionConfigured = true;
+  }
+
+  private teardownInputModeDetection(): void {
+    if (!this.inputDetectionConfigured) return;
+
+    if (this.pointerDownListener) {
+      window.removeEventListener('pointerdown', this.pointerDownListener);
+    }
+    if (this.touchStartListener) {
+      window.removeEventListener('touchstart', this.touchStartListener);
+    }
+    if (this.wheelListener) {
+      window.removeEventListener('wheel', this.wheelListener);
+    }
+
+    this.pointerDownListener = undefined;
+    this.touchStartListener = undefined;
+    this.wheelListener = undefined;
+    this.inputDetectionConfigured = false;
   }
 
   /**
@@ -301,6 +368,8 @@ export class ScrollOrchestrationService {
     this.metricsManager.destroy();
     this.magneticScrollManager.destroy();
     this.heroAnimationManager.destroy();
+
+    this.teardownInputModeDetection();
 
     this.isInitialized = false;
   }

@@ -16,6 +16,10 @@ export class MagneticScrollManager {
   private prevScrollBehaviorHtml: string | null = null;
   private prevScrollBehaviorBody: string | null = null;
 
+  private magnetCleanupTimeout: number | null = null;
+  private activeMagnetOut: HTMLElement | null = null;
+  private activeMagnetIn: HTMLElement | null = null;
+
   // Novos controles de direção
   private directionLock: { dir: Dir; until: number } = { dir: null, until: 0 };
   private pendingSnapDirection: Dir | null = null;
@@ -109,20 +113,24 @@ export class MagneticScrollManager {
     // Nunca snap contra a direção corrente
     // Regras "duras" só disparam se a direção NÃO for contrária
     if (active.progress >= this.SNAP_FWD_THRESHOLD && next && dir !== 'backward' && this.isDirectionAllowed('forward')) {
+      this.applyMagnetCue(active, next);
       this.scheduleSnapTo(next, this.delayForInput(), 'forward');
       return true;
     }
     if (active.progress <= this.SNAP_BACK_THRESHOLD && prev && dir !== 'forward' && this.isDirectionAllowed('backward')) {
+      this.applyMagnetCue(active, prev);
       this.scheduleSnapTo(prev, this.delayForInput(), 'backward');
       return true;
     }
 
     // Regras de intenção (simétricas e respeitando direção)
     if (dir === 'forward' && next && lowSpeed && active.progress >= (1 - this.INTENT_THRESHOLD) && this.isDirectionAllowed('forward')) {
+      this.applyMagnetCue(active, next);
       this.scheduleSnapTo(next, this.delayForInput(), 'forward');
       return true;
     }
     if (dir === 'backward' && prev && lowSpeed && active.progress <= this.INTENT_THRESHOLD && this.isDirectionAllowed('backward')) {
+      this.applyMagnetCue(active, prev);
       this.scheduleSnapTo(prev, this.delayForInput(), 'backward');
       return true;
     }
@@ -146,10 +154,12 @@ export class MagneticScrollManager {
 
     // Ao parar, só snappa a favor da direção detectada
     if (dir === 'forward' && active.progress >= this.SNAP_FWD_THRESHOLD && next && this.isDirectionAllowed('forward')) {
+      this.applyMagnetCue(active, next);
       this.scheduleSnapTo(next, this.delayForInput(), 'forward');
       return;
     }
     if (dir === 'backward' && active.progress <= this.SNAP_BACK_THRESHOLD && prev && this.isDirectionAllowed('backward')) {
+      this.applyMagnetCue(active, prev);
       this.scheduleSnapTo(prev, this.delayForInput(), 'backward');
       return;
     }
@@ -181,6 +191,7 @@ export class MagneticScrollManager {
     }
     this.pendingSnapDirection = null;
     this.directionLock = { dir: null, until: 0 };
+    this.clearMagnetCue();
   }
 
   private delayForInput(): number {
@@ -245,6 +256,47 @@ export class MagneticScrollManager {
     }
     if ('vibrate' in navigator) try { navigator.vibrate?.(20); } catch {}
     this.performSmoothScroll(targetY, this.SNAP_DURATION_MS);
+  }
+
+  private applyMagnetCue(current: ScrollSection | null, target: ScrollSection | null): void {
+    if (this.prefersReducedMotion) return;
+    if (!target?.element) return;
+
+    this.clearMagnetCue();
+
+    const outEl = current?.element ?? null;
+    const inEl = target.element;
+
+    if (outEl) {
+      outEl.classList.add('magnet-transition-out');
+      this.activeMagnetOut = outEl;
+    }
+
+    inEl.classList.add('magnet-transition-in');
+    inEl.setAttribute('data-magnet-state', 'incoming');
+    this.activeMagnetIn = inEl;
+
+    const cleanupDelay = this.SNAP_DURATION_MS + 200;
+    this.magnetCleanupTimeout = window.setTimeout(() => this.clearMagnetCue(), cleanupDelay);
+  }
+
+  private clearMagnetCue(): void {
+    if (this.magnetCleanupTimeout) {
+      clearTimeout(this.magnetCleanupTimeout);
+      this.magnetCleanupTimeout = null;
+    }
+
+    if (this.activeMagnetOut) {
+      this.activeMagnetOut.classList.remove('magnet-transition-out');
+      this.activeMagnetOut.removeAttribute('data-magnet-state');
+      this.activeMagnetOut = null;
+    }
+
+    if (this.activeMagnetIn) {
+      this.activeMagnetIn.classList.remove('magnet-transition-in');
+      this.activeMagnetIn.removeAttribute('data-magnet-state');
+      this.activeMagnetIn = null;
+    }
   }
 
   private performSmoothScroll(targetY: number, durationMs: number): void {

@@ -68,6 +68,16 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   private spin = { x: 0, y: 0 };
   private scrollVelocity = 0;
 
+  // Shape formation state
+  private shapeTargets: Float32Array | null = null;
+  private shapeBlend = 0;
+  private shapeActive = false;
+  private shapeStartTime = 0;
+  private lastShapeTrigger = 0;
+  private readonly shapeInDuration = 520;
+  private readonly shapeHoldDuration = 220;
+  private readonly shapeOutDuration = 520;
+
   constructor(private el: ElementRef, private ngZone: NgZone, private scrollService: ScrollOrchestrationService) {}
 
   ngOnInit(): void {
@@ -115,9 +125,27 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   // Method expected by tests for particle shape formation
   private formShape(shape?: string): void {
-    // Implementation for particle shape formation during transitions
-    // This would animate particles to form specific shapes (like logo/text)
-    // For now, just a placeholder that the tests can spy on
+    if (!this.particles || this.prefersReducedMotion) return;
+    if (!this.shapeTargets || !this.shapeTargets.length) return;
+
+    const now = performance.now();
+    const totalDuration = this.shapeInDuration + this.shapeHoldDuration + this.shapeOutDuration;
+
+    // Avoid retriggering too aggressively while an existing shape animation is active
+    if (this.shapeActive && now - this.shapeStartTime < totalDuration * 0.6) {
+      this.lastShapeTrigger = now;
+      return;
+    }
+
+    if (now - this.lastShapeTrigger < 350) {
+      return;
+    }
+
+    if (shape === 'transition') {
+      this.shapeActive = true;
+      this.shapeStartTime = now;
+      this.lastShapeTrigger = now;
+    }
   }
 
   // Method expected by tests to detect transitions
@@ -290,6 +318,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.particles.frustumCulled = false;
     this.scene.add(this.particles);
     if (this.prefersReducedMotion) this.renderer.render(this.scene, this.camera);
+
+    this.shapeTargets = this.generateShapeTargets(particleCount);
   }
 
   private createParticleTexture(): any {
@@ -396,6 +426,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       (this.particles.material as any).opacity = Math.min(baseOpacity + scrollOpacityBoost, 0.8);
     }
 
+    this.updateShapeState(now);
+
     this.accumulator += dt;
     let sub = 0;
     while (this.accumulator >= this.dtFixed && sub < 3) {
@@ -446,9 +478,25 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       }
       v[i] += totalForceX * 0.05;
       v[i + 1] += totalForceY * 0.05;
-      v[i] += (this.originalPositions[i] - positions[i]) * 0.0005;
-      v[i + 1] += (this.originalPositions[i + 1] - positions[i + 1]) * 0.0005;
-      v[i + 2] += (this.originalPositions[i + 2] - positions[i + 2]) * 0.0005;
+
+      const baseX = this.originalPositions[i];
+      const baseY = this.originalPositions[i + 1];
+      const baseZ = this.originalPositions[i + 2];
+
+      let targetX = baseX;
+      let targetY = baseY;
+      let targetZ = baseZ;
+
+      if (this.shapeBlend > 0 && this.shapeTargets) {
+        targetX = baseX * (1 - this.shapeBlend) + this.shapeTargets[i] * this.shapeBlend;
+        targetY = baseY * (1 - this.shapeBlend) + this.shapeTargets[i + 1] * this.shapeBlend;
+        targetZ = baseZ * (1 - this.shapeBlend) + this.shapeTargets[i + 2] * this.shapeBlend;
+      }
+
+      const attractionStrength = this.shapeBlend > 0 ? 0.0012 : 0.0005;
+      v[i] += (targetX - positions[i]) * attractionStrength;
+      v[i + 1] += (targetY - positions[i + 1]) * attractionStrength;
+      v[i + 2] += (targetZ - positions[i + 2]) * attractionStrength;
       v[i] *= friction;
       v[i + 1] *= friction;
       v[i + 2] *= friction;
@@ -457,6 +505,79 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
       positions[i + 2] += v[i + 2];
     }
     (this.particles.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+  }
+
+  private updateShapeState(now: number): void {
+    if (!this.shapeTargets) return;
+
+    if (this.shapeActive) {
+      const elapsed = now - this.shapeStartTime;
+      const introEnd = this.shapeInDuration;
+      const holdEnd = introEnd + this.shapeHoldDuration;
+      const outroEnd = holdEnd + this.shapeOutDuration;
+
+      if (elapsed <= introEnd) {
+        const t = elapsed / introEnd;
+        this.shapeBlend = this.easeInOut(t);
+      } else if (elapsed <= holdEnd) {
+        this.shapeBlend = 1;
+      } else if (elapsed <= outroEnd) {
+        const t = (elapsed - holdEnd) / this.shapeOutDuration;
+        this.shapeBlend = 1 - this.easeInOut(t);
+      } else {
+        this.shapeBlend = 0;
+        this.shapeActive = false;
+      }
+    } else if (this.shapeBlend > 0) {
+      this.shapeBlend = Math.max(0, this.shapeBlend - 0.04);
+    }
+  }
+
+  private easeInOut(t: number): number {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  private generateShapeTargets(count: number): Float32Array {
+    const targets = new Float32Array(count * 3);
+    const outerCount = Math.floor(count * 0.6);
+    const innerCount = Math.max(0, count - outerCount);
+    const outerRadius = 42;
+    const eyeRadius = 14;
+
+    for (let i = 0; i < count; i++) {
+      let x = 0;
+      let y = 0;
+      let z = 0;
+
+      if (i < outerCount) {
+        const ratio = outerCount > 1 ? i / (outerCount - 1) : 0;
+        const angle = ratio * Math.PI * 2 * 1.1;
+        const radiusMod = outerRadius * (0.7 + 0.3 * Math.sin(ratio * Math.PI * 4));
+        x = Math.cos(angle) * radiusMod;
+        y = Math.sin(angle) * radiusMod * 0.6;
+        z = Math.sin(angle * 2) * 8;
+      } else {
+        const innerIndex = i - outerCount;
+        const leftCount = Math.ceil(innerCount / 2);
+        const rightCount = Math.max(0, innerCount - leftCount);
+        const isLeft = innerIndex < leftCount;
+        const localIdx = isLeft ? innerIndex : innerIndex - leftCount;
+        const eyeCount = isLeft ? leftCount : rightCount;
+        const eyeSide = isLeft ? -18 : 18;
+        const localRatio = eyeCount > 1 ? localIdx / (eyeCount - 1) : 0;
+        const angle = localRatio * Math.PI * 2;
+        const radius = eyeRadius * (0.65 + 0.25 * Math.cos(localRatio * Math.PI * 3));
+        x = eyeSide + Math.cos(angle) * radius;
+        y = Math.sin(angle) * radius * 0.85;
+        z = Math.sin(angle * 3) * 5;
+      }
+
+      targets[i * 3] = x;
+      targets[i * 3 + 1] = y;
+      targets[i * 3 + 2] = z;
+    }
+
+    return targets;
   }
 
   /**
