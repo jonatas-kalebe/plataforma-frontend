@@ -6,6 +6,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 @Injectable({
   providedIn: 'root'
 })
+
 export class ServicosAnimationService {
   private readonly platformId = inject(PLATFORM_ID);
   private isBrowser: boolean;
@@ -15,7 +16,7 @@ export class ServicosAnimationService {
 
   constructor() {
     this.isBrowser = isPlatformBrowser(this.platformId);
-    
+
     if (this.isBrowser) {
       this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     }
@@ -29,7 +30,7 @@ export class ServicosAnimationService {
     if (!this.isBrowser) return;
 
     const cardsArray = Array.from(cards);
-    
+
     // Initial state - cards hidden and translated
     gsap.set(cardsArray, {
       opacity: 0,
@@ -83,7 +84,7 @@ export class ServicosAnimationService {
     cardsArray.forEach((card, index) => {
       // Different parallax speeds for visual depth
       const speed = 1 + (index * 0.1);
-      
+
       const trigger = ScrollTrigger.create({
         trigger: '#servicos',
         start: 'top bottom',
@@ -91,13 +92,13 @@ export class ServicosAnimationService {
         scrub: true,
         onUpdate: (self) => {
           const progress = self.progress;
-          
+
           // Subtle parallax movement that drifts cards upward
           // Extra 30px upward movement when section is scrolled further (as specified)
           const baseMove = (progress - 0.5) * 20 * speed;
           const extraDrift = progress > 0.5 ? (progress - 0.5) * 30 : 0;
           const totalMove = baseMove - extraDrift; // Negative for upward drift
-          
+
           gsap.set(card, {
             y: totalMove,
             rotateX: (progress - 0.5) * 1.5, // Reduced for subtlety
@@ -141,10 +142,10 @@ export class ServicosAnimationService {
             ease: 'power2.out'
           });
         }
-        
+
         // Enhanced glow effect that feels rewarding
         gsap.to(card, {
-          boxShadow: this.prefersReducedMotion 
+          boxShadow: this.prefersReducedMotion
             ? '0 10px 30px rgba(64, 224, 208, 0.2)'
             : '0 20px 40px rgba(64, 224, 208, 0.3), 0 0 20px rgba(64, 224, 208, 0.1)',
           borderColor: 'rgba(64, 224, 208, 0.6)',
@@ -164,7 +165,7 @@ export class ServicosAnimationService {
           duration: 0.4,
           ease: 'power2.out'
         });
-        
+
         // Remove glow
         gsap.to(card, {
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
@@ -180,14 +181,14 @@ export class ServicosAnimationService {
         if (navigator.vibrate) {
           navigator.vibrate(50); // Short, subtle vibration as specified
         }
-        
+
         // Visual feedback for touch - scale up slightly
         gsap.to(card, {
           scale: this.prefersReducedMotion ? 1.01 : 1.02,
           duration: 0.2,
           ease: 'power2.out'
         });
-        
+
         // Add subtle glow on touch
         gsap.to(card, {
           boxShadow: '0 8px 25px rgba(64, 224, 208, 0.15)',
@@ -195,7 +196,7 @@ export class ServicosAnimationService {
           duration: 0.2,
           ease: 'power2.out'
         });
-        
+
         // Prevent mouse events on touch devices
         e.preventDefault();
       });
@@ -206,7 +207,7 @@ export class ServicosAnimationService {
           duration: 0.3,
           ease: 'power2.out'
         });
-        
+
         // Remove touch glow
         gsap.to(card, {
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
@@ -223,10 +224,10 @@ export class ServicosAnimationService {
             const rect = card.getBoundingClientRect();
             const centerX = rect.left + rect.width / 2;
             const centerY = rect.top + rect.height / 2;
-            
+
             const deltaX = (e.clientX - centerX) / (rect.width / 2);
             const deltaY = (e.clientY - centerY) / (rect.height / 2);
-            
+
             // Subtle magnetic attraction to cursor
             gsap.to(card, {
               rotateX: deltaY * -3, // Reduced intensity for subtlety
@@ -258,19 +259,19 @@ export class ServicosAnimationService {
       scrub: 0.5,
       onUpdate: (self) => {
         const progress = self.progress;
-        
+
         // Brief pin at 50% for reading focus (20% viewport height as specified)
         if (progress > 0.45 && progress < 0.55) {
           // Slow down scroll in the middle for content absorption
           self.scroll(self.start + (self.end - self.start) * 0.5);
         }
-        
+
         // Visual feedback for the floating cards effect
         const cards = document.querySelectorAll('#servicos .service-card');
         cards.forEach((card, i) => {
           const cardProgress = Math.min(1, Math.max(0, progress + (i * 0.1)));
           const floatIntensity = Math.sin(cardProgress * Math.PI) * 5;
-          
+
           gsap.set(card, {
             y: `+=${floatIntensity}`,
             rotateY: cardProgress * 2,
