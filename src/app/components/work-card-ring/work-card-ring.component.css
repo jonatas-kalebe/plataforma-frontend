@@ -1,18 +1,20 @@
 :host {
+  --card-w: clamp(160px, 40vmin, 240px);
+  --card-h: calc(var(--card-w) * 0.6);
+  --ring-viewport: clamp(260px, 80vmin, 320px);
+  --font-size: clamp(0.875rem, 2.8vmin, 1.1rem);
   display: block;
-  --card-w: 240px;
-  --card-h: 140px;
-  --ring-viewport: 320px; /* tamanho fixo do .ring; controlado pelo TS */
 }
 
 .ring-wrap {
   perspective: var(--perspective, 1200px);
   display: grid;
   place-items: center;
-  height: 420px;
   width: 100%;
+  height: clamp(280px, 80vmin, 420px);
   position: relative;
-  overflow: visible; /* permite que os cards ultrapassem o .ring */
+  overflow: visible;
+  touch-action: none;
 }
 
 .ring {
@@ -23,6 +25,8 @@
   cursor: grab;
   transform-origin: 50% 50% 0;
   will-change: transform;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .ring:active { cursor: grabbing; }
@@ -32,8 +36,8 @@
   top: 50%;
   left: 50%;
   transform-style: preserve-3d;
-  margin-top: calc(-1 * var(--card-h) / 2);
-  margin-left: calc(-1 * var(--card-w) / 2);
+  margin-top: calc(-0.5 * var(--card-h));
+  margin-left: calc(-0.5 * var(--card-w));
   backface-visibility: visible;
   will-change: transform;
 }
@@ -43,13 +47,12 @@
   height: var(--card-h);
   display: grid;
   place-items: center;
-  background-color: #112240;
-  border: 2px solid #64FFDA;
-  color: #CCD6F6;
+  background: #112240;
+  border: 2px solid #64ffda;
+  color: #ccd6f6;
   border-radius: 1rem;
-  font-size: 1.1rem;
+  font-size: var(--font-size);
   font-weight: 700;
-  position: relative;
   overflow: hidden;
   box-shadow:
     0 0 10px rgba(100, 255, 218, 0.3),
@@ -59,40 +62,40 @@
   backface-visibility: hidden;
 }
 
-.work-card-inner::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(45deg, transparent, rgba(100, 255, 218, 0.12), transparent);
-  transform: rotate(45deg);
-  animation: lightTrail 4s linear infinite;
-  opacity: 0;
-  pointer-events: none;
-}
-
-@keyframes lightTrail {
-  0% { transform: translateX(-100%) rotate(45deg); opacity: 0; }
-  50% { opacity: 0.3; }
-  100% { transform: translateX(100%) rotate(45deg); opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .work-card-inner::before {
+    content: '';
+    position: absolute;
+    inset: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(100, 255, 218, 0.12), transparent);
+    transform: rotate(45deg);
+    animation: lightTrail 4s linear infinite;
+    opacity: 0;
+    pointer-events: none;
+  }
+  @keyframes lightTrail {
+    0% { transform: translateX(-100%) rotate(45deg); opacity: 0; }
+    50% { opacity: 0.3; }
+    100% { transform: translateX(100%) rotate(45deg); opacity: 0; }
+  }
 }
 
 .work-card-inner:hover {
-  border-color: #64FFDA;
+  border-color: #64ffda;
   box-shadow: 0 0 20px rgba(100, 255, 218, 0.5), inset 0 0 15px rgba(100, 255, 218, 0.2);
   transform: rotateY(var(--inner-flip, 0deg)) scale(1.02);
 }
 
-/* Responsivo */
-@media (max-width: 768px) {
-  .ring-wrap { height: 320px; }
-  :host { --card-w: 200px; --card-h: 120px; --ring-viewport: 260px; }
-  .work-card-inner { font-size: 1rem; }
-}
-
-/* Preferência do usuário */
 @media (prefers-reduced-motion: reduce) {
   .work-card-inner { transition: none; }
+}
+
+@media (min-width: 768px) {
+  :host {
+    --card-w: clamp(200px, 35vmin, 240px);
+    --font-size: clamp(1rem, 2.5vmin, 1.1rem);
+  }
+  .ring-wrap { height: clamp(320px, 70vmin, 420px); }
 }

@@ -1,21 +1,5 @@
-import {
-  AfterViewInit,
-  ChangeDetectionStrategy,
-  Component,
-  ElementRef,
-  EventEmitter,
-  Inject,
-  Input,
-  NgZone,
-  OnChanges,
-  OnDestroy,
-  Output,
-  PLATFORM_ID,
-  QueryList,
-  SimpleChanges,
-  ViewChild,
-  ViewChildren,
-} from '@angular/core';
+// work-card-ring.component.ts
+import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, EventEmitter, HostListener, Inject, Input, NgZone, OnChanges, OnDestroy, Output, PLATFORM_ID, QueryList, SimpleChanges, ViewChild, ViewChildren } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 
 type Item = any;
@@ -122,6 +106,12 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.cardEls = this.cardRefs.toArray().map(r => r.nativeElement);
 
     this.setupReducedMotion();
+
+    const style = getComputedStyle(this.hostRef.nativeElement);
+    const vp = parseFloat(style.getPropertyValue('--ring-viewport'));
+    if (!Number.isNaN(vp)) this.ringViewport = vp;
+    this.hostRef.nativeElement.style.setProperty('--ring-viewport', `${this.ringViewport}px`);
+
     this.setupDOM();
     this.applyOrientationFlipVariable();
     this.recomputeBaseRadiusEffective();      // calcula raio de repouso com gap
@@ -395,5 +385,18 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private emitActiveIndex() {
     this.lastEmittedIndex = -1;
     this.maybeEmitIndex();
+  }
+
+  @HostListener('window:resize')
+  onResize() {
+    const style = getComputedStyle(this.hostRef.nativeElement);
+    const vp = parseFloat(style.getPropertyValue('--ring-viewport'));
+    if (!Number.isNaN(vp) && vp !== this.ringViewport) {
+      this.ringViewport = vp;
+      this.hostRef.nativeElement.style.setProperty('--ring-viewport', `${this.ringViewport}px`);
+      this.recomputeBaseRadiusEffective();
+      this.lastRadiusApplied = -1;
+      this.layoutCards(true);
+    }
   }
 }
