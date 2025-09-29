@@ -65,8 +65,8 @@ export class FilosofiaSectionComponent implements AfterViewInit, OnDestroy {
         loopsCount: 36,
         loopRadiusMin: 34,
         loopRadiusMax: 104,
-        noiseAmplitude: 110,
-        harmonics: 9,
+        noiseAmplitude: 120,
+        harmonics: 10,
         tangleMultiplier: 1.6,
 
         // Decaimento mais rápido para “desembaralhar”
@@ -81,7 +81,18 @@ export class FilosofiaSectionComponent implements AfterViewInit, OnDestroy {
         freezeOnIdle: true,
 
         // Mantém o traço dentro da caixa
-        boundsPadding: 18
+        boundsPadding: 18,
+
+        // NOVO: aleatoriedade forte
+        patternChaos: 0.9,
+        reseedOnEveryMove: false,         // NÃO reseed ao iniciar movimento
+        reseedOnLeaveStraight: true,      // SIM: reseed ao sair de "reta"
+        randomizePhases: true,
+
+        // Jitter temporal orgânico (escala suave com o wave interno)
+        timeJitterAmplitude: 6, // px (aumente para 8–10 se quiser mais)
+        timeJitterSpeed: 0.8,
+        timeJitterGranularity: 1.0
       };
       this.knotSvc.initializeKnot(this.knotCanvas.nativeElement, cfg, this.prefersReduced ? 1 : 0);
 
