@@ -34,7 +34,7 @@ export class MagneticScrollManager {
   }
 
   updateSectionsSnapshot(sections: ScrollSection[]): void {
-    this.lastSectionsSnapshot = sections.map(section => ({ ...section }));
+    this.lastSectionsSnapshot = sections;
   }
 
   notifyScrollActivity(): void {
@@ -93,14 +93,6 @@ export class MagneticScrollManager {
   }
 
   checkMagneticSnap(sections: ScrollSection[], _globalProgress: number): boolean {
-    if (!sections.length) {
-      this.lastSectionsSnapshot = [];
-      return false;
-    }
-
-    // Mantém um snapshot fresco para que o handler de scroll parado tenha dados confiáveis
-    this.updateSectionsSnapshot(sections);
-
     if (this.prefersReducedMotion || this.snapTimeoutId || this.isAnimating || Date.now() < this.flingLockUntil) {
       return false;
     }
