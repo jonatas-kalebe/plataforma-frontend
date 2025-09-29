@@ -15,9 +15,9 @@
       <div
         *ngFor="let service of services; let i = index; trackBy: trackByService"
         [ngClass]="getCardClass(i)"
-        class="service-card card-base p-6 sm:p-8 transition-transform border border-transparent hover:-translate-y-2 hover:shadow-glow hover:border-athenity-green-circuit/60 touch-target-comfortable cursor-pointer"
+        class="service-card card-base p-6 sm:p-8 transition-transform border border-transparent hover:shadow-glow hover:border-athenity-green-circuit/60 touch-target-comfortable cursor-pointer"
         [attr.data-testid]="'service-card-' + i"
-        [style.transitionDelay.s]="getCardAnimationDelay(i)"
+        [style.--card-stagger-delay.s]="getCardAnimationDelay(i)"
         (click)="onServiceClick(service, i, $event)">
         <h4 class="text-fluid-xl sm:text-fluid-2xl text-athenity-green-circuit font-heading font-bold mb-3">
           {{ service.title }}
