@@ -2,21 +2,27 @@
   <app-three-particle-background [scrollState]="scrollState"></app-three-particle-background>
 
   <div #heroBg class="absolute inset-0 -z-10"></div>
-  <div class="section-content text-center">
-    <h1 id="hero-title" class="text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter">
+  <div class="section-content text-center px-4 sm:px-6 lg:px-8">
+    <h1 id="hero-title" 
+        class="text-fluid-6xl sm:text-fluid-7xl lg:text-fluid-8xl font-black tracking-tighter leading-tight">
       {{ titlePrefix }}<span class="text-athenity-gold">{{ titleHighlight }}</span>{{ titleSuffix }}
     </h1>
-    <p id="hero-subtitle" class="mt-6 text-lg md:text-xl max-w-2xl text-athenity-text-body mx-auto">
+    <p id="hero-subtitle" 
+       class="mt-4 sm:mt-6 text-fluid-lg sm:text-fluid-xl max-w-2xl text-athenity-text-body mx-auto px-4 leading-relaxed">
       Não criamos sites. Criamos experiências onde o seu cliente é o protagonista.
     </p>
-    <div id="hero-cta" class="mt-10">
+    <div id="hero-cta" class="mt-8 sm:mt-10 px-4">
       <a href="#servicos" 
          data-testid="hero-cta-button"
          (click)="onCtaClick($event)"
-         class="bg-athenity-gold text-athenity-blue-deep font-bold py-4 px-8 rounded-xl text-lg hover:opacity-90 transition transform hover:scale-[1.03] shadow-glow">Explore Nosso Trabalho</a>
+         class="btn-primary touch-target-comfortable text-fluid-base sm:text-fluid-lg font-bold py-3 px-6 sm:py-4 sm:px-8 rounded-xl shadow-glow inline-flex items-center justify-center w-full sm:w-auto min-w-[280px] sm:min-w-[320px]">
+        <span>Explore Nosso Trabalho</span>
+      </a>
     </div>
     <div id="scroll-hint" 
          data-testid="hero-scroll-hint"
-         class="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs uppercase tracking-widest text-athenity-text-body/70">Scroll</div>
+         class="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 text-xs uppercase tracking-widest text-athenity-text-body/70 hidden sm:block">
+      Scroll
+    </div>
   </div>
 </section>
