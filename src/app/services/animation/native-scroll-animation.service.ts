@@ -5,7 +5,7 @@
 
 import { Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { NativeAnimation, NativeAnimationConfig, ScrollTriggerConfig } from './native-animation.class';
+import { NativeAnimation, NativeAnimationConfig, ScrollTriggerConfig } from '../../shared/animation/native-animation.class';
 
 export interface ScrollAnimationConfig extends NativeAnimationConfig {
   selector: string;
@@ -251,10 +251,10 @@ export class NativeScrollAnimationService {
     
     // Remove scroll listeners
     this.scrollListeners.forEach(({ element, handler }) => {
-      if (element === window) {
+      if (element === (window as any)) {
         window.removeEventListener('scroll', handler);
       } else {
-        element.removeEventListener('scroll', handler);
+        (element as HTMLElement).removeEventListener('scroll', handler);
       }
     });
     this.scrollListeners = [];
