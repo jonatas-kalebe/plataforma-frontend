@@ -1,8 +1,5 @@
 import {AfterViewInit, Component, ElementRef, inject, NgZone, OnDestroy, PLATFORM_ID, ViewChild, OnInit} from '@angular/core';
 import {CommonModule, isPlatformBrowser} from '@angular/common';
-import gsap from 'gsap';
-import {ScrollTrigger} from 'gsap/ScrollTrigger';
-import {ScrollToPlugin} from 'gsap/ScrollToPlugin';
 import {ScrollOrchestrationService, ScrollState} from '../../services/scroll-orchestration.service';
 import {Subject, takeUntil} from 'rxjs';
 import { PreloadService, PreloadStatus } from '../../services/preload.service';
@@ -15,15 +12,7 @@ import {TrabalhosSectionComponent} from '../../components/sections/trabalhos-sec
 import {CtaSectionComponent} from '../../components/sections/cta-section/cta-section.component';
 
 // Import new animation system
-import { SectionAnimations } from '../../shared/animation/section-animations.class';
-
-// Configuração global do GSAP (centralizada)
-if (typeof window !== 'undefined') {
-  (window as any).gsap = gsap;
-  (window as any).ScrollTrigger = ScrollTrigger;
-}
-
-gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
+import { NativeSectionAnimations } from '../../shared/animation/native-section-animations.class';
 
 @Component({
   selector: 'app-landing',
@@ -43,7 +32,7 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
   private zone = new NgZone({enableLongStackTrace: false});
 
   // Sistema de animações consolidado
-  private sectionAnimations = new SectionAnimations();
+  private sectionAnimations = new NativeSectionAnimations();
 
   // Canvas e animação do knot
   private knotCtx!: CanvasRenderingContext2D | null;
@@ -118,7 +107,10 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onServicosSectionReady(event: any): void {
     console.log('Serviços section ready:', event);
-    this.initializeServicosAnimations();
+    // Trigger service card animations when section is ready
+    setTimeout(() => {
+      this.sectionAnimations.setupServiceCardAnimations();
+    }, 100);
   }
 
   onServiceClicked(event: { service: any; index: number; event: Event }): void {
@@ -165,7 +157,6 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
 
     cancelAnimationFrame(this.knotId);
     this.sectionAnimations.destroy();
-    ScrollTrigger.getAll().forEach(st => st.kill());
     this.scrollService.destroy();
   }
 
@@ -214,27 +205,6 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  /**
-   * Inicializa animações específicas da seção de serviços
-   * Substituindo múltiplas animações GSAP por sistema consolidado
-   */
-  private initializeServicosAnimations(): void {
-    const serviceCards = document.querySelectorAll('.service-card');
-    serviceCards.forEach((card, index) => {
-      this.sectionAnimations.animateScrollTriggeredElements({
-        selector: `.service-card:nth-child(${index + 1})`,
-        trigger: card as HTMLElement,
-        animationConfig: {
-          y: 40,
-          duration: 0.8,
-          delay: this.prefersReducedMotion ? index * 0.1 : 0
-        },
-        scrollConfig: {
-          start: 'top 85%',
-          end: this.prefersReducedMotion ? 'top 85%' : 'bottom center'
-        }
-      });
-    });
-  }
+
 
 }
