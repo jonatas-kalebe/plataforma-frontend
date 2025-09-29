@@ -3,8 +3,7 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { ThreeParticleBackgroundComponent } from '../../three-particle-background/three-particle-background.component';
 import { SECTION_IDS } from '../../../shared/constants/section.constants';
 import { ScrollOrchestrationService } from '../../../services/scroll-orchestration.service';
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { NativeScrollAnimationService } from '../../../services/animation/native-scroll-animation.service';
 
 @Component({
   selector: 'app-hero-section',
@@ -38,7 +37,8 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
   private heroSubtitle!: HTMLElement;
   private heroCta!: HTMLElement;
   private scrollHint!: HTMLElement;
-  private scrollTriggerInstance: any = null;
+  private nativeScrollService = new NativeScrollAnimationService();
+  private scrollHandler: (() => void) | null = null;
 
   constructor(private scrollService: ScrollOrchestrationService) {}
   
@@ -63,13 +63,16 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (isPlatformBrowser(this.platformId) && this.scrollTriggerInstance) {
-      this.scrollTriggerInstance.kill();
+    if (isPlatformBrowser(this.platformId)) {
+      this.nativeScrollService.destroy();
+      if (this.scrollHandler) {
+        window.removeEventListener('scroll', this.scrollHandler, { passive: true } as any);
+      }
     }
   }
 
   /**
-   * Setup scroll-based resistance and acceleration animations
+   * Setup scroll-based resistance and acceleration animations using native JavaScript
    */
   private setupScrollAnimations(): void {
     if (!this.heroTitle || !this.heroSubtitle) return;
@@ -80,85 +83,82 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    const gsapInstance = (window as any).gsap || gsap;
-    const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
+    // Create native scroll handler for parallax effects
+    this.scrollHandler = () => {
+      this.updateParallaxElements();
+    };
 
-    // Create scroll trigger for hero section with resistance/acceleration behavior
-    this.scrollTriggerInstance = ScrollTriggerInstance.create({
-      trigger: '#hero',
-      start: 'top top',
-      end: 'bottom top',
-      scrub: true,
-      onUpdate: (self: any) => {
-        const progress = self.progress; // 0 to 1
-        
-        if (progress <= 0.2) {
-          // 0-20%: Gentle resistance - small movement
-          const resistanceProgress = progress / 0.2; // 0 to 1 within the resistance zone
-          const resistance = resistanceProgress * 0.2; // Reduced from 0.3 to 0.2 for less movement
-          
-          gsapInstance.set(this.heroTitle, {
-            y: -resistance * 40, // Reduced from 50 to 40px (max ~8px at 20%)
-            opacity: Math.max(0.7, 1 - resistance * 0.3) // Min 0.7 instead of 0.6
-          });
-          
-          gsapInstance.set(this.heroSubtitle, {
-            y: -resistance * 25, // Reduced from 30 to 25px
-            opacity: Math.max(0.8, 1 - resistance * 0.2)
-          });
-        } else {
-          // >20%: Acceleration - progressively larger movement
-          const accelerationProgress = (progress - 0.2) / 0.8; // 0 to 1 within acceleration zone
-          const acceleratedMovement = 0.2 + (accelerationProgress * accelerationProgress * 2); // Quadratic acceleration
-          
-          gsapInstance.set(this.heroTitle, {
-            y: -acceleratedMovement * 100, // Larger movement with acceleration
-            opacity: Math.max(0, 1 - acceleratedMovement * 1.5) // More aggressive fade
-          });
-          
-          gsapInstance.set(this.heroSubtitle, {
-            y: -acceleratedMovement * 80,
-            opacity: Math.max(0, 1 - acceleratedMovement * 1.2)
-          });
-
-          gsapInstance.set(this.heroCta, {
-            y: -acceleratedMovement * 60,
-            opacity: Math.max(0, 1 - acceleratedMovement)
-          });
-        }
+    // Throttle scroll events for performance
+    let ticking = false;
+    const throttledScrollHandler = () => {
+      if (!ticking && this.scrollHandler) {
+        requestAnimationFrame(() => {
+          this.scrollHandler!();
+          ticking = false;
+        });
+        ticking = true;
       }
-    });
+    };
+
+    window.addEventListener('scroll', throttledScrollHandler, { passive: true });
   }
 
   /**
-   * Setup animated scroll hint
+   * Update parallax elements based on scroll position
+   */
+  private updateParallaxElements(): void {
+    const heroSection = document.getElementById('hero');
+    if (!heroSection) return;
+
+    const rect = heroSection.getBoundingClientRect();
+    const windowHeight = window.innerHeight;
+    
+    // Calculate scroll progress (0 = hero starts entering viewport, 1 = hero completely exits)
+    const sectionTop = rect.top;
+    const sectionHeight = rect.height;
+    const progress = Math.max(0, Math.min(1, (windowHeight - sectionTop) / (windowHeight + sectionHeight)));
+
+    if (progress <= 0.2) {
+      // 0-20%: Gentle resistance - small movement
+      const resistanceProgress = progress / 0.2;
+      const resistance = resistanceProgress * 0.2;
+      
+      this.heroTitle.style.transform = `translateY(${-resistance * 40}px)`;
+      this.heroTitle.style.opacity = Math.max(0.7, 1 - resistance * 0.3).toString();
+      
+      this.heroSubtitle.style.transform = `translateY(${-resistance * 25}px)`;
+      this.heroSubtitle.style.opacity = Math.max(0.8, 1 - resistance * 0.2).toString();
+    } else {
+      // >20%: Acceleration - progressively larger movement
+      const accelerationProgress = (progress - 0.2) / 0.8;
+      const acceleratedMovement = 0.2 + (accelerationProgress * accelerationProgress * 2);
+      
+      this.heroTitle.style.transform = `translateY(${-acceleratedMovement * 100}px)`;
+      this.heroTitle.style.opacity = Math.max(0, 1 - acceleratedMovement * 1.5).toString();
+      
+      this.heroSubtitle.style.transform = `translateY(${-acceleratedMovement * 80}px)`;
+      this.heroSubtitle.style.opacity = Math.max(0, 1 - acceleratedMovement * 1.2).toString();
+
+      if (this.heroCta) {
+        this.heroCta.style.transform = `translateY(${-acceleratedMovement * 60}px)`;
+        this.heroCta.style.opacity = Math.max(0, 1 - acceleratedMovement).toString();
+      }
+    }
+
+    // Fade out scroll hint as user scrolls
+    if (this.scrollHint) {
+      this.scrollHint.style.opacity = Math.max(0, 1 - progress * 2).toString();
+    }
+  }
+
+  /**
+   * Setup animated scroll hint using CSS animation
    */
   private setupScrollHintAnimation(): void {
     if (!this.scrollHint) return;
 
-    const gsapInstance = (window as any).gsap || gsap;
-
-    // Create floating animation for scroll hint
-    gsapInstance.to(this.scrollHint, {
-      y: -10,
-      duration: 1.5,
-      ease: 'power2.inOut',
-      repeat: -1,
-      yoyo: true
-    });
-
-    // Fade out scroll hint as user scrolls
-    ScrollTrigger.create({
-      trigger: '#hero',
-      start: 'top top',
-      end: 'bottom top',
-      onUpdate: (self: any) => {
-        const progress = self.progress;
-        gsapInstance.set(this.scrollHint, {
-          opacity: Math.max(0, 1 - progress * 2) // Fade out quickly
-        });
-      }
-    });
+    // Add CSS animation class instead of using GSAP
+    this.scrollHint.classList.add('pulse-float');
   }
 
   /**
@@ -203,28 +203,28 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
       mouseY += (targetY - mouseY) * 0.1;
 
       if (this.heroTitle) {
-        gsap.set(this.heroTitle, {
-          x: mouseX * 15, // Subtle horizontal movement
-          y: mouseY * 10, // Subtle vertical movement
-          rotateX: mouseY * 2,
-          rotateY: mouseX * 2
-        });
+        this.heroTitle.style.transform = `
+          translateX(${mouseX * 15}px) 
+          translateY(${mouseY * 10}px) 
+          rotateX(${mouseY * 2}deg) 
+          rotateY(${mouseX * 2}deg)
+        `;
       }
 
       if (this.heroSubtitle) {
-        gsap.set(this.heroSubtitle, {
-          x: mouseX * 8, // Less movement for subtitle
-          y: mouseY * 5,
-          rotateX: mouseY * 1,
-          rotateY: mouseX * 1
-        });
+        this.heroSubtitle.style.transform = `
+          translateX(${mouseX * 8}px) 
+          translateY(${mouseY * 5}px) 
+          rotateX(${mouseY * 1}deg) 
+          rotateY(${mouseX * 1}deg)
+        `;
       }
 
       if (this.heroCta) {
-        gsap.set(this.heroCta, {
-          x: mouseX * 5,
-          y: mouseY * 3
-        });
+        this.heroCta.style.transform = `
+          translateX(${mouseX * 5}px) 
+          translateY(${mouseY * 3}px)
+        `;
       }
 
       requestAnimationFrame(animateParallax);
@@ -259,21 +259,21 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
       tiltY = (event.beta || 0) / 90; // -1 to 1
 
       if (this.heroTitle) {
-        gsap.set(this.heroTitle, {
-          x: tiltX * 20,
-          y: tiltY * 15,
-          rotateX: tiltY * 3,
-          rotateY: tiltX * 3
-        });
+        this.heroTitle.style.transform = `
+          translateX(${tiltX * 20}px) 
+          translateY(${tiltY * 15}px) 
+          rotateX(${tiltY * 3}deg) 
+          rotateY(${tiltX * 3}deg)
+        `;
       }
 
       if (this.heroSubtitle) {
-        gsap.set(this.heroSubtitle, {
-          x: tiltX * 12,
-          y: tiltY * 8,
-          rotateX: tiltY * 2,
-          rotateY: tiltX * 2
-        });
+        this.heroSubtitle.style.transform = `
+          translateX(${tiltX * 12}px) 
+          translateY(${tiltY * 8}px) 
+          rotateX(${tiltY * 2}deg) 
+          rotateY(${tiltX * 2}deg)
+        `;
       }
     };
 

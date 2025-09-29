@@ -1,4 +1,10 @@
-#hero {
+/* Hero section elements with GPU acceleration */
+#hero-title,
+#hero-subtitle,
+#hero-cta {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform, opacity;
 }
 
 #hero-title {
@@ -12,7 +18,6 @@
 }
 
 #hero-subtitle {
-
   transform: translateY(20px);
   transition: all 0.8s ease 0.2s;
 }
@@ -23,7 +28,6 @@
 }
 
 #hero-cta {
-
   transform: translateY(20px);
   transition: all 0.8s ease 0.4s;
 }
@@ -33,8 +37,12 @@
   transform: translateY(0);
 }
 
-#scroll-hint {
-  animation: scrollHintPulse 2s ease-in-out infinite;
+/* Scroll hint floating animation */
+#scroll-hint,
+.pulse-float {
+  animation: scrollHintPulse 1.5s ease-in-out infinite;
+  transform-origin: center;
+  will-change: transform, opacity;
 }
 
 @keyframes scrollHintPulse {
@@ -44,6 +52,20 @@
   }
   50% {
     opacity: 1;
-    transform: translateX(-50%) translateY(-5px);
+    transform: translateX(-50%) translateY(-10px);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  #hero-title,
+  #hero-subtitle,
+  #hero-cta,
+  #scroll-hint,
+  .pulse-float {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
   }
 }
