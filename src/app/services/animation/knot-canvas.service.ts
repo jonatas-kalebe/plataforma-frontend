@@ -1,6 +1,6 @@
 /**
  * Knot Canvas Service (sem GSAP)
- * Corda extremamente embaraçada com controle separado de nós/ondas e sensível à velocidade.
+ * Mantém forma estável ao parar a rolagem usando latch/histerese de movimento.
  */
 
 import { Injectable, PLATFORM_ID, inject } from '@angular/core';
@@ -24,9 +24,11 @@ export interface KnotConfig {
 
   tangleMultiplier?: number;
   globalFalloff?: number;
-  // Quedas diferenciadas
   knotFalloff?: number;
   waveFalloff?: number;
+
+  // Novo: manter ondas latched quando o usuário para de rolar
+  freezeOnIdle?: boolean;
 }
 
 type Dir = 1 | -1;
@@ -37,7 +39,7 @@ interface LoopDef {
   radius: number;
   dirX: Dir;
   dirY: Dir;
-  twist: number; // 1=círculo, 2=8, 3=triplo
+  twist: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -62,9 +64,10 @@ export class KnotCanvasService {
 
     tangleMultiplier: 1.35,
     globalFalloff: 1.35,
-
     knotFalloff: 0.9,
     waveFalloff: 1.6,
+
+    freezeOnIdle: true,
   };
 
   private readonly platformId = inject(PLATFORM_ID);
@@ -76,15 +79,18 @@ export class KnotCanvasService {
   private loops: LoopDef[] = [];
   private progress = 0;
 
-  // Sensibilidade a movimento (0=parado, 1=rolando)
-  private motion = 0;
+  // Movimento com latch/histerese
+  private motionInput = 0;    // 0..1 (valor instantâneo vindo do componente)
+  private motionLatched = 0;  // 0..1 (valor “congelado” para desenhar)
+  private readonly gateUp = 0.08;  // precisa passar disso para atualizar o latch
+  private readonly gateDown = 0.04; // abaixo disso consideramos “parado”
 
-  // Componentes pré-computados
+  // Componentes dos offsets
   private loopDX: Float32Array = new Float32Array(0);
   private loopDY: Float32Array = new Float32Array(0);
   private waveDX: Float32Array = new Float32Array(0);
   private waveDY: Float32Array = new Float32Array(0);
-  // Compat
+  // Compat total
   private offsetsX: Float32Array = new Float32Array(0);
   private offsetsY: Float32Array = new Float32Array(0);
 
@@ -101,6 +107,10 @@ export class KnotCanvasService {
     this.baseSeed = (typeof this.cfg.seed === 'number')
       ? (this.cfg.seed >>> 0)
       : ((Math.random() * 0x7fffffff) | 0) >>> 0;
+
+    // Inicia latched com 1 (mais “cheio”) para não mudar quando parado
+    this.motionInput = 0;
+    this.motionLatched = 1;
 
     this.setupCanvasDimensions(true);
     this.prepareLoops();
@@ -123,14 +133,34 @@ export class KnotCanvasService {
     this.draw();
   }
 
-  // NOVO: recebe fator de movimento (0..1) e redesenha
+  // Define movimento instantâneo; só atualiza o valor “latched” se passar do gateUp
   setMotion(motion: number): void {
-    this.motion = this.clamp01(motion);
+    this.motionInput = this.clamp01(motion);
+
+    if (!this.cfg.freezeOnIdle) {
+      // Sem “congelar”: usa direto (mantém compat)
+      this.motionLatched = this.motionInput;
+    } else {
+      // Histerese: atualiza latch apenas quando claramente em movimento
+      if (this.motionInput > this.gateUp) {
+        this.motionLatched = this.motionInput;
+      } else if (this.motionInput < this.gateDown) {
+        // fica como está (congelado)
+      } else {
+        // zona morta: não mexe no latched
+      }
+    }
+
     this.draw();
   }
 
   updateConfig(config: Partial<KnotConfig>): void {
+    const freezeFlagBefore = this.cfg.freezeOnIdle;
     this.cfg = { ...this.cfg, ...config };
+    // Se o freezeOnIdle mudou de false->true e estamos parados, congele no valor atual
+    if (!freezeFlagBefore && this.cfg.freezeOnIdle && this.motionInput < this.gateDown) {
+      this.motionLatched = Math.max(this.motionLatched, 0.6); // opcional: assegura forma “cheia”
+    }
     this.prepareLoops();
     this.buildOffsets();
     this.draw();
@@ -163,8 +193,6 @@ export class KnotCanvasService {
     this.offsetsX = new Float32Array(0);
     this.offsetsY = new Float32Array(0);
   }
-
-  // ---------- Internos ----------
 
   private cssWidth(): number {
     if (!this.canvas) return 0;
@@ -238,7 +266,7 @@ export class KnotCanvasService {
         const r = rnd();
         const twist = r > 0.86 ? 3 : (r > 0.58 ? 2 : 1);
 
-        const halfWidth = this.randRange(rnd, 0.06, 0.12); // um pouco mais largos
+        const halfWidth = this.randRange(rnd, 0.055, 0.12);
 
         loops.push({ t, halfWidth, radius, dirX, dirY, twist });
       }
@@ -306,6 +334,8 @@ export class KnotCanvasService {
     }
   }
 
+// ... resto do arquivo inalterado ...
+
   private draw(): void {
     if (!this.canvas || !this.ctx) return;
 
@@ -322,72 +352,62 @@ export class KnotCanvasService {
       ctx.restore();
     }
 
+    // Base reta
     const centerY = height / 2;
     const startX = width * 0.06;
     const endX = width * 0.94;
     const lengthX = endX - startX;
 
-    // Quedas por progresso
-    const fallBase = Math.max(0.6, this.cfg.globalFalloff ?? 1.0);
-    const loopGainBase = Math.pow(1 - this.progress, (this.cfg.knotFalloff ?? fallBase * 0.6));
-    const waveGainBase = Math.pow(1 - this.progress, (this.cfg.waveFalloff ?? fallBase * 1.2));
-
-    // Gating por movimento: parado => ondas ~0; movimentando => 1
-    // Smoothstep para evitar popping
-    const motionGate = this.smoothstep(0.05, 0.22, this.motion);
-    const waveGain = waveGainBase * motionGate;
-    const loopGain = loopGainBase;
+    // Fator de “bagunça” (continua igual; só não vamos usar para mudar estilo)
+    const fall = Math.max(0.6, this.cfg.globalFalloff ?? 1.0);
+    const wave = Math.pow(1 - this.progress, fall);
 
     const segments = Math.min(this.offsetsX.length - 1, Math.max(2, this.cfg.segments | 0));
     const path: { x: number; y: number }[] = new Array(segments + 1);
-
-    const baseStep = lengthX / segments;
 
     for (let i = 0; i <= segments; i++) {
       const t = i / segments;
       const baseX = startX + t * lengthX;
       const baseY = centerY;
 
-      const dx = this.loopDX[i] * loopGain + this.waveDX[i] * waveGain;
-      const dy = this.loopDY[i] * loopGain + this.waveDY[i] * waveGain;
+      // Importante: só a geometria depende do wave; a aparência não
+      const x = baseX + this.offsetsX[i] * wave;
+      const y = baseY + this.offsetsY[i] * wave;
 
-      path[i] = { x: baseX + dx, y: baseY + dy };
+      path[i] = { x, y };
     }
 
-    const hasBacktrack = this.pathHasBacktracking(path, baseStep);
-
+    // Aparência CONSTANTE (não muda quando para)
     const strokeBase = this.cfg.strokeWidth;
     const glowLevels = Math.max(1, this.cfg.glowLevels || 1);
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Suavização só quando há movimento e sem backtracking
-    const useSmooth = !hasBacktrack && (motionGate > 0.25);
 
-    // Glow
-    const chaos = Math.max(loopGain, waveGain);
-    for (let g = glowLevels; g >= 1; g--) {
-      const alpha = 0.07 * g;
-      ctx.strokeStyle = this.hexToRgba(this.cfg.glowColor, alpha);
-      ctx.lineWidth = strokeBase + g * (8 + 4 * chaos);
-      ctx.shadowBlur = 18 * g * (0.6 + 0.4 * chaos);
-      ctx.shadowColor = this.cfg.glowColor;
-      this.strokePath(ctx, path, useSmooth);
-    }
 
-    // Traço principal
-    ctx.strokeStyle = this.cfg.strokeColor;
-    ctx.lineWidth = strokeBase + 1.5;
-    ctx.shadowBlur = 0;
-    this.strokePath(ctx, path, useSmooth);
+    // Traço principal (constante)
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#64FFDA';
+    ctx.shadowColor = 'rgba(100,255,218,0.4)';
+    ctx.shadowBlur = 12;
 
-    // Traço interno
-    ctx.strokeStyle = this.hexToRgba('#FFFFFF', 0.12 + 0.25 * (1 - chaos));
-    ctx.lineWidth = Math.max(1, strokeBase - 0.5);
-    this.strokePath(ctx, path, useSmooth);
+    this.strokePathPolyline(ctx, path);
   }
 
+  // Desenha SEM suavização para não “apagar” nós
+  private strokePathPolyline(ctx: CanvasRenderingContext2D, path: { x: number; y: number }[]) {
+    const n = path.length;
+    if (n < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(path[0].x, path[0].y);
+    for (let i = 1; i < n; i++) {
+      ctx.lineTo(path[i].x, path[i].y);
+    }
+    ctx.stroke();
+  }
+
+// --- Opcional: mantenha a strokePathSmooth original no arquivo, mas não a chame em draw() ---
   private pathHasBacktracking(path: { x: number; y: number }[], baseStep: number): boolean {
     const tol = Math.max(0.4, baseStep * 0.15);
     for (let i = 0; i < path.length - 1; i++) {

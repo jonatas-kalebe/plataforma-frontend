@@ -33,24 +33,24 @@ gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 })
 export class LandingComponent implements AfterViewInit, OnDestroy {
   @ViewChild('knotCanvas', {static: true}) knotCanvas!: ElementRef<HTMLCanvasElement>;
-  
+
   // Estado público para template
   public scrollState: ScrollState | null = null;
-  
+
   // Dependências do Angular
   private readonly platformId = inject(PLATFORM_ID);
   private zone = new NgZone({enableLongStackTrace: false});
-  
+
   // Sistema de animações consolidado
   private sectionAnimations = new SectionAnimations();
-  
+
   // Canvas e animação do knot
   private knotCtx!: CanvasRenderingContext2D | null;
   private knotId = 0;
-  
+
   // Gerenciamento de lifecycle
   private destroy$ = new Subject<void>();
-  
+
   // Configurações de acessibilidade
   private prefersReducedMotion = false;
 
@@ -72,11 +72,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
   onFilosofiaSectionReady(elementRef: ElementRef): void {
     console.log('Filosofia section ready:', elementRef);
-  }
-
-  onKnotCanvasReady(canvas: HTMLCanvasElement): void {
-    console.log('Knot canvas ready:', canvas);
-    this.setupKnotCanvas(canvas);
   }
 
   onServicosSectionReady(event: any): void {
@@ -115,7 +110,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       // Inicialização consolidada dos sistemas
       this.initializeScrollSystem();
       this.initializeSectionAnimations();
-      this.initKnot();
+
     });
   }
 
@@ -125,18 +120,13 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     // Cleanup consolidado e organizado
     this.destroy$.next();
     this.destroy$.complete();
-    
+
     cancelAnimationFrame(this.knotId);
     this.sectionAnimations.destroy();
     ScrollTrigger.getAll().forEach(st => st.kill());
     this.scrollService.destroy();
   }
 
-  private setupKnotCanvas(canvas: HTMLCanvasElement): void {
-    if (!isPlatformBrowser(this.platformId)) return;
-    this.knotCanvas = new ElementRef(canvas);
-    this.initKnot();
-  }
 
   /**
    * Verifica preferências de movimento reduzido
@@ -204,85 +194,5 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       });
     });
   }
-  /**
-   * Inicializa animação do knot (canvas)
-   * Otimizada e simplificada mantendo funcionalidade
-   */
-  private initKnot(): void {
-    if (!isPlatformBrowser(this.platformId) || !this.knotCanvas?.nativeElement) return;
 
-    // Configuração inicial do canvas
-    this.knotCtx = this.knotCanvas.nativeElement.getContext('2d');
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-
-    // Função de redimensionamento otimizada
-    const resize = () => {
-      const el = this.knotCanvas.nativeElement;
-      const rect = el.getBoundingClientRect();
-      el.width = rect.width * dpr;
-      el.height = rect.height * dpr;
-      if (this.knotCtx) this.knotCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    };
-    
-    resize();
-    window.addEventListener('resize', resize);
-
-    // Variáveis de animação
-    let t = 0;
-    
-    // Função de desenho otimizada
-    const draw = () => {
-      const ctx = this.knotCtx;
-      if (!ctx) return;
-      
-      const el = this.knotCanvas.nativeElement;
-      ctx.clearRect(0, 0, el.clientWidth, el.clientHeight);
-      
-      const w = el.clientWidth;
-      const h = el.clientHeight;
-      const cy = h / 2;
-      const pad = 24;
-
-      // Configuração de estilo
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = '#64FFDA';
-      ctx.shadowColor = 'rgba(100,255,218,0.4)';
-      ctx.shadowBlur = 12;
-
-      // Desenho do knot otimizado
-      ctx.beginPath();
-      const segments = 120;
-      for (let i = 0; i <= segments; i++) {
-        const p = i / segments;
-        const x = pad + p * (w - pad * 2);
-        const amp = (1 - t) * (h * 0.4);
-        const freq = 4;
-        const y = cy + Math.sin(p * Math.PI * freq + t * Math.PI * 2) * amp * (1 - Math.abs(0.5 - p) * 1.8);
-
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    };
-
-    // ScrollTrigger usando novo sistema
-    const knotTimeline = gsap.timeline({
-      scrollTrigger: {
-        trigger: '#filosofia',
-        start: 'top bottom',
-        end: this.prefersReducedMotion ? 'top bottom' : 'center center',
-        ...(this.prefersReducedMotion ? {toggleActions: 'play none none reverse'} : {scrub: 1})
-      }
-    });
-
-    knotTimeline.to({val: 0}, {
-      val: 1,
-      duration: this.prefersReducedMotion ? 0.3 : 1.5,
-      ease: 'none',
-      onUpdate: function () {
-        t = (this as any).targets()[0].val;
-        draw();
-      }
-    });
-  }
 }

@@ -1,11 +1,12 @@
-<section id="filosofia" class="section-base">
+<section #sectionEl id="filosofia" class="section-base">
   <div class="section-content grid md:grid-cols-2 gap-12 items-center">
-    <div>
-      <h2 class="text-4xl md:text-5xl font-extrabold">Da Complexidade à Clareza.</h2>
-      <p class="mt-6 leading-relaxed">Transformamos sistemas caóticos em experiências nítidas. Arquitetura, design e engenharia convergem para mover pessoas e negócios.</p>
+    <div #contentLeft class="filosofia-content">
+      <h2 class="text-4xl md:text-5xl font-extrabold">{{ title }}</h2>
+      <p class="mt-6 leading-relaxed">{{ description }}</p>
     </div>
-    <div class="relative">
-      <canvas #knotCanvas class="w-full h-[260px] md:h-[320px] rounded-xl bg-athenity-blue-card"></canvas>
+
+    <div #canvasBox class="filosofia-animation" [class.sticky-pin]="enablePinning">
+      <canvas #knotCanvas class="knot-canvas w-full h-[260px] md:h-[320px] rounded-xl bg-athenity-blue-card"></canvas>
     </div>
   </div>
 </section>
