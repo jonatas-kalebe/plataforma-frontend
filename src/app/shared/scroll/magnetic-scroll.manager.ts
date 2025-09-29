@@ -26,6 +26,9 @@ export class MagneticScrollManager {
   private readonly DIRECTION_LOCK_MS = 350;
   private readonly FLING_VELOCITY_THRESHOLD = 1.8;
   private readonly FLING_LOCK_DURATION_MS = 400;
+  private readonly VIEWPORT_EDGE_THRESHOLD = 0.28;
+  private readonly VIEWPORT_CENTER_THRESHOLD = 0.18;
+  private readonly MIN_PROGRESS_FOR_VIEWPORT_CHECK = 0.05;
 
   constructor(private prefersReducedMotion: boolean = false) {}
 
@@ -34,7 +37,7 @@ export class MagneticScrollManager {
   }
 
   updateSectionsSnapshot(sections: ScrollSection[]): void {
-    this.lastSectionsSnapshot = sections;
+    this.lastSectionsSnapshot = sections.map(section => ({ ...section }));
   }
 
   notifyScrollActivity(): void {
@@ -93,6 +96,14 @@ export class MagneticScrollManager {
   }
 
   checkMagneticSnap(sections: ScrollSection[], _globalProgress: number): boolean {
+    if (!sections.length) {
+      this.lastSectionsSnapshot = [];
+      return false;
+    }
+
+    // Mantém um snapshot fresco para que o handler de scroll parado tenha dados confiáveis
+    this.updateSectionsSnapshot(sections);
+
     if (this.prefersReducedMotion || this.snapTimeoutId || this.isAnimating || Date.now() < this.flingLockUntil) {
       return false;
     }
@@ -103,6 +114,7 @@ export class MagneticScrollManager {
     const active = sections[idx];
     const next = this.getNext(sections, idx);
     const prev = this.getPrev(sections, idx);
+    const viewportData = this.getViewportData(active);
 
     const dir = this.deriveDirection(idx, active.progress);
     const lowSpeed = Math.abs(this.intention.velocity) < 0.25;
@@ -123,6 +135,28 @@ export class MagneticScrollManager {
     if (dir === 'backward' && prev && lowSpeed && active.progress <= this.INTENT_THRESHOLD) {
       this.triggerSnap(prev, 'backward');
       return true;
+    }
+
+    if (viewportData) {
+      const { topRatio, bottomRatio, normalizedCenterOffset } = viewportData;
+      const isNearCenter = Math.abs(normalizedCenterOffset) <= this.VIEWPORT_CENTER_THRESHOLD;
+      const progressViable = (active.progress ?? 0) >= this.MIN_PROGRESS_FOR_VIEWPORT_CHECK;
+
+      if (next && dir !== 'backward' && progressViable) {
+        const nearForwardEdge = topRatio <= this.VIEWPORT_EDGE_THRESHOLD;
+        if (nearForwardEdge || (dir === 'forward' && lowSpeed && isNearCenter)) {
+          this.triggerSnap(next, 'forward');
+          return true;
+        }
+      }
+
+      if (prev && dir !== 'forward' && progressViable) {
+        const nearBackwardEdge = bottomRatio >= 1 - this.VIEWPORT_EDGE_THRESHOLD;
+        if (nearBackwardEdge || (dir === 'backward' && lowSpeed && isNearCenter)) {
+          this.triggerSnap(prev, 'backward');
+          return true;
+        }
+      }
     }
 
     return false;
@@ -241,11 +275,18 @@ export class MagneticScrollManager {
 
   private findActiveIndex(sections: ScrollSection[]): number {
     let best = -1;
-    let bestProgress = -1;
+    let bestScore = -1;
+    const viewportHeight = this.getViewportHeight();
     for (let i = 0; i < sections.length; i++) {
-      const p = sections[i].progress ?? 0;
-      if (p > 0 && p < 1 && p > bestProgress) {
-        bestProgress = p;
+      const section = sections[i];
+      const progress = section.progress ?? 0;
+      const viewportData = this.getViewportData(section, viewportHeight);
+      const centerScore = viewportData
+        ? 1 - Math.min(1, Math.abs(viewportData.normalizedCenterOffset) * 2)
+        : 0;
+      const score = Math.max(progress, centerScore);
+      if (progress > 0 && progress < 1 && score > bestScore) {
+        bestScore = score;
         best = i;
       }
     }
@@ -253,7 +294,17 @@ export class MagneticScrollManager {
     let closest = -1;
     let bestDist = Infinity;
     for (let i = 0; i < sections.length; i++) {
-      const d = Math.abs((sections[i].progress ?? 0) - 0.5);
+      const section = sections[i];
+      const viewportData = this.getViewportData(section, viewportHeight);
+      if (viewportData) {
+        const dist = Math.abs(viewportData.normalizedCenterOffset);
+        if (dist < bestDist) {
+          bestDist = dist;
+          closest = i;
+          continue;
+        }
+      }
+      const d = Math.abs((section.progress ?? 0) - 0.5);
       if (d < bestDist) {
         bestDist = d;
         closest = i;
@@ -288,6 +339,26 @@ export class MagneticScrollManager {
   private getElementPageY(el: Element): number {
     const rect = el.getBoundingClientRect();
     return Math.round(window.scrollY + rect.top);
+  }
+
+  private getViewportData(section: ScrollSection, viewportHeight?: number):
+    | { topRatio: number; bottomRatio: number; normalizedCenterOffset: number }
+    | null {
+    const el = section.element;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    const vh = viewportHeight ?? this.getViewportHeight();
+    if (!vh) return null;
+    const centerOffset = rect.top + rect.height / 2 - vh / 2;
+    return {
+      topRatio: rect.top / vh,
+      bottomRatio: rect.bottom / vh,
+      normalizedCenterOffset: centerOffset / vh
+    };
+  }
+
+  private getViewportHeight(): number {
+    return window.innerHeight || document.documentElement?.clientHeight || 0;
   }
 
   private smoothScrollTo(targetY: number, durationMs: number, onDone?: () => void): void {

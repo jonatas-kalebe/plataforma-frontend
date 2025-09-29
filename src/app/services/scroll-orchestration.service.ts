@@ -254,7 +254,8 @@ export class ScrollOrchestrationService {
       this.scrollDirection
     );
 
-    // Verifica snap magnético
+    // Atualiza snapshot de seções para lógica magnética e verifica snap
+    this.magneticScrollManager.updateSectionsSnapshot(sections);
     this.magneticScrollManager.checkMagneticSnap(sections, globalProgress);
   }
 
