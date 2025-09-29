@@ -11,9 +11,20 @@
 }
 
 .service-card {
-  opacity: 1;
-  transform: translateY(0);
-  transition: all 0.6s ease;
+  --card-opacity: 0;
+  --card-scale: 0.95;
+  --card-translate-x: 0px;
+  --card-translate-y: 60px;
+  --card-parallax: 0px;
+  --card-rotate-x: 0deg;
+  --card-rotate-y: 0deg;
+  --card-stagger-delay: 0s;
+
+  opacity: var(--card-opacity);
+  transform: translate3d(var(--card-translate-x), calc(var(--card-translate-y) + var(--card-parallax)), 0)
+    scale(var(--card-scale)) rotateX(var(--card-rotate-x)) rotateY(var(--card-rotate-y));
+  transition: transform 0.6s ease, opacity 0.6s ease, box-shadow 0.6s ease, border-color 0.6s ease;
+  transition-delay: var(--card-stagger-delay);
   transform-style: preserve-3d;
   backface-visibility: hidden;
   will-change: transform, opacity, box-shadow;
@@ -21,10 +32,10 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   position: relative;
-  
+
   /* Ensure touch targets are adequate */
   min-height: var(--touch-target-comfortable);
-  
+
   /* Better touch interaction */
   touch-action: manipulation;
   user-select: none;
@@ -32,13 +43,19 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.service-card.is-visible {
+  --card-opacity: 1;
+  --card-scale: 1;
+  --card-translate-y: 0px;
+  transition-delay: 0s;
+}
+
 .service-card:hover {
-  /* Base hover state - enhanced by JavaScript */
-  transition: all 0.4s ease;
+  transition-duration: 0.4s;
 }
 
 .service-card:active {
-  transform: translateY(0) scale(0.98);
+  --card-scale: 0.98;
   transition: transform 0.1s ease;
 }
 
@@ -46,10 +63,7 @@
 .service-card::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background: linear-gradient(135deg, rgba(64, 224, 208, 0.05) 0%, rgba(64, 224, 208, 0.02) 100%);
   border-radius: inherit;
   opacity: 0;
@@ -57,8 +71,30 @@
   pointer-events: none;
 }
 
-.service-card:hover::before {
+.service-card:hover::before,
+.service-card.magnetic-hover-active::before,
+.service-card.touch-active::before {
   opacity: 1;
+}
+
+.service-card.magnetic-hover-active {
+  --card-scale: 1.05;
+  --card-translate-y: -8px;
+  box-shadow: 0 20px 40px rgba(64, 224, 208, 0.3);
+  border-color: rgba(64, 224, 208, 0.6);
+}
+
+.service-card.hover-reduced {
+  --card-scale: 1.02;
+  opacity: 0.95;
+  box-shadow: 0 10px 30px rgba(64, 224, 208, 0.2);
+  border-color: rgba(64, 224, 208, 0.3);
+}
+
+.service-card.touch-active {
+  --card-scale: 1.02;
+  box-shadow: 0 8px 25px rgba(64, 224, 208, 0.15);
+  border-color: rgba(64, 224, 208, 0.3);
 }
 
 /* Mobile-specific improvements */
@@ -68,14 +104,15 @@
     padding: var(--spacing-lg) !important;
     border-radius: var(--radius-lg);
   }
-  
-  .service-card:active {
-    transform: scale(0.98);
-    transition: transform 0.1s ease;
+
+  .service-card.magnetic-hover-active {
+    --card-scale: 1.02;
+    --card-translate-y: -4px;
+    box-shadow: 0 10px 20px rgba(64, 224, 208, 0.2);
   }
 
-  .service-card:hover {
-    transform: translateY(-1px);
+  .service-card:active {
+    --card-scale: 0.98;
   }
 }
 
@@ -99,40 +136,41 @@
   .grid-compact {
     gap: var(--spacing-sm);
   }
-  
+
   .grid-spacious {
     gap: var(--spacing-md);
   }
 }
 
-/* Animation enhancement classes */
-.service-card.magnetic-hover {
-  transform: translateY(-8px) scale(1.05) rotateY(2deg);
-  box-shadow: 0 20px 40px rgba(64, 224, 208, 0.3);
-  border-color: rgba(64, 224, 208, 0.6);
+/* Subtle focus styles when the section is highlighted */
+#servicos.servicos-snapping .service-card.is-visible {
+  box-shadow: 0 10px 30px rgba(64, 224, 208, 0.15);
 }
 
-@media (max-width: 768px) {
-  .service-card.magnetic-hover {
-    transform: translateY(-4px) scale(1.02);
-    box-shadow: 0 10px 20px rgba(64, 224, 208, 0.2);
-  }
+#servicos.is-focused {
+  scroll-margin-top: 20vh;
 }
 
 /* Reduced motion fallbacks */
 @media (prefers-reduced-motion: reduce) {
   .service-card {
-    transform: none !important;
+    --card-scale: 1;
+    --card-translate-y: 20px;
     transition: opacity 0.3s ease;
   }
-  
-  .service-card:hover {
-    opacity: 0.9;
-    transform: none !important;
+
+  .service-card.is-visible {
+    --card-translate-y: 0px;
   }
-  
+
+  .service-card:hover,
   .service-card:active {
-    opacity: 0.8;
-    transform: none !important;
+    opacity: 0.9;
+    transform: none;
+  }
+
+  .service-card.magnetic-hover-active {
+    --card-scale: 1.01;
+    --card-translate-y: -2px;
   }
 }
