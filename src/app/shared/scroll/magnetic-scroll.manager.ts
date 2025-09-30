@@ -7,6 +7,10 @@ export interface SnapScrollConfig {
   snapDurationMs: number;
   /** Atraso antes do snap automático ser disparado */
   snapDelayMs: number;
+  /** Atraso adicional aplicado quando o snap é para trás */
+  backwardSnapExtraDelayMs: number;
+  /** Multiplicador aplicado à duração do snap quando voltando para uma seção anterior */
+  backwardSnapDurationMultiplier: number;
   /** Tempo de inatividade antes de forçar snap para a seção mais próxima */
   idleSnapDelayMs: number;
   /** Variação mínima de scroll (px) para considerar que o usuário ainda está se movendo */
@@ -34,6 +38,8 @@ export interface SnapScrollConfig {
 const DEFAULT_SNAP_CONFIG: SnapScrollConfig = {
   snapDurationMs: 850,
   snapDelayMs: 80,
+  backwardSnapExtraDelayMs: 110,
+  backwardSnapDurationMultiplier: 1.2,
   idleSnapDelayMs: 180,
   velocityIgnoreThreshold: 2,
   settleVelocityThreshold: 0.5,
@@ -289,7 +295,8 @@ export class MagneticScrollManager {
       return;
     }
 
-    this.performSmoothScroll(this.getTargetY(element), this.config.snapDurationMs, reason);
+    const duration = this.getSnapDuration(reason);
+    this.performSmoothScroll(this.getTargetY(element), duration, reason);
   }
 
   private performSmoothScroll(targetY: number, durationMs: number, reason: SnapReason): void {
@@ -442,10 +449,20 @@ export class MagneticScrollManager {
     if (reason === SnapReason.Programmatic) {
       return 0;
     }
+    if (reason === SnapReason.BackwardProgress) {
+      return this.config.snapDelayMs + this.config.backwardSnapExtraDelayMs;
+    }
     if (reason === SnapReason.Idle || reason === SnapReason.LowVelocity) {
       return this.config.snapDelayMs + 120;
     }
     return this.config.snapDelayMs;
+  }
+
+  private getSnapDuration(reason: SnapReason): number {
+    if (reason === SnapReason.BackwardProgress) {
+      return Math.round(this.config.snapDurationMs * this.config.backwardSnapDurationMultiplier);
+    }
+    return this.config.snapDurationMs;
   }
 
   private computeAdaptiveDuration(distance: number, baseDuration: number): number {

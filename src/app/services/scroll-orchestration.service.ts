@@ -39,14 +39,16 @@ const SCROLL_SECTION_IDS = ['hero', 'filosofia', 'servicos', 'trabalhos', 'cta']
 const SCROLL_SECTION_SELECTORS = SCROLL_SECTION_IDS.map(id => `#${id}`);
 
 const SNAP_SCROLL_BEHAVIOR: SnapScrollConfig = {
-  snapDurationMs: 880,
-  snapDelayMs: 90,
-  idleSnapDelayMs: 170,
+  snapDurationMs: 920,
+  snapDelayMs: 110,
+  backwardSnapExtraDelayMs: 140,
+  backwardSnapDurationMultiplier: 1.3,
+  idleSnapDelayMs: 210,
   velocityIgnoreThreshold: 1.8,
   settleVelocityThreshold: 0.45,
   flingVelocityThreshold: 140,
-  progressForwardSnap: 0.78,
-  progressBackwardSnap: 0.22,
+  progressForwardSnap: 0.82,
+  progressBackwardSnap: 0.18,
   directionLockMs: 320,
   topOffsetPx: 0,
   align: 'start',
