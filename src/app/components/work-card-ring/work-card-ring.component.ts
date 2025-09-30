@@ -83,7 +83,12 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private dragging = false;
   private pointerId: number | null = null;
   private lastPointerX = 0;
+  private pointerStartX = 0;
+  private pointerStartY = 0;
   private lastMoveTS = 0;
+  private pointerCaptured = false;
+  private gestureMode: 'idle' | 'pending' | 'rotate' | 'scroll' = 'idle';
+  private readonly intentThreshold = 12; // px
 
   private rafId: number | null = null;
   private prevTS = 0;
@@ -165,16 +170,50 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
   // Pointer
   onPointerDown = (ev: PointerEvent) => {
-    this.dragging = true;
     this.pointerId = ev.pointerId;
     this.lastPointerX = ev.clientX;
+    this.pointerStartX = ev.clientX;
+    this.pointerStartY = ev.clientY;
     this.lastMoveTS = ev.timeStamp || performance.now();
-    this.ringEl.setPointerCapture(ev.pointerId);
-    this.ringEl.style.cursor = 'grabbing';
-    this.desiredRotationDeg = null;
+    this.dragging = false;
+    this.pointerCaptured = false;
+    this.gestureMode = ev.pointerType === 'touch' ? 'pending' : 'rotate';
+
+    if (this.gestureMode === 'rotate') {
+      this.beginRotate(ev);
+    } else {
+      this.dragging = false;
+      this.ringEl.style.cursor = 'grab';
+      this.ringEl.style.touchAction = 'pan-y';
+    }
   };
   onPointerMove = (ev: PointerEvent) => {
-    if (!this.dragging || ev.pointerId !== this.pointerId) return;
+    if (ev.pointerId !== this.pointerId) return;
+
+    if (this.gestureMode === 'pending') {
+      const dx = ev.clientX - this.pointerStartX;
+      const dy = ev.clientY - this.pointerStartY;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+
+      if (absDy >= this.intentThreshold && absDy > absDx) {
+        this.gestureMode = 'scroll';
+        this.pointerId = null;
+        this.dragging = false;
+        this.pointerCaptured = false;
+        this.ringEl.style.cursor = 'grab';
+        this.ringEl.style.touchAction = 'pan-y';
+        return;
+      }
+
+      if (absDx >= this.intentThreshold && absDx > absDy) {
+        this.beginRotate(ev);
+      } else {
+        return;
+      }
+    }
+
+    if (!this.dragging || this.gestureMode !== 'rotate') return;
     const now = ev.timeStamp || performance.now();
     const dx = ev.clientX - this.lastPointerX;
     const dt = Math.max(1, now - this.lastMoveTS) / 1000;
@@ -186,12 +225,40 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.angularVelocity = deltaDeg / dt;
   };
   onPointerUp = (ev: PointerEvent) => {
-    if (ev.pointerId !== this.pointerId) return;
+    if (this.pointerId != null && ev.pointerId !== this.pointerId) return;
+
+    if (this.pointerCaptured) {
+      try {
+        this.ringEl.releasePointerCapture(ev.pointerId);
+      } catch {
+        // Ignore if capture was already released
+      }
+    }
+
     this.dragging = false;
     this.pointerId = null;
-    this.ringEl.releasePointerCapture(ev.pointerId);
+    this.pointerCaptured = false;
+    this.gestureMode = 'idle';
     this.ringEl.style.cursor = 'grab';
+    this.ringEl.style.touchAction = 'pan-y';
   };
+
+  private beginRotate(ev: PointerEvent) {
+    this.dragging = true;
+    this.gestureMode = 'rotate';
+    this.pointerId = ev.pointerId;
+    this.lastPointerX = ev.clientX;
+    this.lastMoveTS = ev.timeStamp || performance.now();
+    try {
+      this.ringEl.setPointerCapture(ev.pointerId);
+      this.pointerCaptured = true;
+    } catch {
+      this.pointerCaptured = false;
+    }
+    this.ringEl.style.cursor = 'grabbing';
+    this.ringEl.style.touchAction = 'none';
+    this.desiredRotationDeg = null;
+  }
 
   // Wheel
   private wheelHandler = (ev: WheelEvent) => {
@@ -209,7 +276,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.hostRef.nativeElement.style.setProperty('--ring-viewport', `${this.ringViewport}px`);
     this.hostRef.nativeElement.style.setProperty('--card-w', `${this.cardWidth}px`);
     this.hostRef.nativeElement.style.setProperty('--card-h', `${this.cardHeight}px`);
-    this.ringEl.style.touchAction = 'none';
+    this.ringEl.style.touchAction = 'pan-y';
     this.ringEl.style.cursor = 'grab';
   }
 
