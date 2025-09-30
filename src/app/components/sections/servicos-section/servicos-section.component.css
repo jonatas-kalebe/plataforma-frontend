@@ -1,5 +1,5 @@
 #servicos {
-  background: linear-gradient(135deg, var(--athenity-blue-deep) 0%, rgba(17, 34, 64, 0.95) 100%);
+  background: transparent;
   overflow: hidden; /* Prevent parallax overflow */
 }
 
