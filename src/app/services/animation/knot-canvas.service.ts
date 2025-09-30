@@ -59,7 +59,7 @@ export class KnotCanvasService {
    * Janela em que forçamos o progresso para 1 garantindo a linha reta
    * quando o componente aplica o "snap" de centralização.
    */
-  private readonly SNAP_THRESHOLD = 0.97;
+  private readonly SNAP_THRESHOLD = 1;
 
   initializeKnot(
     host: HTMLElement,
