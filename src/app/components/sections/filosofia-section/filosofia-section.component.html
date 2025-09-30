@@ -6,7 +6,10 @@
     </div>
 
     <div #canvasBox class="filosofia-animation" [class.sticky-pin]="enablePinning">
-      <canvas #knotCanvas class="knot-canvas w-full h-[260px] md:h-[320px] rounded-xl bg-athenity-blue-card"></canvas>
+      <div
+        #knotContainer
+        class="knot-canvas w-full h-[260px] md:h-[320px] rounded-xl bg-athenity-blue-card overflow-hidden"
+      ></div>
     </div>
   </div>
 </section>

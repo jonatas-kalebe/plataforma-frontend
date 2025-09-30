@@ -31,10 +31,10 @@ export class FilosofiaSectionComponent implements AfterViewInit, OnDestroy {
   @Input() enablePinning: boolean = true;
 
   @Output() sectionReady = new EventEmitter<ElementRef>();
-  @Output() canvasReady = new EventEmitter<HTMLCanvasElement>();
+  @Output() canvasReady = new EventEmitter<SVGSVGElement | null>();
 
   @ViewChild('sectionEl', { static: true }) sectionRef!: ElementRef<HTMLElement>;
-  @ViewChild('knotCanvas', { static: true }) knotCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('knotContainer', { static: true }) knotContainer!: ElementRef<HTMLDivElement>;
   @ViewChild('contentLeft', { static: true }) contentLeft!: ElementRef<HTMLElement>;
   @ViewChild('canvasBox', { static: true }) canvasBox!: ElementRef<HTMLElement>;
 
@@ -56,50 +56,25 @@ export class FilosofiaSectionComponent implements AfterViewInit, OnDestroy {
 
     this.prefersReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
-    this.sectionReady.emit(this.knotCanvas);
-    this.canvasReady.emit(this.knotCanvas.nativeElement);
+    this.sectionReady.emit(this.knotContainer);
 
     requestAnimationFrame(() => {
       const cfg: Partial<KnotConfig> = {
-        segments: 560,
-        loopsCount: 36,
-        loopRadiusMin: 34,
-        loopRadiusMax: 104,
-        noiseAmplitude: 120,
-        harmonics: 10,
-        tangleMultiplier: 1.6,
-
-        // Decaimento mais rápido para “desembaralhar”
-        globalFalloff: 2.1,     // antes ~1.35
-        knotFalloff: 0.85,
-        waveFalloff: 1.7,
-
-        strokeWidth: 3,
-        glowLevels: 4,
-        animate: !this.prefersReduced,
+        segments: 680,
+        strokeWidth: 2,
+        strokeColor: '#64FFDA',
         backgroundColor: 'transparent',
-        freezeOnIdle: true,
-
-        // Mantém o traço dentro da caixa
-        boundsPadding: 18,
-
-        // NOVO: aleatoriedade forte
-        patternChaos: 0.9,
-        reseedOnEveryMove: false,         // NÃO reseed ao iniciar movimento
-        reseedOnLeaveStraight: true,      // SIM: reseed ao sair de "reta"
-        randomizePhases: true,
-
-        // Jitter temporal orgânico (escala suave com o wave interno)
-        timeJitterAmplitude: 6, // px (aumente para 8–10 se quiser mais)
-        timeJitterSpeed: 0.8,
-        timeJitterGranularity: 1.0
+        straightLinePadding: 12,
       };
-      this.knotSvc.initializeKnot(this.knotCanvas.nativeElement, cfg, this.prefersReduced ? 1 : 0);
 
-      this.setupIntersectionAnimations();
-
-      this.updateTargetFromScroll();
-      this.startTicker();
+      this.knotSvc
+        .initializeKnot(this.knotContainer.nativeElement, cfg, this.prefersReduced ? 1 : 0)
+        .then((svg) => {
+          this.canvasReady.emit(svg);
+          this.setupIntersectionAnimations();
+          this.updateTargetFromScroll();
+          this.startTicker();
+        });
     });
   }
 
