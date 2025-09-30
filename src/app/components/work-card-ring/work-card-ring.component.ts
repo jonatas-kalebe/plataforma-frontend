@@ -1,4 +1,3 @@
-// work-card-ring.component.ts
 import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, EventEmitter, HostListener, Inject, Input, NgZone, OnChanges, OnDestroy, Output, PLATFORM_ID, QueryList, SimpleChanges, ViewChild, ViewChildren } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 
@@ -17,7 +16,6 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   @ViewChild('ring', { static: true }) ringRef!: ElementRef<HTMLDivElement>;
   @ViewChildren('card') cardRefs!: QueryList<ElementRef<HTMLDivElement>>;
 
-  // Aliases for test compatibility
   get ring() { return this.ringRef; }
   set ring(value: any) { this.ringRef = value; }
   get cards() { return this.cardRefs; }
@@ -25,49 +23,42 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   get isDragging() { return this.dragging; }
   set isDragging(value: boolean) { this.dragging = value; }
 
-  // Dados
   @Input() items: Item[] = Array.from({ length: 8 }, (_, i) => ({ title: `Projeto ${i + 1}` }));
 
-  // Aparência
-  @Input() ringViewport = 320; // px - tamanho fixo do container .ring (não muda com o raio)
-  @Input() baseRadius = 200;   // px - raio mínimo
-  @Input() cardWidth = 240;    // px
-  @Input() cardHeight = 140;   // px
-  @Input() perspective = 1200; // px
+  @Input() ringViewport = 320;
+  @Input() baseRadius = 200;
+  @Input() cardWidth = 240;
+  @Input() cardHeight = 140;
+  @Input() perspective = 1200;
 
-  // Interação
-  @Input() dragSensitivity = 0.35; // deg/px
-  @Input() wheelSpeed = 0.2;       // deg por deltaY
-  @Input() friction = 2.8;         // 1/s
+  @Input() dragSensitivity = 0.35;
+  @Input() wheelSpeed = 0.2;
+  @Input() friction = 2.8;
   @Input() inertiaEnabled = true;
 
-  // Snap
   @Input() snapEnabled = true;
-  @Input() snapVelocityThreshold = 15; // deg/s
-  @Input() snapStrength = 45;          // deg/s²
+  @Input() snapVelocityThreshold = 15;
+  @Input() snapStrength = 45;
 
-  // Scroll externo
   @Input() interceptWheel = true;
-  @Input() scrollProgress: number | undefined; // 0..1
+  @Input() scrollProgress: number | undefined;
   @Input() scrollRotations = 2;
 
-  // Elástico do raio
-  @Input() radiusElasticity = 0.25;   // 0..1
-  @Input() radiusVelInfluence = 720;  // deg/s
-  @Input() springStiffness = 120;     // 1/s²
-  @Input() springDamping = 22;        // 1/s
+  @Input() radiusElasticity = 0.25;
+  @Input() radiusVelInfluence = 720;
+  @Input() springStiffness = 120;
+  @Input() springDamping = 22;
 
-  // Orientação dos cards
   @Input() orientation: OrientationMode = 'outward';
 
-  // Espaçamento automático entre cards
   @Input() autoRadiusSpacing = true;
   @Input() minGapPx = 24;
 
-  // Eventos
+  @Input() gestureThreshold = 8;
+  @Input() horizontalBias = 1.2;
+
   @Output() activeIndexChange = new EventEmitter<number>();
 
-  // Estado interno
   private isBrowser = false;
   private reducedMotion = false;
 
@@ -83,6 +74,9 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private dragging = false;
   private pointerId: number | null = null;
   private lastPointerX = 0;
+  private startPointerX = 0;
+  private startPointerY = 0;
+  private gesture: 'idle' | 'pending' | 'rotate' | 'scroll' = 'idle';
   private lastMoveTS = 0;
 
   private rafId: number | null = null;
@@ -114,7 +108,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
     this.setupDOM();
     this.applyOrientationFlipVariable();
-    this.recomputeBaseRadiusEffective();      // calcula raio de repouso com gap
+    this.recomputeBaseRadiusEffective();
     this.dynamicRadius = this.baseRadiusEffective;
     this.layoutCards(true);
     this.attachEvents();
@@ -163,53 +157,84 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   get count(): number { return Math.max(1, this.items?.length ?? 0); }
   get stepDeg(): number { return 360 / this.count; }
 
-  // Pointer
   onPointerDown = (ev: PointerEvent) => {
-    this.dragging = true;
     this.pointerId = ev.pointerId;
+    this.startPointerX = ev.clientX;
+    this.startPointerY = ev.clientY;
     this.lastPointerX = ev.clientX;
     this.lastMoveTS = ev.timeStamp || performance.now();
-    this.ringEl.setPointerCapture(ev.pointerId);
-    this.ringEl.style.cursor = 'grabbing';
     this.desiredRotationDeg = null;
+    this.gesture = 'pending';
+    this.dragging = false;
+    this.ringEl.style.cursor = 'grab';
+    this.ringEl.style.touchAction = 'pan-y';
   };
-  onPointerMove = (ev: PointerEvent) => {
-    if (!this.dragging || ev.pointerId !== this.pointerId) return;
-    const now = ev.timeStamp || performance.now();
-    const dx = ev.clientX - this.lastPointerX;
-    const dt = Math.max(1, now - this.lastMoveTS) / 1000;
-    this.lastPointerX = ev.clientX;
-    this.lastMoveTS = now;
 
+  onPointerMove = (ev: PointerEvent) => {
+    if (this.pointerId == null || ev.pointerId !== this.pointerId) return;
+
+    const now = ev.timeStamp || performance.now();
+    const dt = Math.max(1, now - this.lastMoveTS) / 1000;
+
+    if (this.gesture === 'pending') {
+      const dx0 = ev.clientX - this.startPointerX;
+      const dy0 = ev.clientY - this.startPointerY;
+      if (Math.abs(dx0) > this.gestureThreshold || Math.abs(dy0) > this.gestureThreshold) {
+        if (Math.abs(dx0) * this.horizontalBias > Math.abs(dy0)) {
+          this.gesture = 'rotate';
+          this.dragging = true;
+          this.ringEl.setPointerCapture(this.pointerId);
+          this.ringEl.style.cursor = 'grabbing';
+          this.ringEl.style.touchAction = 'none';
+          this.lastPointerX = ev.clientX;
+          this.lastMoveTS = now;
+        } else {
+          this.gesture = 'scroll';
+          this.dragging = false;
+          this.ringEl.style.touchAction = 'pan-y';
+        }
+      }
+      return;
+    }
+
+    if (this.gesture !== 'rotate') return;
+
+    const dx = ev.clientX - this.lastPointerX;
     const deltaDeg = dx * this.dragSensitivity;
     this.rotationDeg += deltaDeg;
     this.angularVelocity = deltaDeg / dt;
-  };
-  onPointerUp = (ev: PointerEvent) => {
-    if (ev.pointerId !== this.pointerId) return;
-    this.dragging = false;
-    this.pointerId = null;
-    this.ringEl.releasePointerCapture(ev.pointerId);
-    this.ringEl.style.cursor = 'grab';
+
+    this.lastPointerX = ev.clientX;
+    this.lastMoveTS = now;
   };
 
-  // Wheel
+  onPointerUp = (ev: PointerEvent) => {
+    if (ev.pointerId !== this.pointerId) return;
+    if (this.gesture === 'rotate') {
+      this.ringEl.releasePointerCapture(ev.pointerId);
+      this.ringEl.style.cursor = 'grab';
+    }
+    this.dragging = false;
+    this.pointerId = null;
+    this.gesture = 'idle';
+    this.ringEl.style.touchAction = 'pan-y';
+  };
+
   private wheelHandler = (ev: WheelEvent) => {
     if (this.interceptWheel) ev.preventDefault();
     const delta = ev.deltaY || ev.detail || 0;
     const deltaDeg = delta * this.wheelSpeed;
     this.rotationDeg += deltaDeg;
-    this.angularVelocity += deltaDeg * 60; // impulso
+    this.angularVelocity += deltaDeg * 60;
     this.desiredRotationDeg = null;
   };
 
-  // DOM
   private setupDOM() {
     this.hostRef.nativeElement.style.setProperty('--perspective', `${this.perspective}px`);
     this.hostRef.nativeElement.style.setProperty('--ring-viewport', `${this.ringViewport}px`);
     this.hostRef.nativeElement.style.setProperty('--card-w', `${this.cardWidth}px`);
     this.hostRef.nativeElement.style.setProperty('--card-h', `${this.cardHeight}px`);
-    this.ringEl.style.touchAction = 'none';
+    this.ringEl.style.touchAction = 'pan-y';
     this.ringEl.style.cursor = 'grab';
   }
 
@@ -218,17 +243,14 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.ringEl.style.setProperty('--inner-flip', flip);
   }
 
-  // Raio que garante gap mínimo entre cards (sem mexer no tamanho do .ring)
   private recomputeBaseRadiusEffective() {
     const stepRad = (2 * Math.PI) / Math.max(1, this.count);
     let spacingRadius = 0;
-
     if (this.autoRadiusSpacing && this.count > 1) {
       const requiredChord = this.cardWidth + this.minGapPx;
       const denom = 2 * Math.sin(stepRad / 2);
       spacingRadius = denom > 0 ? requiredChord / denom : 0;
     }
-
     this.baseRadiusEffective = Math.max(this.baseRadius, spacingRadius || 0);
   }
 
@@ -272,6 +294,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.ringEl.addEventListener('pointerleave', this.onPointerUp, { passive: true });
     this.ringEl.addEventListener('wheel', this.wheelHandler, { passive: !this.interceptWheel });
   }
+
   private detachEvents() {
     this.ringEl.removeEventListener('pointerdown', this.onPointerDown);
     this.ringEl.removeEventListener('pointermove', this.onPointerMove);
@@ -288,7 +311,6 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     mq.addEventListener?.('change', (e) => (this.reducedMotion = e.matches));
   }
 
-  // Física
   private tick = (now: number) => {
     const dt = Math.min(0.05, (now - (this.prevTS || now)) / 1000);
     this.prevTS = now;
@@ -322,12 +344,10 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       }
     }
 
-    // Raio elástico baseado no raio de repouso (com espaçamento)
     const velAbs = Math.abs(this.angularVelocity);
     const maxAdd = this.baseRadiusEffective * (this.reducedMotion ? 0 : this.radiusElasticity);
     const radiusTarget = this.baseRadiusEffective + Math.min(1, velAbs / this.radiusVelInfluence) * maxAdd;
 
-    // Mola
     const k = this.springStiffness;
     const c = this.springDamping;
     const x = this.dynamicRadius;
@@ -354,11 +374,13 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     const idx = Math.round(normalized / step);
     return -idx * step;
   }
+
   private normalizeDeg(deg: number): number {
     let d = deg % 360;
     if (d < 0) d += 360;
     return d;
   }
+
   private shortestAngleDist(a: number, b: number): number {
     let diff = (b - a) % 360;
     if (diff < -180) diff += 360;
