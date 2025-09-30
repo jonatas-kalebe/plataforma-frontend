@@ -1,3 +1,7 @@
+.section-content {
+  overflow: visible;
+}
+
 .filosofia-content {
   opacity: 0;
   transform: translateX(-30px);
@@ -24,6 +28,25 @@
 .sticky-pin {
   position: sticky;
   top: 20vh;
+}
+
+@media (max-width: 1024px), (max-height: 820px) {
+  .sticky-pin {
+    position: static;
+    top: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .section-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+  }
+
+  .filosofia-animation {
+    width: 100%;
+  }
 }
 
 /* Canvas hover feedback (leve) */

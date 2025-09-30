@@ -84,6 +84,10 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private pointerId: number | null = null;
   private lastPointerX = 0;
   private lastMoveTS = 0;
+  private pointerActive = false;
+  private pointerStartX = 0;
+  private pointerStartY = 0;
+  private dragActivationThreshold = 8;
 
   private rafId: number | null = null;
   private prevTS = 0;
@@ -165,17 +169,52 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
   // Pointer
   onPointerDown = (ev: PointerEvent) => {
-    this.dragging = true;
     this.pointerId = ev.pointerId;
+    this.pointerActive = true;
+    this.pointerStartX = ev.clientX;
+    this.pointerStartY = ev.clientY;
     this.lastPointerX = ev.clientX;
     this.lastMoveTS = ev.timeStamp || performance.now();
-    this.ringEl.setPointerCapture(ev.pointerId);
-    this.ringEl.style.cursor = 'grabbing';
     this.desiredRotationDeg = null;
+
+    if (ev.pointerType === 'mouse') {
+      this.beginDragging(ev);
+    }
   };
   onPointerMove = (ev: PointerEvent) => {
-    if (!this.dragging || ev.pointerId !== this.pointerId) return;
+    if (ev.pointerId !== this.pointerId) return;
+
     const now = ev.timeStamp || performance.now();
+    const isTouchLike = ev.pointerType === 'touch' || ev.pointerType === 'pen';
+
+    if (!this.dragging) {
+      if (!this.pointerActive) return;
+
+      if (!isTouchLike) {
+        this.beginDragging(ev);
+      } else {
+        const moveX = ev.clientX - this.pointerStartX;
+        const moveY = ev.clientY - this.pointerStartY;
+
+        if (Math.abs(moveY) > Math.abs(moveX) && Math.abs(moveY) > this.dragActivationThreshold) {
+          this.pointerActive = false;
+          this.pointerId = null;
+          this.pointerStartX = 0;
+          this.pointerStartY = 0;
+          this.ringEl.style.cursor = 'grab';
+          return;
+        }
+
+        if (Math.abs(moveX) >= this.dragActivationThreshold) {
+          this.beginDragging(ev);
+        } else {
+          return;
+        }
+      }
+    }
+
+    if (!this.dragging) return;
+
     const dx = ev.clientX - this.lastPointerX;
     const dt = Math.max(1, now - this.lastMoveTS) / 1000;
     this.lastPointerX = ev.clientX;
@@ -186,12 +225,41 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.angularVelocity = deltaDeg / dt;
   };
   onPointerUp = (ev: PointerEvent) => {
-    if (ev.pointerId !== this.pointerId) return;
-    this.dragging = false;
-    this.pointerId = null;
-    this.ringEl.releasePointerCapture(ev.pointerId);
-    this.ringEl.style.cursor = 'grab';
+    if (ev.pointerId !== this.pointerId && this.pointerId !== null) return;
+    this.endDragging(ev);
   };
+
+  private beginDragging(ev: PointerEvent) {
+    if (this.dragging) return;
+    this.dragging = true;
+    try {
+      this.ringEl.setPointerCapture(ev.pointerId);
+    } catch (err) {
+      /* noop */
+    }
+    this.ringEl.style.cursor = 'grabbing';
+    this.lastPointerX = ev.clientX;
+    this.lastMoveTS = ev.timeStamp || performance.now();
+  }
+
+  private endDragging(ev?: PointerEvent) {
+    if (this.dragging && ev) {
+      try {
+        if (this.ringEl.hasPointerCapture?.(ev.pointerId)) {
+          this.ringEl.releasePointerCapture(ev.pointerId);
+        }
+      } catch (err) {
+        /* noop */
+      }
+    }
+
+    this.dragging = false;
+    this.pointerActive = false;
+    this.pointerId = null;
+    this.pointerStartX = 0;
+    this.pointerStartY = 0;
+    this.ringEl.style.cursor = 'grab';
+  }
 
   // Wheel
   private wheelHandler = (ev: WheelEvent) => {
@@ -209,7 +277,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.hostRef.nativeElement.style.setProperty('--ring-viewport', `${this.ringViewport}px`);
     this.hostRef.nativeElement.style.setProperty('--card-w', `${this.cardWidth}px`);
     this.hostRef.nativeElement.style.setProperty('--card-h', `${this.cardHeight}px`);
-    this.ringEl.style.touchAction = 'none';
+    this.ringEl.style.touchAction = 'pan-y pinch-zoom';
     this.ringEl.style.cursor = 'grab';
   }
 

@@ -1,6 +1,7 @@
 #trabalhos {
   position: relative;
-  height: 100vh;
+  min-height: calc(var(--vh, 1vh) * 100);
+  height: auto;
   overflow-x: hidden;
 }
 
@@ -15,10 +16,31 @@
   padding: var(--spacing-xl) var(--spacing-lg);
 }
 
+@media (max-width: 1024px) {
+  .section-content {
+    position: relative;
+    top: auto;
+    align-content: start;
+    justify-items: center;
+    padding: var(--spacing-lg) var(--spacing-md);
+    gap: var(--spacing-lg);
+  }
+
+  .pin-container {
+    transform: none;
+    opacity: 1;
+  }
+}
+
 @media (max-width: 768px) {
   .section-content {
     padding: var(--spacing-lg) var(--spacing-md);
     gap: var(--spacing-md);
+  }
+
+  .trabalhos-showcase {
+    width: min(100%, 360px);
+    margin-inline: auto;
   }
 }
 
@@ -26,6 +48,10 @@
   .section-content {
     padding: var(--spacing-md) var(--spacing-sm);
     gap: var(--spacing-sm);
+  }
+
+  .trabalhos-showcase {
+    width: 100%;
   }
 }
 
