@@ -272,6 +272,7 @@ export class KnotCanvasService {
     this.ctx.clearRect(0, 0, w, h);
   }
 
+
   destroy(): void {
     if (this.rafId) cancelAnimationFrame(this.rafId);
     this.rafId = 0;
