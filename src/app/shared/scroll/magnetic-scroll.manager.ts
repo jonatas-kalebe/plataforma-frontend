@@ -2,235 +2,304 @@ import { ScrollSection } from './scroll-metrics.manager';
 
 type Dir = 'forward' | 'backward' | null;
 
+export interface SnapScrollConfig {
+  /** Tempo da animação de snap em milissegundos */
+  snapDurationMs: number;
+  /** Atraso antes do snap automático ser disparado */
+  snapDelayMs: number;
+  /** Tempo de inatividade antes de forçar snap para a seção mais próxima */
+  idleSnapDelayMs: number;
+  /** Variação mínima de scroll (px) para considerar que o usuário ainda está se movendo */
+  velocityIgnoreThreshold: number;
+  /** Quando a velocidade fica abaixo desse limiar, o snap tenta alinhar automaticamente */
+  settleVelocityThreshold: number;
+  /** Velocidade em pixels considerada um "fling" para bloquear snaps temporariamente */
+  flingVelocityThreshold: number;
+  /** Progresso mínimo (0-1) para disparar snap para frente */
+  progressForwardSnap: number;
+  /** Progresso máximo (0-1) para disparar snap para trás */
+  progressBackwardSnap: number;
+  /** Tempo que mantém a direção travada depois de uma mudança brusca */
+  directionLockMs: number;
+  /** Offset aplicado ao alinhar a seção */
+  topOffsetPx: number;
+  /** Forma de alinhamento da seção */
+  align: 'start' | 'center';
+  /** Função de easing usada na animação */
+  easingFn: (t: number) => number;
+  /** Habilita logs de debug */
+  debug: boolean;
+}
+
+const DEFAULT_SNAP_CONFIG: SnapScrollConfig = {
+  snapDurationMs: 850,
+  snapDelayMs: 80,
+  idleSnapDelayMs: 180,
+  velocityIgnoreThreshold: 2,
+  settleVelocityThreshold: 0.5,
+  flingVelocityThreshold: 120,
+  progressForwardSnap: 0.8,
+  progressBackwardSnap: 0.2,
+  directionLockMs: 280,
+  topOffsetPx: 0,
+  align: 'start',
+  easingFn: (t: number) => 1 - Math.pow(1 - t, 3),
+  debug: false,
+};
+
+const enum SnapReason {
+  ForwardProgress = 'forward-progress',
+  BackwardProgress = 'backward-progress',
+  Idle = 'idle',
+  LowVelocity = 'low-velocity',
+  Programmatic = 'programmatic',
+}
+
 export class MagneticScrollManager {
+  private config: SnapScrollConfig;
+  private prefersReducedMotion: boolean;
+
   private snapTimeoutId: number | null = null;
-  private lastScrollTime = 0;
-  private scrollStoppedCheckInterval: number | null = null;
+  private idleTimeoutId: number | null = null;
   private rafScrollId: number | null = null;
-  private inputMode: 'mouse' | 'touch' | 'unknown' = 'unknown';
-  private intention: { direction: Dir; at: number; velocity: number } = { direction: null, at: 0, velocity: 0 };
+
+  private direction: Dir = null;
+  private lastVelocity = 0;
+  private skipSnapUntil = 0;
   private isAnimating = false;
-  private lastActiveIndex = -1;
-  private lastActiveProgress = 0;
+
   private lastSectionsSnapshot: ScrollSection[] = [];
+
   private prevScrollBehaviorHtml: string | null = null;
   private prevScrollBehaviorBody: string | null = null;
-  private directionLock: { dir: Dir; until: number } = { dir: null, until: 0 };
-  private flingLockUntil = 0;
 
-  private readonly SCROLL_STOP_DELAY = 150;
-  private readonly INTENT_THRESHOLD = 0.2;
-  private readonly SNAP_FWD_THRESHOLD = 0.85;
-  private readonly SNAP_BACK_THRESHOLD = 0.15;
-  private readonly SNAP_DURATION_MS = 800;
-  private readonly DIRECTION_LOCK_MS = 350;
-  private readonly FLING_VELOCITY_THRESHOLD = 1.8;
-  private readonly FLING_LOCK_DURATION_MS = 400;
+  constructor(prefersReducedMotion: boolean = false, config: Partial<SnapScrollConfig> = {}) {
+    this.prefersReducedMotion = prefersReducedMotion;
+    this.config = { ...DEFAULT_SNAP_CONFIG, ...config };
+  }
 
-  constructor(private prefersReducedMotion: boolean = false) {}
+  updatePreference(prefersReducedMotion: boolean): void {
+    this.prefersReducedMotion = prefersReducedMotion;
+  }
 
-  setInputMode(mode: 'mouse' | 'touch' | 'unknown'): void {
-    this.inputMode = mode;
+  updateConfig(config: Partial<SnapScrollConfig>): void {
+    this.config = { ...this.config, ...config };
+  }
+
+  setInputMode(_mode: 'mouse' | 'touch' | 'unknown'): void {
+    // Mantido por compatibilidade futura. A lógica atual não depende do modo de input.
   }
 
   updateSectionsSnapshot(sections: ScrollSection[]): void {
-    this.lastSectionsSnapshot = sections;
+    this.lastSectionsSnapshot = sections.map(section => ({ ...section }));
   }
 
   notifyScrollActivity(): void {
-    this.lastScrollTime = Date.now();
     if (this.snapTimeoutId) {
       clearTimeout(this.snapTimeoutId);
       this.snapTimeoutId = null;
     }
+    if (this.idleTimeoutId) {
+      clearTimeout(this.idleTimeoutId);
+      this.idleTimeoutId = null;
+    }
   }
 
   startScrollStopCheck(): void {
-    this.clearScrollStopCheck();
     if (this.prefersReducedMotion) return;
-    this.lastScrollTime = Date.now();
-    this.scrollStoppedCheckInterval = window.setInterval(() => {
-      const d = Date.now() - this.lastScrollTime;
-      if (d >= this.SCROLL_STOP_DELAY) this.onScrollingStopped();
-    }, 50);
-  }
-
-  private clearScrollStopCheck(): void {
-    if (this.scrollStoppedCheckInterval) {
-      clearInterval(this.scrollStoppedCheckInterval);
-      this.scrollStoppedCheckInterval = null;
+    if (this.idleTimeoutId) {
+      clearTimeout(this.idleTimeoutId);
     }
+    this.idleTimeoutId = window.setTimeout(() => {
+      this.idleTimeoutId = null;
+      this.snapToClosest(SnapReason.Idle);
+    }, this.config.idleSnapDelayMs);
   }
 
   detectScrollIntention(velocity: number): void {
     if (this.prefersReducedMotion) return;
-    const now = Date.now();
-    const v = velocity || 0;
 
-    if (Math.abs(v) > this.FLING_VELOCITY_THRESHOLD) {
-      this.flingLockUntil = now + this.FLING_LOCK_DURATION_MS;
-      if (this.snapTimeoutId) {
-        clearTimeout(this.snapTimeoutId);
-        this.snapTimeoutId = null;
+    const now = performance.now();
+    this.lastVelocity = velocity;
+
+    const absVelocity = Math.abs(velocity);
+    if (absVelocity > this.config.velocityIgnoreThreshold) {
+      const newDir: Dir = velocity > 0 ? 'forward' : 'backward';
+      if (newDir !== this.direction) {
+        this.direction = newDir;
       }
     }
 
-    if (this.isAnimating && Math.abs(v) > 0.01) {
-      this.cancelAnimation();
-    }
-
-    const newDir: Dir = v === 0 ? null : v > 0 ? 'forward' : 'backward';
-    const prevDir = this.intention.direction;
-
-    this.intention.velocity = v;
-    this.intention.direction = newDir;
-    this.intention.at = now;
-    this.lastScrollTime = now;
-
-    if (newDir && newDir !== prevDir) {
-      this.directionLock = { dir: newDir, until: now + this.DIRECTION_LOCK_MS };
+    if (absVelocity > this.config.flingVelocityThreshold) {
+      this.skipSnapUntil = now + this.config.directionLockMs;
     }
   }
 
-  checkMagneticSnap(sections: ScrollSection[], _globalProgress: number): boolean {
-    if (this.prefersReducedMotion || this.snapTimeoutId || this.isAnimating || Date.now() < this.flingLockUntil) {
+  checkMagneticSnap(sections: ScrollSection[]): boolean {
+    if (this.prefersReducedMotion) return false;
+
+    this.updateSectionsSnapshot(sections);
+
+    if (!sections.length || this.isAnimating) {
       return false;
     }
 
-    const idx = this.findActiveIndex(sections);
-    if (idx === -1) return false;
-
-    const active = sections[idx];
-    const next = this.getNext(sections, idx);
-    const prev = this.getPrev(sections, idx);
-
-    const dir = this.deriveDirection(idx, active.progress);
-    const lowSpeed = Math.abs(this.intention.velocity) < 0.25;
-
-    if (active.progress >= this.SNAP_FWD_THRESHOLD && next && dir !== 'backward') {
-      this.triggerSnap(next, 'forward');
-      return true;
-    }
-    if (active.progress <= this.SNAP_BACK_THRESHOLD && prev && dir !== 'forward') {
-      this.triggerSnap(prev, 'backward');
-      return true;
+    const now = performance.now();
+    if (now < this.skipSnapUntil) {
+      return false;
     }
 
-    if (dir === 'forward' && next && lowSpeed && active.progress >= 1 - this.INTENT_THRESHOLD) {
-      this.triggerSnap(next, 'forward');
-      return true;
+    const dominant = this.findDominantSection(sections);
+    if (!dominant) {
+      return false;
     }
-    if (dir === 'backward' && prev && lowSpeed && active.progress <= this.INTENT_THRESHOLD) {
-      this.triggerSnap(prev, 'backward');
-      return true;
+
+    const { index, progress } = dominant;
+    const next = sections[index + 1];
+    const prev = sections[index - 1];
+
+    if (this.direction === 'forward' && progress >= this.config.progressForwardSnap && next) {
+      return this.queueSnap(next, SnapReason.ForwardProgress);
+    }
+
+    if (this.direction === 'backward' && progress <= this.config.progressBackwardSnap && prev) {
+      return this.queueSnap(prev, SnapReason.BackwardProgress);
+    }
+
+    if (Math.abs(this.lastVelocity) <= this.config.settleVelocityThreshold) {
+      return this.snapToClosest(SnapReason.LowVelocity);
     }
 
     return false;
   }
 
-  private onScrollingStopped(): void {
-    this.clearScrollStopCheck();
-    if (this.prefersReducedMotion || this.snapTimeoutId || this.isAnimating) {
-      return;
-    }
-    if (!this.lastSectionsSnapshot || !this.lastSectionsSnapshot.length) return;
-
-    const idx = this.findActiveIndex(this.lastSectionsSnapshot);
-    if (idx === -1) return;
-
-    const active = this.lastSectionsSnapshot[idx];
-    const next = this.getNext(this.lastSectionsSnapshot, idx);
-    const prev = this.getPrev(this.lastSectionsSnapshot, idx);
-
-    const dir = this.deriveDirection(idx, active.progress);
-
-    if (dir === 'forward' && active.progress >= 0.5 && next) {
-      this.triggerSnap(next, 'forward');
-      return;
-    }
-    if (dir === 'backward' && active.progress < 0.5 && prev) {
-      this.triggerSnap(prev, 'backward');
-      return;
-    }
-
-    if (active.progress > 0.5 && next) {
-      this.triggerSnap(next, 'forward');
-    } else if (active.progress <= 0.5 && prev) {
-      this.triggerSnap(prev, 'backward');
-    }
-  }
-
-  private triggerSnap(section: ScrollSection, dir: Exclude<Dir, null>): void {
-    if (!section.element || this.isAnimating || this.snapTimeoutId) return;
-    if (!this.isDirectionAllowed(dir)) return;
-    const SNAP_ACTION_DELAY = 50;
-    this.snapTimeoutId = window.setTimeout(() => {
-      this.snapTimeoutId = null;
-      if (this.isDirectionAllowed(dir)) {
-        this.performSnap(section);
-      }
-    }, SNAP_ACTION_DELAY);
-  }
-
   scrollToSection(sectionId: string, durationSec: number = 1): void {
-    const el = document.querySelector<HTMLElement>(`#${sectionId}`);
-    if (!el) return;
-    const targetY = this.getElementPageY(el);
-    const ms = (this.prefersReducedMotion ? 0.3 : durationSec) * 1000;
-    if (this.prefersReducedMotion) {
-      window.scrollTo(0, targetY);
+    const element = document.querySelector<HTMLElement>(`#${sectionId}`);
+    if (!element) return;
+
+    const targetY = this.getTargetY(element);
+    const durationMs = this.prefersReducedMotion ? 0 : Math.max(0, durationSec * 1000 || this.config.snapDurationMs);
+
+    this.cancelPendingSnap();
+
+    if (durationMs === 0) {
+      window.scrollTo({ top: targetY, behavior: 'auto' });
       return;
     }
-    this.performSmoothScroll(targetY, ms);
+
+    this.performSmoothScroll(targetY, durationMs, SnapReason.Programmatic);
   }
 
   destroy(): void {
-    this.clearScrollStopCheck();
-    this.cancelAnimation();
+    this.cancelPendingSnap();
+    if (this.idleTimeoutId) {
+      clearTimeout(this.idleTimeoutId);
+      this.idleTimeoutId = null;
+    }
+    if (this.rafScrollId) {
+      cancelAnimationFrame(this.rafScrollId);
+      this.rafScrollId = null;
+    }
+    this.restoreNativeSmooth();
+    this.lastSectionsSnapshot = [];
+    this.direction = null;
+    this.lastVelocity = 0;
+    this.skipSnapUntil = 0;
+  }
+
+  private queueSnap(section: ScrollSection, reason: SnapReason): boolean {
+    if (!section.element || this.isAnimating) {
+      return false;
+    }
+
+    this.cancelPendingSnap();
+
+    const targetElement = section.element;
+    this.snapTimeoutId = window.setTimeout(() => {
+      this.snapTimeoutId = null;
+      this.performSnap(targetElement, reason);
+    }, this.config.snapDelayMs);
+
+    return true;
+  }
+
+  private snapToClosest(reason: SnapReason): boolean {
+    if (!this.lastSectionsSnapshot.length || this.isAnimating) {
+      return false;
+    }
+
+    const closest = this.findClosestSection(this.lastSectionsSnapshot);
+    if (!closest || !closest.section.element) {
+      return false;
+    }
+
+    if (Math.abs(this.getTargetY(closest.section.element) - window.scrollY) < 1) {
+      return false;
+    }
+
+    return this.queueSnap(closest.section, reason);
+  }
+
+  private performSnap(element: HTMLElement, reason: SnapReason): void {
+    if (this.prefersReducedMotion) {
+      window.scrollTo({ top: this.getTargetY(element), behavior: 'auto' });
+      return;
+    }
+
+    this.performSmoothScroll(this.getTargetY(element), this.config.snapDurationMs, reason);
+  }
+
+  private performSmoothScroll(targetY: number, durationMs: number, reason: SnapReason): void {
+    if (this.isAnimating && this.rafScrollId) {
+      cancelAnimationFrame(this.rafScrollId);
+      this.rafScrollId = null;
+    }
+
+    const startY = window.scrollY;
+    const delta = targetY - startY;
+
+    if (durationMs <= 0 || Math.abs(delta) < 1) {
+      window.scrollTo(0, targetY);
+      return;
+    }
+
+    this.disableNativeSmooth();
+    this.isAnimating = true;
+
+    const startTs = performance.now();
+    const ease = this.config.easingFn;
+
+    const step = () => {
+      const now = performance.now();
+      const t = Math.min(1, (now - startTs) / durationMs);
+      const easedT = ease(t);
+      const y = startY + delta * easedT;
+      window.scrollTo(0, Math.round(y));
+
+      if (t < 1) {
+        this.rafScrollId = requestAnimationFrame(step);
+      } else {
+        this.finishAnimation(reason);
+      }
+    };
+
+    this.rafScrollId = requestAnimationFrame(step);
+  }
+
+  private finishAnimation(reason: SnapReason): void {
+    if (this.config.debug) {
+      console.debug(`[MagneticScrollManager] Snap complete (${reason})`);
+    }
+    this.isAnimating = false;
+    this.rafScrollId = null;
+    this.restoreNativeSmooth();
+  }
+
+  private cancelPendingSnap(): void {
     if (this.snapTimeoutId) {
       clearTimeout(this.snapTimeoutId);
       this.snapTimeoutId = null;
     }
-    this.directionLock = { dir: null, until: 0 };
-    this.flingLockUntil = 0;
-  }
-
-  private isDirectionAllowed(targetDir: Exclude<Dir, null>): boolean {
-    const now = Date.now();
-    if (this.directionLock.dir && now < this.directionLock.until) {
-      return this.directionLock.dir === targetDir;
-    }
-    if (now - this.intention.at > this.DIRECTION_LOCK_MS || Math.abs(this.intention.velocity) < 0.1) {
-      return true;
-    }
-    if (this.intention.direction === null) {
-      return true;
-    }
-    return this.intention.direction === targetDir;
-  }
-
-  private performSnap(section: ScrollSection): void {
-    if (!section.element) return;
-    const targetY = this.getElementPageY(section.element as Element);
-    if (this.prefersReducedMotion) {
-      window.scrollTo(0, targetY);
-      return;
-    }
-    if ('vibrate' in navigator) try { navigator.vibrate?.(20); } catch {}
-    this.performSmoothScroll(targetY, this.SNAP_DURATION_MS);
-  }
-
-  private performSmoothScroll(targetY: number, durationMs: number): void {
-    if (this.isAnimating) this.cancelAnimation();
-    this.isAnimating = true;
-    this.disableNativeSmooth();
-    this.smoothScrollTo(targetY, durationMs, () => {
-      this.isAnimating = false;
-      this.restoreNativeSmooth();
-    });
-  }
-
-  private cancelAnimation(): void {
     if (this.rafScrollId) {
       cancelAnimationFrame(this.rafScrollId);
       this.rafScrollId = null;
@@ -239,84 +308,64 @@ export class MagneticScrollManager {
     this.restoreNativeSmooth();
   }
 
-  private findActiveIndex(sections: ScrollSection[]): number {
-    let best = -1;
-    let bestProgress = -1;
-    for (let i = 0; i < sections.length; i++) {
-      const p = sections[i].progress ?? 0;
-      if (p > 0 && p < 1 && p > bestProgress) {
-        bestProgress = p;
-        best = i;
+  private findDominantSection(sections: ScrollSection[]): { section: ScrollSection; index: number; progress: number } | null {
+    let bestIndex = -1;
+    let bestProgress = -Infinity;
+
+    sections.forEach((section, index) => {
+      const progress = section.progress ?? 0;
+      if (progress > bestProgress) {
+        bestProgress = progress;
+        bestIndex = index;
       }
-    }
-    if (best !== -1) return best;
-    let closest = -1;
-    let bestDist = Infinity;
-    for (let i = 0; i < sections.length; i++) {
-      const d = Math.abs((sections[i].progress ?? 0) - 0.5);
-      if (d < bestDist) {
-        bestDist = d;
-        closest = i;
-      }
-    }
-    return closest;
-  }
+    });
 
-  private deriveDirection(idx: number, progress: number): Dir {
-    let dir: Dir = this.intention.direction;
-    if (!dir) {
-      if (this.lastActiveIndex === idx) {
-        if (progress > this.lastActiveProgress + 0.004) dir = 'forward';
-        else if (progress < this.lastActiveProgress - 0.004) dir = 'backward';
-      } else {
-        dir = idx > this.lastActiveIndex ? 'forward' : this.lastActiveIndex === -1 ? null : 'backward';
-      }
+    if (bestIndex === -1) {
+      return null;
     }
-    this.lastActiveIndex = idx;
-    this.lastActiveProgress = progress;
-    return dir;
-  }
 
-  private getNext(sections: ScrollSection[], idx: number): ScrollSection | null {
-    return idx < sections.length - 1 ? sections[idx + 1] : null;
-  }
-
-  private getPrev(sections: ScrollSection[], idx: number): ScrollSection | null {
-    return idx > 0 ? sections[idx - 1] : null;
-  }
-
-  private getElementPageY(el: Element): number {
-    const rect = el.getBoundingClientRect();
-    return Math.round(window.scrollY + rect.top);
-  }
-
-  private smoothScrollTo(targetY: number, durationMs: number, onDone?: () => void): void {
-    if (this.rafScrollId) {
-      cancelAnimationFrame(this.rafScrollId);
-      this.rafScrollId = null;
-    }
-    const startY = window.scrollY;
-    const delta = targetY - startY;
-    if (durationMs <= 0 || Math.abs(delta) < 1) {
-      window.scrollTo(0, targetY);
-      if (onDone) onDone();
-      return;
-    }
-    const startTs = performance.now();
-    const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-    const step = () => {
-      const now = performance.now();
-      const t = Math.min(1, (now - startTs) / durationMs);
-      const y = startY + delta * ease(t);
-      window.scrollTo(0, Math.round(y));
-      if (t < 1 && this.isAnimating) {
-        this.rafScrollId = requestAnimationFrame(step);
-      } else {
-        this.rafScrollId = null;
-        if (onDone) onDone();
-      }
+    return {
+      section: sections[bestIndex],
+      index: bestIndex,
+      progress: bestProgress,
     };
-    this.rafScrollId = requestAnimationFrame(step);
+  }
+
+  private findClosestSection(sections: ScrollSection[]): { section: ScrollSection; index: number } | null {
+    const currentY = window.scrollY;
+    let bestSection: ScrollSection | null = null;
+    let bestIndex = -1;
+    let bestDistance = Infinity;
+
+    sections.forEach((section, index) => {
+      if (!section.element) return;
+      const targetY = this.getTargetY(section.element);
+      const distance = Math.abs(targetY - currentY);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestSection = section;
+        bestIndex = index;
+      }
+    });
+
+    if (bestIndex === -1 || !bestSection) {
+      return null;
+    }
+
+    return { section: bestSection, index: bestIndex };
+  }
+
+  private getTargetY(element: HTMLElement): number {
+    const rect = element.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const scrollY = window.scrollY;
+
+    if (this.config.align === 'center') {
+      const centerOffset = rect.height / 2;
+      return Math.round(scrollY + rect.top + centerOffset - viewportHeight / 2 + this.config.topOffsetPx);
+    }
+
+    return Math.round(scrollY + rect.top + this.config.topOffsetPx);
   }
 
   private disableNativeSmooth(): void {

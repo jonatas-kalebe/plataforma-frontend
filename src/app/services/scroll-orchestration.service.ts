@@ -16,7 +16,6 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
 
 // Application Configuration and Services
-import { SCROLL_CONFIG, SECTION_SCROLL_CONFIG } from '../shared/constants/scroll-config.constants';
 import { ScrollTelemetryService } from './scroll-telemetry.service';
 
 // Novo sistema de utilidades
@@ -26,11 +25,41 @@ import {
   ScrollMetrics,
   ScrollState
 } from '../shared/scroll/scroll-metrics.manager';
-import { MagneticScrollManager } from '../shared/scroll/magnetic-scroll.manager';
+import { MagneticScrollManager, SnapScrollConfig } from '../shared/scroll/magnetic-scroll.manager';
 import { HeroAnimationManager } from '../shared/scroll/hero-animation.manager';
 
 // Re-export para compatibilidade
 export type { ScrollSection, ScrollMetrics, ScrollState };
+
+// ---------------------------------------------------------------------------
+// 🔧 Configurações principais para customização rápida do comportamento
+// ---------------------------------------------------------------------------
+
+const SCROLL_SECTION_IDS = ['hero', 'filosofia', 'servicos', 'trabalhos', 'cta'] as const;
+const SCROLL_SECTION_SELECTORS = SCROLL_SECTION_IDS.map(id => `#${id}`);
+
+const SNAP_SCROLL_BEHAVIOR: SnapScrollConfig = {
+  snapDurationMs: 880,
+  snapDelayMs: 90,
+  idleSnapDelayMs: 170,
+  velocityIgnoreThreshold: 1.8,
+  settleVelocityThreshold: 0.45,
+  flingVelocityThreshold: 140,
+  progressForwardSnap: 0.78,
+  progressBackwardSnap: 0.22,
+  directionLockMs: 320,
+  topOffsetPx: 0,
+  align: 'start',
+  easingFn: (t: number) => 1 - Math.pow(1 - t, 3),
+  debug: false,
+};
+
+const SCROLL_TRIGGER_SETTINGS = {
+  start: 'top bottom',
+  end: 'bottom top'
+} as const;
+
+const SCROLL_EVENT_OPTIONS: AddEventListenerOptions = { passive: true };
 
 @Injectable({
   providedIn: 'root'
@@ -60,7 +89,7 @@ export class ScrollOrchestrationService {
   constructor() {
     // Inicializa managers
     this.metricsManager = new ScrollMetricsManager(this.telemetryService);
-    this.magneticScrollManager = new MagneticScrollManager(this.prefersReducedMotion);
+    this.magneticScrollManager = new MagneticScrollManager(this.prefersReducedMotion, SNAP_SCROLL_BEHAVIOR);
     this.heroAnimationManager = new HeroAnimationManager(this.prefersReducedMotion);
 
     // Expõe observables dos managers
@@ -153,15 +182,14 @@ export class ScrollOrchestrationService {
     const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
     const gsapInstance = (window as any).gsap || gsap;
 
-    const sectionIds = ['#hero', '#filosofia', '#servicos', '#trabalhos', '#cta'];
     const sections: ScrollSection[] = [];
 
-    sectionIds.forEach((id, index) => {
-      const element = document.querySelector(id) as HTMLElement;
+    SCROLL_SECTION_SELECTORS.forEach((selector, index) => {
+      const element = document.querySelector(selector) as HTMLElement;
       if (!element) return;
 
       const section: ScrollSection = {
-        id: id.substring(1),
+        id: SCROLL_SECTION_IDS[index],
         element,
         progress: 0,
         isActive: false
@@ -170,10 +198,10 @@ export class ScrollOrchestrationService {
       sections.push(section);
 
       // Configuração consolidada de ScrollTrigger
-      const scrollTriggerConfig = {
+      const scrollTriggerConfig: any = {
         trigger: element,
-        start: 'top bottom',
-        end: 'bottom top',
+        start: SCROLL_TRIGGER_SETTINGS.start,
+        end: SCROLL_TRIGGER_SETTINGS.end,
         onUpdate: (self: any) => {
           section.progress = self.progress;
           this.updateScrollMetrics(sections);
@@ -218,7 +246,7 @@ export class ScrollOrchestrationService {
       }
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scroll', handleScroll, SCROLL_EVENT_OPTIONS);
   }
 
   /**
@@ -233,6 +261,7 @@ export class ScrollOrchestrationService {
     this.lastScrollY = currentScrollY;
 
     // Detecta intenção e verifica snap magnético
+    this.magneticScrollManager.notifyScrollActivity();
     this.magneticScrollManager.detectScrollIntention(velocity);
     this.magneticScrollManager.startScrollStopCheck();
   }
@@ -255,7 +284,7 @@ export class ScrollOrchestrationService {
     );
 
     // Verifica snap magnético
-    this.magneticScrollManager.checkMagneticSnap(sections, globalProgress);
+    this.magneticScrollManager.checkMagneticSnap(sections);
   }
 
   /**
@@ -274,7 +303,8 @@ export class ScrollOrchestrationService {
       this.prefersReducedMotion = mediaQuery.matches;
 
       // Atualiza managers
-      this.magneticScrollManager = new MagneticScrollManager(this.prefersReducedMotion);
+      this.magneticScrollManager.updatePreference(this.prefersReducedMotion);
+      this.magneticScrollManager.updateConfig(SNAP_SCROLL_BEHAVIOR);
       this.heroAnimationManager = new HeroAnimationManager(this.prefersReducedMotion);
     }
   }
