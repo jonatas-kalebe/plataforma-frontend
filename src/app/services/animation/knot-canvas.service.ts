@@ -220,12 +220,14 @@ export class KnotCanvasService {
   private renderProgress(progress: number): void {
     if (!this.pathEl || this.originalPoints.length === 0) return;
 
-    if (progress <= 0) {
+    const easedProgress = this.applyProgressEasing(progress);
+
+    if (easedProgress <= 0) {
       this.pathEl.setAttribute('d', this.originalPathD);
       return;
     }
 
-    if (progress >= 1) {
+    if (easedProgress >= 1) {
       const d = this.buildPath(this.straightPoints);
       this.pathEl.setAttribute('d', d);
       return;
@@ -234,13 +236,41 @@ export class KnotCanvasService {
     const interpolated = this.originalPoints.map((start, index) => {
       const end = this.straightPoints[index];
       return {
-        x: start.x + (end.x - start.x) * progress,
-        y: start.y + (end.y - start.y) * progress,
+        x: start.x + (end.x - start.x) * easedProgress,
+        y: start.y + (end.y - start.y) * easedProgress,
       };
     });
 
     const d = this.buildPath(interpolated);
     this.pathEl.setAttribute('d', d);
+  }
+
+  private applyProgressEasing(progress: number): number {
+    const clamped = this.clamp01(progress);
+
+    // Delay the start of the straightening to give the impression that the
+    // knot takes longer to begin unfolding.
+    const startDelay = 0.18; // 18% of the gesture keeps the original knot.
+    if (clamped <= startDelay) {
+      return 0;
+    }
+
+    const normalized = (clamped - startDelay) / (1 - startDelay);
+    if (normalized >= 1) {
+      return 1;
+    }
+
+    // Ease-in curve so the line begins to straighten gently before speeding up.
+    const eased = normalized * normalized * normalized;
+
+    // Snap the line to a perfect straight segment once the user is close
+    // enough to the centred position.
+    const snapThreshold = 0.92;
+    if (normalized >= snapThreshold) {
+      return 1;
+    }
+
+    return this.clamp01(eased);
   }
 
   private buildPath(points: Point[]): string {
