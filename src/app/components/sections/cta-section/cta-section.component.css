@@ -1,5 +1,16 @@
 #cta {
-  background: linear-gradient(135deg, var(--athenity-blue-deep) 0%, rgba(10, 25, 47, 0.95) 100%);
+  position: relative;
+}
+
+#cta::before {
+  content: '';
+  position: absolute;
+  inset: var(--section-shell-inset);
+  border-radius: clamp(1.5rem, 4vw, 3.5rem);
+  background: linear-gradient(180deg, rgba(12, 35, 63, 0.35) 0%, rgba(12, 35, 63, 0) 55%);
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: -1;
 }
 
 /* Enhanced CTA animations */

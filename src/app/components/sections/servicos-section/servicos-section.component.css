@@ -1,6 +1,9 @@
 #servicos {
-  background: linear-gradient(135deg, var(--athenity-blue-deep) 0%, rgba(17, 34, 64, 0.95) 100%);
   overflow: hidden; /* Prevent parallax overflow */
+}
+
+#servicos::before {
+  background: linear-gradient(180deg, rgba(12, 26, 49, 0.7) 0%, rgba(6, 15, 30, 0.88) 100%);
 }
 
 .servicos-grid {
