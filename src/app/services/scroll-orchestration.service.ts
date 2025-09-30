@@ -26,11 +26,20 @@ import {
   ScrollMetrics,
   ScrollState
 } from '../shared/scroll/scroll-metrics.manager';
-import { MagneticScrollManager } from '../shared/scroll/magnetic-scroll.manager';
+import { MagneticScrollManager, SnapScrollConfig } from '../shared/scroll/magnetic-scroll.manager';
 import { HeroAnimationManager } from '../shared/scroll/hero-animation.manager';
 
 // Re-export para compatibilidade
 export type { ScrollSection, ScrollMetrics, ScrollState };
+
+const SECTION_IDS: string[] = ['#hero', '#filosofia', '#servicos', '#trabalhos', '#cta'];
+
+const MAGNETIC_SCROLL_CONFIG: Partial<SnapScrollConfig> = {
+  forwardSnapProgress: 0.8,
+  backwardSnapProgress: 0.2,
+  snapAnimationDurationMs: 700,
+  snapReferencePoint: 0.45
+};
 
 @Injectable({
   providedIn: 'root'
@@ -60,7 +69,7 @@ export class ScrollOrchestrationService {
   constructor() {
     // Inicializa managers
     this.metricsManager = new ScrollMetricsManager(this.telemetryService);
-    this.magneticScrollManager = new MagneticScrollManager(this.prefersReducedMotion);
+    this.magneticScrollManager = new MagneticScrollManager(this.prefersReducedMotion, MAGNETIC_SCROLL_CONFIG);
     this.heroAnimationManager = new HeroAnimationManager(this.prefersReducedMotion);
 
     // Expõe observables dos managers
@@ -153,10 +162,9 @@ export class ScrollOrchestrationService {
     const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
     const gsapInstance = (window as any).gsap || gsap;
 
-    const sectionIds = ['#hero', '#filosofia', '#servicos', '#trabalhos', '#cta'];
     const sections: ScrollSection[] = [];
 
-    sectionIds.forEach((id, index) => {
+    SECTION_IDS.forEach((id, index) => {
       const element = document.querySelector(id) as HTMLElement;
       if (!element) return;
 
@@ -274,7 +282,8 @@ export class ScrollOrchestrationService {
       this.prefersReducedMotion = mediaQuery.matches;
 
       // Atualiza managers
-      this.magneticScrollManager = new MagneticScrollManager(this.prefersReducedMotion);
+      this.magneticScrollManager.destroy();
+      this.magneticScrollManager = new MagneticScrollManager(this.prefersReducedMotion, MAGNETIC_SCROLL_CONFIG);
       this.heroAnimationManager = new HeroAnimationManager(this.prefersReducedMotion);
     }
   }
