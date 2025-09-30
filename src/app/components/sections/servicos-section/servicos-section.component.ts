@@ -121,13 +121,13 @@ export class ServicosSectionComponent implements AfterViewInit, OnDestroy {
 
     switch (this.backgroundColor) {
       case 'deep':
-        classes.push('bg-athenity-blue-deep');
+        classes.push('surface-deep');
         break;
       case 'gradient':
-        classes.push('bg-gradient-to-b from-athenity-blue-deep to-athenity-blue-card');
+        classes.push('surface-highlight');
         break;
       default:
-        // Use default styling from template
+        classes.push('surface-minimal');
         break;
     }
 

@@ -1,7 +1,8 @@
-<section 
+<section
   #sectionElement
-  id="cta" 
+  id="cta"
   class="section-base"
+  [ngClass]="getSectionClasses()"
   [attr.data-testid]="testId">
   
   <div class="section-content text-center px-4 sm:px-6 lg:px-8">
@@ -21,7 +22,8 @@
     </p>
 
     <!-- CTA Buttons Container -->
-    <div class="cta-buttons mt-8 sm:mt-10 flex flex-col sm:flex-row gap-4 justify-center items-stretch sm:items-center max-w-lg mx-auto"
+    <div class="cta-buttons mt-8 sm:mt-10 flex gap-4 justify-center items-stretch sm:items-center max-w-lg mx-auto"
+         [ngClass]="getButtonLayoutClasses()"
          [attr.data-testid]="'cta-buttons'">
       
       <!-- Primary CTA Button -->

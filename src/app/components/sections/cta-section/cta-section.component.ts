@@ -208,27 +208,20 @@ export class CtaSectionComponent implements AfterViewInit, OnDestroy {
    * Get section classes based on configuration
    */
   getSectionClasses(): string {
-    const classes: string[] = [];
-    
     switch (this.backgroundColor) {
       case 'deep':
-        classes.push('bg-athenity-blue-deep');
-        break;
+        return 'surface-deep';
       case 'gradient':
-        classes.push('bg-gradient-to-b from-athenity-blue-deep to-athenity-blue-card');
-        break;
+        return 'surface-highlight';
       default:
-        // Use default styling from template
-        break;
+        return 'surface-minimal';
     }
+  }
 
-    if (this.buttonLayout === 'stacked') {
-      classes.push('flex-col');
-    } else {
-      classes.push('flex-row');
-    }
-    
-    return classes.join(' ');
+  getButtonLayoutClasses(): string {
+    return this.buttonLayout === 'stacked'
+      ? 'flex-col sm:flex-col'
+      : 'flex-col sm:flex-row';
   }
 
   /**

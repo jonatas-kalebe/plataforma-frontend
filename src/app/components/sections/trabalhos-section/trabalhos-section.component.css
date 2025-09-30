@@ -2,6 +2,11 @@
   position: relative;
   height: 100vh;
   overflow-x: hidden;
+  --section-surface-inset: clamp(1rem, 3.5vw, 3rem);
+  --section-surface-bg: linear-gradient(170deg, rgba(15, 30, 56, 0.9) 0%, rgba(9, 20, 40, 0.72) 100%);
+  --section-surface-border: rgba(100, 255, 218, 0.12);
+  --section-surface-shadow: 0 45px 95px rgba(5, 12, 30, 0.6);
+  --section-divider-opacity: 0.4;
 }
 
 .section-content {

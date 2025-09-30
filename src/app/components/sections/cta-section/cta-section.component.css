@@ -1,5 +1,8 @@
 #cta {
-  background: linear-gradient(135deg, var(--athenity-blue-deep) 0%, rgba(10, 25, 47, 0.95) 100%);
+  --section-surface-bg: linear-gradient(150deg, rgba(13, 28, 54, 0.88) 0%, rgba(7, 18, 36, 0.74) 100%);
+  --section-surface-border: rgba(255, 215, 0, 0.2);
+  --section-surface-shadow: 0 35px 80px rgba(5, 12, 26, 0.5);
+  --section-divider-opacity: 0.32;
 }
 
 /* Enhanced CTA animations */
