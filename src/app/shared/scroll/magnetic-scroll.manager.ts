@@ -67,6 +67,12 @@ export class MagneticScrollManager {
   private lastVelocity = 0;
   private skipSnapUntil = 0;
   private isAnimating = false;
+  private lastDominantIndex: number | null = null;
+  private lastUserActivityTs = typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
+  private lastAssistTs = 0;
+  private lastSnapTargetId: string | null = null;
 
   private lastSectionsSnapshot: ScrollSection[] = [];
 
@@ -103,6 +109,8 @@ export class MagneticScrollManager {
       clearTimeout(this.idleTimeoutId);
       this.idleTimeoutId = null;
     }
+    this.lastUserActivityTs = this.now();
+    this.lastSnapTargetId = null;
   }
 
   startScrollStopCheck(): void {
@@ -119,8 +127,9 @@ export class MagneticScrollManager {
   detectScrollIntention(velocity: number): void {
     if (this.prefersReducedMotion) return;
 
-    const now = performance.now();
+    const now = this.now();
     this.lastVelocity = velocity;
+    this.lastUserActivityTs = now;
 
     const absVelocity = Math.abs(velocity);
     if (absVelocity > this.config.velocityIgnoreThreshold) {
@@ -144,7 +153,7 @@ export class MagneticScrollManager {
       return false;
     }
 
-    const now = performance.now();
+    const now = this.now();
     if (now < this.skipSnapUntil) {
       return false;
     }
@@ -158,15 +167,36 @@ export class MagneticScrollManager {
     const next = sections[index + 1];
     const prev = sections[index - 1];
 
-    if (this.direction === 'forward' && progress >= this.config.progressForwardSnap && next) {
+    const timeSinceActivity = now - this.lastUserActivityTs;
+    const lowVelocity = Math.abs(this.lastVelocity) <= this.config.settleVelocityThreshold * 1.5;
+    const nearIdle = timeSinceActivity >= this.config.snapDelayMs;
+    const settled = lowVelocity && timeSinceActivity >= this.config.snapDelayMs / 2;
+
+    const leaps = this.lastDominantIndex === null ? 0 : Math.abs(index - this.lastDominantIndex);
+    this.lastDominantIndex = index;
+
+    if (!nearIdle && !settled) {
+      return false;
+    }
+
+    const shouldAssistIdle = nearIdle;
+
+    if (shouldAssistIdle) {
+      const assistTarget = this.resolveIdleAssist(dominant, prev, next);
+      if (assistTarget) {
+        return this.queueSnap(assistTarget, SnapReason.Idle);
+      }
+    }
+
+    if (settled && leaps <= 1 && this.direction === 'forward' && progress >= this.config.progressForwardSnap && next) {
       return this.queueSnap(next, SnapReason.ForwardProgress);
     }
 
-    if (this.direction === 'backward' && progress <= this.config.progressBackwardSnap && prev) {
+    if (settled && leaps <= 1 && this.direction === 'backward' && progress <= this.config.progressBackwardSnap && prev) {
       return this.queueSnap(prev, SnapReason.BackwardProgress);
     }
 
-    if (Math.abs(this.lastVelocity) <= this.config.settleVelocityThreshold) {
+    if (settled) {
       return this.snapToClosest(SnapReason.LowVelocity);
     }
 
@@ -205,6 +235,10 @@ export class MagneticScrollManager {
     this.direction = null;
     this.lastVelocity = 0;
     this.skipSnapUntil = 0;
+    this.lastDominantIndex = null;
+    this.lastSnapTargetId = null;
+    this.lastAssistTs = 0;
+    this.lastUserActivityTs = this.now();
   }
 
   private queueSnap(section: ScrollSection, reason: SnapReason): boolean {
@@ -212,13 +246,22 @@ export class MagneticScrollManager {
       return false;
     }
 
+    if (this.snapTimeoutId && this.lastSnapTargetId === section.id) {
+      return false;
+    }
+
     this.cancelPendingSnap();
 
     const targetElement = section.element;
+    const delay = this.getSnapDelay(reason);
+    this.lastSnapTargetId = section.id;
     this.snapTimeoutId = window.setTimeout(() => {
       this.snapTimeoutId = null;
+      if (reason === SnapReason.Idle || reason === SnapReason.LowVelocity) {
+        this.lastAssistTs = this.now();
+      }
       this.performSnap(targetElement, reason);
-    }, this.config.snapDelayMs);
+    }, delay);
 
     return true;
   }
@@ -258,7 +301,9 @@ export class MagneticScrollManager {
     const startY = window.scrollY;
     const delta = targetY - startY;
 
-    if (durationMs <= 0 || Math.abs(delta) < 1) {
+    const adaptiveDuration = this.computeAdaptiveDuration(delta, durationMs);
+
+    if (adaptiveDuration <= 0 || Math.abs(delta) < 1) {
       window.scrollTo(0, targetY);
       return;
     }
@@ -266,12 +311,12 @@ export class MagneticScrollManager {
     this.disableNativeSmooth();
     this.isAnimating = true;
 
-    const startTs = performance.now();
+    const startTs = this.now();
     const ease = this.config.easingFn;
 
     const step = () => {
-      const now = performance.now();
-      const t = Math.min(1, (now - startTs) / durationMs);
+      const now = this.now();
+      const t = Math.min(1, (now - startTs) / adaptiveDuration);
       const easedT = ease(t);
       const y = startY + delta * easedT;
       window.scrollTo(0, Math.round(y));
@@ -293,6 +338,10 @@ export class MagneticScrollManager {
     this.isAnimating = false;
     this.rafScrollId = null;
     this.restoreNativeSmooth();
+    this.lastSnapTargetId = null;
+    if (reason === SnapReason.Idle || reason === SnapReason.LowVelocity) {
+      this.lastAssistTs = this.now();
+    }
   }
 
   private cancelPendingSnap(): void {
@@ -306,6 +355,7 @@ export class MagneticScrollManager {
     }
     this.isAnimating = false;
     this.restoreNativeSmooth();
+    this.lastSnapTargetId = null;
   }
 
   private findDominantSection(sections: ScrollSection[]): { section: ScrollSection; index: number; progress: number } | null {
@@ -386,5 +436,95 @@ export class MagneticScrollManager {
     else body.style.scrollBehavior = this.prevScrollBehaviorBody;
     this.prevScrollBehaviorHtml = null;
     this.prevScrollBehaviorBody = null;
+  }
+
+  private getSnapDelay(reason: SnapReason): number {
+    if (reason === SnapReason.Programmatic) {
+      return 0;
+    }
+    if (reason === SnapReason.Idle || reason === SnapReason.LowVelocity) {
+      return this.config.snapDelayMs + 120;
+    }
+    return this.config.snapDelayMs;
+  }
+
+  private computeAdaptiveDuration(distance: number, baseDuration: number): number {
+    const absDistance = Math.abs(distance);
+    if (baseDuration <= 0) {
+      return baseDuration;
+    }
+
+    const minDuration = Math.max(280, baseDuration * 0.65);
+    const maxDuration = baseDuration * 1.5;
+
+    if (absDistance < 120) {
+      return minDuration;
+    }
+    if (absDistance > 1200) {
+      return Math.min(maxDuration, baseDuration + absDistance * 0.2);
+    }
+
+    const ratio = absDistance / 1200;
+    return Math.min(maxDuration, Math.max(minDuration, baseDuration * (0.65 + 0.35 * ratio)));
+  }
+
+  private resolveIdleAssist(
+    dominant: { section: ScrollSection; index: number; progress: number },
+    prev?: ScrollSection,
+    next?: ScrollSection
+  ): ScrollSection | null {
+    const now = this.now();
+    if (now - this.lastAssistTs < this.config.snapDelayMs) {
+      return null;
+    }
+
+    const candidate = this.findBestAlignmentCandidate([
+      prev,
+      dominant.section,
+      next
+    ]);
+
+    if (!candidate) {
+      return null;
+    }
+
+    const { section, distance } = candidate;
+    if (distance < 12) {
+      return null;
+    }
+
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 0;
+    const comfortableDistance = Math.max(180, viewportHeight * 0.28);
+    if (distance > comfortableDistance) {
+      return null;
+    }
+
+    if (this.lastSnapTargetId === section.id) {
+      return null;
+    }
+
+    return section;
+  }
+
+  private findBestAlignmentCandidate(
+    candidates: Array<ScrollSection | undefined>
+  ): { section: ScrollSection; distance: number } | null {
+    const currentY = window.scrollY;
+    const scored = candidates
+      .filter((section): section is ScrollSection => !!section && !!section.element)
+      .map(section => ({
+        section,
+        distance: Math.abs(this.getTargetY(section.element as HTMLElement) - currentY)
+      }))
+      .sort((a, b) => a.distance - b.distance);
+
+    return scored[0] ?? null;
+  }
+
+  private now(): number {
+    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+      return performance.now();
+    }
+    return Date.now();
   }
 }
