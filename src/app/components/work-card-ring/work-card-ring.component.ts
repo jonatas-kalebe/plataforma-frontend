@@ -83,6 +83,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private dragging = false;
   private pointerId: number | null = null;
   private lastPointerX = 0;
+  private lastPointerY = 0;
+  private activePointerType: PointerEvent['pointerType'] | null = null;
   private lastMoveTS = 0;
 
   private rafId: number | null = null;
@@ -90,6 +92,14 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
   private ringEl!: HTMLDivElement;
   private cardEls: HTMLDivElement[] = [];
+  private resizeListener: (() => void) | null = null;
+
+  private readonly baseSizing = {
+    ringViewport: this.ringViewport,
+    cardWidth: this.cardWidth,
+    cardHeight: this.cardHeight,
+    perspective: this.perspective,
+  };
 
   constructor(
     private zone: NgZone,
@@ -112,12 +122,22 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     if (!Number.isNaN(vp)) this.ringViewport = vp;
     this.hostRef.nativeElement.style.setProperty('--ring-viewport', `${this.ringViewport}px`);
 
+    this.baseSizing.ringViewport = this.ringViewport;
+    this.baseSizing.cardWidth = this.cardWidth;
+    this.baseSizing.cardHeight = this.cardHeight;
+    this.baseSizing.perspective = this.perspective;
+
     this.setupDOM();
     this.applyOrientationFlipVariable();
     this.recomputeBaseRadiusEffective();      // calcula raio de repouso com gap
     this.dynamicRadius = this.baseRadiusEffective;
     this.layoutCards(true);
     this.attachEvents();
+
+    this.zone.runOutsideAngular(() => {
+      this.applyResponsiveSizing(true);
+      this.installResizeListener();
+    });
 
     this.zone.runOutsideAngular(() => {
       this.prevTS = performance.now();
@@ -127,6 +147,11 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
   ngOnChanges(changes: SimpleChanges): void {
     if (!this.isBrowser) return;
+
+    if (changes['cardWidth']) this.baseSizing.cardWidth = this.cardWidth;
+    if (changes['cardHeight']) this.baseSizing.cardHeight = this.cardHeight;
+    if (changes['ringViewport']) this.baseSizing.ringViewport = this.ringViewport;
+    if (changes['perspective']) this.baseSizing.perspective = this.perspective;
 
     if (changes['items'] || changes['cardWidth'] || changes['baseRadius'] ||
       changes['minGapPx'] || changes['autoRadiusSpacing']) {
@@ -157,6 +182,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   ngOnDestroy(): void {
     if (!this.isBrowser) return;
     this.detachEvents();
+    this.removeResizeListener();
     if (this.rafId != null) cancelAnimationFrame(this.rafId);
   }
 
@@ -168,8 +194,12 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.dragging = true;
     this.pointerId = ev.pointerId;
     this.lastPointerX = ev.clientX;
+    this.lastPointerY = ev.clientY;
+    this.activePointerType = ev.pointerType;
     this.lastMoveTS = ev.timeStamp || performance.now();
-    this.ringEl.setPointerCapture(ev.pointerId);
+    if (ev.pointerType !== 'touch') {
+      this.ringEl.setPointerCapture(ev.pointerId);
+    }
     this.ringEl.style.cursor = 'grabbing';
     this.desiredRotationDeg = null;
   };
@@ -177,8 +207,14 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     if (!this.dragging || ev.pointerId !== this.pointerId) return;
     const now = ev.timeStamp || performance.now();
     const dx = ev.clientX - this.lastPointerX;
+    const dy = ev.clientY - this.lastPointerY;
+    if (this.activePointerType === 'touch' && Math.abs(dy) > Math.abs(dx) * 1.35) {
+      this.cancelTouchDrag();
+      return;
+    }
     const dt = Math.max(1, now - this.lastMoveTS) / 1000;
     this.lastPointerX = ev.clientX;
+    this.lastPointerY = ev.clientY;
     this.lastMoveTS = now;
 
     const deltaDeg = dx * this.dragSensitivity;
@@ -189,7 +225,12 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     if (ev.pointerId !== this.pointerId) return;
     this.dragging = false;
     this.pointerId = null;
-    this.ringEl.releasePointerCapture(ev.pointerId);
+    this.activePointerType = null;
+    try {
+      this.ringEl.releasePointerCapture(ev.pointerId);
+    } catch {
+      // ignore if pointer capture wasn't set
+    }
     this.ringEl.style.cursor = 'grab';
   };
 
@@ -209,8 +250,9 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.hostRef.nativeElement.style.setProperty('--ring-viewport', `${this.ringViewport}px`);
     this.hostRef.nativeElement.style.setProperty('--card-w', `${this.cardWidth}px`);
     this.hostRef.nativeElement.style.setProperty('--card-h', `${this.cardHeight}px`);
-    this.ringEl.style.touchAction = 'none';
+    this.ringEl.style.touchAction = 'pan-y pinch-zoom';
     this.ringEl.style.cursor = 'grab';
+    this.hostRef.nativeElement.style.touchAction = 'pan-y pinch-zoom';
   }
 
   private applyOrientationFlipVariable() {
@@ -262,6 +304,92 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     }
 
     this.lastRadiusApplied = radius;
+  }
+
+  private applyResponsiveSizing(force = false) {
+    if (!this.isBrowser) return;
+
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const config = { ...this.baseSizing };
+
+    if (width <= 420) {
+      config.cardWidth = Math.min(config.cardWidth, 180);
+      config.cardHeight = Math.min(config.cardHeight, 118);
+      config.ringViewport = Math.min(config.ringViewport, 240);
+      config.perspective = Math.min(config.perspective, 900);
+    } else if (width <= 640) {
+      config.cardWidth = Math.min(config.cardWidth, 200);
+      config.cardHeight = Math.min(config.cardHeight, 128);
+      config.ringViewport = Math.min(config.ringViewport, 270);
+      config.perspective = Math.min(config.perspective, 1000);
+    } else if (width <= 960 || height <= 800) {
+      config.cardWidth = Math.min(config.cardWidth, 220);
+      config.cardHeight = Math.min(config.cardHeight, 136);
+      config.ringViewport = Math.min(config.ringViewport, 300);
+      config.perspective = Math.min(config.perspective, 1100);
+    }
+
+    if (
+      !force &&
+      config.cardWidth === this.cardWidth &&
+      config.cardHeight === this.cardHeight &&
+      config.ringViewport === this.ringViewport &&
+      config.perspective === this.perspective
+    ) {
+      return;
+    }
+
+    this.cardWidth = config.cardWidth;
+    this.cardHeight = config.cardHeight;
+    this.ringViewport = config.ringViewport;
+    this.perspective = config.perspective;
+
+    this.hostRef.nativeElement.style.setProperty('--perspective', `${this.perspective}px`);
+    this.hostRef.nativeElement.style.setProperty('--ring-viewport', `${this.ringViewport}px`);
+    this.hostRef.nativeElement.style.setProperty('--card-w', `${this.cardWidth}px`);
+    this.hostRef.nativeElement.style.setProperty('--card-h', `${this.cardHeight}px`);
+
+    if (this.ringEl) {
+      this.recomputeBaseRadiusEffective();
+      this.dynamicRadius = this.baseRadiusEffective;
+      this.lastRadiusApplied = -1;
+      this.layoutCards(true);
+    }
+  }
+
+  private installResizeListener() {
+    if (!this.isBrowser || this.resizeListener) return;
+    const handler = () => this.applyResponsiveSizing();
+    window.addEventListener('resize', handler, { passive: true });
+    window.addEventListener('orientationchange', handler, { passive: true });
+    this.resizeListener = () => {
+      window.removeEventListener('resize', handler);
+      window.removeEventListener('orientationchange', handler);
+    };
+  }
+
+  private removeResizeListener() {
+    if (this.resizeListener) {
+      this.resizeListener();
+      this.resizeListener = null;
+    }
+  }
+
+  private cancelTouchDrag() {
+    if (!this.dragging) return;
+    if (this.pointerId != null) {
+      try {
+        this.ringEl.releasePointerCapture(this.pointerId);
+      } catch {
+        // ignore if pointer already released
+      }
+    }
+    this.dragging = false;
+    this.pointerId = null;
+    this.activePointerType = null;
+    this.ringEl.style.cursor = 'grab';
   }
 
   private attachEvents() {
@@ -389,6 +517,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
   @HostListener('window:resize')
   onResize() {
+    this.applyResponsiveSizing();
     const style = getComputedStyle(this.hostRef.nativeElement);
     const vp = parseFloat(style.getPropertyValue('--ring-viewport'));
     if (!Number.isNaN(vp) && vp !== this.ringViewport) {

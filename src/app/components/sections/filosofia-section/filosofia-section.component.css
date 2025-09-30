@@ -1,3 +1,17 @@
+.section-base {
+  overflow: visible;
+  align-items: stretch;
+  min-height: auto;
+}
+
+@media (min-width: 1024px) and (min-height: 800px) {
+  .section-base {
+    align-items: center;
+    min-height: 100vh;
+    min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+}
+
 .filosofia-content {
   opacity: 0;
   transform: translateX(-30px);
@@ -24,6 +38,13 @@
 .sticky-pin {
   position: sticky;
   top: 20vh;
+}
+
+@media (max-width: 1024px), (max-height: 820px) {
+  .sticky-pin {
+    position: relative;
+    top: auto;
+  }
 }
 
 /* Canvas hover feedback (leve) */

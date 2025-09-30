@@ -1,8 +1,8 @@
 :host {
-  --card-w: clamp(160px, 40vmin, 240px);
-  --card-h: calc(var(--card-w) * 0.6);
-  --ring-viewport: clamp(260px, 80vmin, 320px);
-  --font-size: clamp(0.875rem, 2.8vmin, 1.1rem);
+  --card-w: clamp(150px, 42vmin, 240px);
+  --card-h: calc(var(--card-w) * 0.62);
+  --ring-viewport: clamp(240px, 78vmin, 320px);
+  --font-size: clamp(0.8rem, 2.6vmin, 1.1rem);
   display: block;
 }
 
@@ -10,11 +10,11 @@
   perspective: var(--perspective, 1200px);
   display: grid;
   place-items: center;
-  width: 100%;
-  height: clamp(280px, 80vmin, 420px);
+  width: min(100%, var(--ring-viewport));
+  height: clamp(260px, 76vmin, 420px);
   position: relative;
   overflow: visible;
-  touch-action: none;
+  touch-action: pan-y pinch-zoom;
 }
 
 .ring {
@@ -98,4 +98,30 @@
     --font-size: clamp(1rem, 2.5vmin, 1.1rem);
   }
   .ring-wrap { height: clamp(320px, 70vmin, 420px); }
+}
+
+@media (max-width: 640px) {
+  :host {
+    --card-w: clamp(140px, 70vw, 200px);
+    --card-h: calc(var(--card-w) * 0.68);
+    --ring-viewport: clamp(210px, 86vw, 280px);
+    --font-size: clamp(0.75rem, 3vw, 0.95rem);
+  }
+
+  .ring-wrap {
+    height: clamp(220px, 90vw, 360px);
+  }
+}
+
+@media (max-width: 420px) {
+  :host {
+    --card-w: clamp(132px, 78vw, 188px);
+    --card-h: calc(var(--card-w) * 0.72);
+    --ring-viewport: clamp(200px, 92vw, 250px);
+    --font-size: clamp(0.7rem, 3.6vw, 0.9rem);
+  }
+
+  .ring-wrap {
+    height: clamp(210px, 95vw, 320px);
+  }
 }
