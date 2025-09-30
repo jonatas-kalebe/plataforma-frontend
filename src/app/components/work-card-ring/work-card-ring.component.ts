@@ -83,7 +83,11 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private dragging = false;
   private pointerId: number | null = null;
   private lastPointerX = 0;
+  private startPointerX = 0;
+  private startPointerY = 0;
   private lastMoveTS = 0;
+  private gestureMode: 'idle' | 'pending' | 'horizontal' | 'vertical' = 'idle';
+  private readonly gestureIntentThreshold = 12;
 
   private rafId: number | null = null;
   private prevTS = 0;
@@ -165,17 +169,42 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
   // Pointer
   onPointerDown = (ev: PointerEvent) => {
-    this.dragging = true;
+    this.dragging = false;
     this.pointerId = ev.pointerId;
+    this.startPointerX = ev.clientX;
+    this.startPointerY = ev.clientY;
     this.lastPointerX = ev.clientX;
     this.lastMoveTS = ev.timeStamp || performance.now();
-    this.ringEl.setPointerCapture(ev.pointerId);
-    this.ringEl.style.cursor = 'grabbing';
+    this.gestureMode = 'pending';
     this.desiredRotationDeg = null;
   };
   onPointerMove = (ev: PointerEvent) => {
-    if (!this.dragging || ev.pointerId !== this.pointerId) return;
+    if (ev.pointerId !== this.pointerId) return;
+
     const now = ev.timeStamp || performance.now();
+    const totalDx = ev.clientX - this.startPointerX;
+    const totalDy = ev.clientY - this.startPointerY;
+
+    if (this.gestureMode === 'pending') {
+      const movedEnough = Math.abs(totalDx) > this.gestureIntentThreshold || Math.abs(totalDy) > this.gestureIntentThreshold;
+      if (!movedEnough) return;
+
+      if (Math.abs(totalDy) > Math.abs(totalDx)) {
+        this.gestureMode = 'vertical';
+        return;
+      }
+
+      this.gestureMode = 'horizontal';
+      this.dragging = true;
+      this.ringEl.setPointerCapture(ev.pointerId);
+      this.ringEl.style.cursor = 'grabbing';
+      this.lastPointerX = ev.clientX;
+      this.lastMoveTS = now;
+      return;
+    }
+
+    if (this.gestureMode !== 'horizontal' || !this.dragging) return;
+
     const dx = ev.clientX - this.lastPointerX;
     const dt = Math.max(1, now - this.lastMoveTS) / 1000;
     this.lastPointerX = ev.clientX;
@@ -187,9 +216,14 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   };
   onPointerUp = (ev: PointerEvent) => {
     if (ev.pointerId !== this.pointerId) return;
+
+    if (this.gestureMode === 'horizontal' && (!this.ringEl.hasPointerCapture || this.ringEl.hasPointerCapture(ev.pointerId))) {
+      this.ringEl.releasePointerCapture(ev.pointerId);
+    }
+
     this.dragging = false;
     this.pointerId = null;
-    this.ringEl.releasePointerCapture(ev.pointerId);
+    this.gestureMode = 'idle';
     this.ringEl.style.cursor = 'grab';
   };
 
@@ -209,7 +243,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.hostRef.nativeElement.style.setProperty('--ring-viewport', `${this.ringViewport}px`);
     this.hostRef.nativeElement.style.setProperty('--card-w', `${this.cardWidth}px`);
     this.hostRef.nativeElement.style.setProperty('--card-h', `${this.cardHeight}px`);
-    this.ringEl.style.touchAction = 'none';
+    this.ringEl.style.touchAction = 'pan-y';
     this.ringEl.style.cursor = 'grab';
   }
 
