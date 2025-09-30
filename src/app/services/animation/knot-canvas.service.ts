@@ -50,6 +50,16 @@ export class KnotCanvasService {
   private cfg: KnotConfig = { ...this.DEFAULT_CONFIG };
   private ready = false;
   private progress = 0;
+  /**
+   * Percentual do progresso (0-1) que mantém a linha ainda embolada
+   * antes de começar a se alinhar visualmente.
+   */
+  private readonly PROGRESS_DELAY = 0.28;
+  /**
+   * Janela em que forçamos o progresso para 1 garantindo a linha reta
+   * quando o componente aplica o "snap" de centralização.
+   */
+  private readonly SNAP_THRESHOLD = 0.97;
 
   initializeKnot(
     host: HTMLElement,
@@ -220,12 +230,14 @@ export class KnotCanvasService {
   private renderProgress(progress: number): void {
     if (!this.pathEl || this.originalPoints.length === 0) return;
 
-    if (progress <= 0) {
+    const mappedProgress = this.transformProgress(progress);
+
+    if (mappedProgress <= 0) {
       this.pathEl.setAttribute('d', this.originalPathD);
       return;
     }
 
-    if (progress >= 1) {
+    if (mappedProgress >= 1) {
       const d = this.buildPath(this.straightPoints);
       this.pathEl.setAttribute('d', d);
       return;
@@ -234,13 +246,34 @@ export class KnotCanvasService {
     const interpolated = this.originalPoints.map((start, index) => {
       const end = this.straightPoints[index];
       return {
-        x: start.x + (end.x - start.x) * progress,
-        y: start.y + (end.y - start.y) * progress,
+        x: start.x + (end.x - start.x) * mappedProgress,
+        y: start.y + (end.y - start.y) * mappedProgress,
       };
     });
 
     const d = this.buildPath(interpolated);
     this.pathEl.setAttribute('d', d);
+  }
+
+  private transformProgress(progress: number): number {
+    const clamped = this.clamp01(progress);
+
+    if (clamped <= 0) return 0;
+    if (clamped >= 1 || clamped >= this.SNAP_THRESHOLD) return 1;
+
+    const delay = this.clamp01(this.PROGRESS_DELAY);
+    if (clamped <= delay) return 0;
+
+    const effectiveMax = Math.max(delay + 0.01, Math.min(this.SNAP_THRESHOLD, 0.999));
+    const range = effectiveMax - delay;
+    if (range <= 0) {
+      return clamped >= this.SNAP_THRESHOLD ? 1 : clamped;
+    }
+
+    const normalised = (clamped - delay) / range;
+    const eased = normalised * normalised * normalised;
+
+    return this.clamp01(eased);
   }
 
   private buildPath(points: Point[]): string {
