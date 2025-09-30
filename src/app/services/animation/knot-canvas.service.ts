@@ -25,6 +25,10 @@ export interface KnotConfig {
   noiseAmplitude: number;
   harmonics: number;
 
+  // Física baseada em partículas
+  usePhysics?: boolean;
+  physicsNodes?: number;
+
   // Aleatoriedade e variação
   seed?: number;
   patternChaos?: number;        // 0..1
@@ -79,6 +83,8 @@ export class KnotCanvasService {
     loopRadiusMax: 86,
     noiseAmplitude: 100,
     harmonics: 8,
+    usePhysics: true,
+    physicsNodes: 60,
 
     // Aleatoriedade
     seed: undefined,
@@ -142,6 +148,23 @@ export class KnotCanvasService {
   private jPhaseX: Float32Array = new Float32Array(0);
   private jPhaseY: Float32Array = new Float32Array(0);
 
+  // --- Física PBD ---
+  private rPos = new Float32Array(0);
+  private rPrev = new Float32Array(0);
+  private rInv = new Float32Array(0);
+  private segLen = 0;
+  private readonly iter = 12;
+  private readonly gravity = 900;
+  private readonly friction = 0.992;
+  private readonly selfRadius = 10;
+  private readonly agitationMax = 14;
+  private readonly pinAlphaBase = 0.08;
+  private anchorL: { x: number; y: number } = { x: 0, y: 0 };
+  private anchorR: { x: number; y: number } = { x: 0, y: 0 };
+  private readonly useSoftPins = true;
+  private physState = { agitationNow: 0, alignLine: 0 };
+  private physNeedsStep = 0;
+
   // RAF e tempo
   private rafId = 0;
   private timeAcc = 0; // avança apenas quando em movimento (para congelar no idle)
@@ -174,6 +197,9 @@ export class KnotCanvasService {
     this.setupCanvasDimensions(true);
     this.prepareLoops();
     this.buildOffsets();
+    if (this.cfg.usePhysics) {
+      this.initRope();
+    }
 
     // Inicia RAF se houver jitter temporal e animação habilitada
     this.startRafIfNeeded();
@@ -183,6 +209,9 @@ export class KnotCanvasService {
         this.setupCanvasDimensions(true);
         this.prepareLoops();
         this.buildOffsets();
+        if (this.cfg.usePhysics) {
+          this.initRope();
+        }
         this.setProgress(initialProgress);
       });
     } else {
@@ -211,6 +240,7 @@ export class KnotCanvasService {
     }
 
     this.lastProgress = this.progress;
+    this.updatePhysicsTargets();
     this.draw();
   }
 
@@ -252,6 +282,10 @@ export class KnotCanvasService {
     }
     this.prepareLoops();
     this.buildOffsets();
+    if (this.cfg.usePhysics) {
+      this.initRope();
+      this.updatePhysicsTargets();
+    }
     this.startRafIfNeeded();
     this.draw();
   }
@@ -262,6 +296,10 @@ export class KnotCanvasService {
     if (!changed) return;
     this.prepareLoops();
     this.buildOffsets();
+    if (this.cfg.usePhysics) {
+      this.initRope();
+      this.updatePhysicsTargets();
+    }
     this.draw();
   }
 
@@ -293,6 +331,13 @@ export class KnotCanvasService {
     this.jFreqY = new Float32Array(0);
     this.jPhaseX = new Float32Array(0);
     this.jPhaseY = new Float32Array(0);
+
+    this.rPos = new Float32Array(0);
+    this.rPrev = new Float32Array(0);
+    this.rInv = new Float32Array(0);
+    this.segLen = 0;
+    this.physState = { agitationNow: 0, alignLine: 0 };
+    this.physNeedsStep = 0;
   }
 
   // --- Internos ---
@@ -507,67 +552,98 @@ export class KnotCanvasService {
     const endX = width * 0.94;
     const lengthX = endX - startX;
 
-    // Retângulo seguro
-    const padCfg = Math.max(0, this.cfg.boundsPadding ?? 16);
-    const effectivePad = Math.min(padCfg, Math.max(0, (lengthX / 2) - 4));
-    const minX = startX + effectivePad;
-    const maxX = endX - effectivePad;
-    const minY = effectivePad;
-    const maxY = height - effectivePad;
+    let path: { x: number; y: number }[];
 
-    // Fator de “bagunça” com decaimento (snap total em 1.0)
-    const fall = Math.max(0.6, this.cfg.globalFalloff ?? 1.0);
-    let wave = Math.pow(1 - this.progress, fall);
-    if (this.progress >= 0.999) {
-      wave = 0; // linha 100% reta ao chegar no fim
-    }
-
-    // Jitter temporal só aparece quando ainda há “bagunça”
-    const jitterGlobalAmp = (this.cfg.timeJitterAmplitude ?? 0) * Math.pow(wave, 0.85);
-    const jitterSpeed = Math.max(0.05, this.cfg.timeJitterSpeed ?? 0.8);
-    const time = this.timeAcc * jitterSpeed;
-
-    const segments = Math.min(this.offsetsX.length - 1, Math.max(2, this.cfg.segments | 0));
-    const path: { x: number; y: number }[] = new Array(segments + 1);
-
-    for (let i = 0; i <= segments; i++) {
-      const t = i / segments;
-      const baseX = startX + t * lengthX;
-      const baseY = centerY;
-
-      // Offsets “base”
-      let ox0 = this.offsetsX[i] * wave;
-      let oy0 = this.offsetsY[i] * wave;
-
-      // Jitter temporal (orgânico, congelado quando idle)
-      if (jitterGlobalAmp > 0) {
-        const jx = jitterGlobalAmp * this.jAmpX[i] * Math.sin(time * (1.2 + this.jFreqX[i]) + this.jPhaseX[i] + t * (2.0 + 5.0 * this.jFreqX[i]));
-        const jy = jitterGlobalAmp * this.jAmpY[i] * Math.cos(time * (1.1 + this.jFreqY[i]) + this.jPhaseY[i] + t * (1.5 + 4.5 * this.jFreqY[i]));
-        ox0 += jx;
-        oy0 += jy;
+    if (this.cfg.usePhysics && this.rPos.length > 0) {
+      const n = this.rInv.length;
+      path = new Array(n);
+      for (let i = 0; i < n; i++) {
+        path[i] = { x: this.rPos[2 * i], y: this.rPos[2 * i + 1] };
       }
 
-      // Limites permitidos a partir do ponto base
-      const allowNegX = baseX - minX;
-      const allowPosX = maxX - baseX;
-      const allowNegY = baseY - minY;
-      const allowPosY = maxY - baseY;
+      const align = Math.max(0, Math.min(1, this.physState.alignLine));
+      if (align > 0 && n >= 2) {
+        const Ax = path[0].x;
+        const Ay = path[0].y;
+        const Bx = path[n - 1].x;
+        const By = path[n - 1].y;
+        const vx = Bx - Ax;
+        const vy = By - Ay;
+        const v2 = vx * vx + vy * vy || 1e-6;
+        const weight = 0.015 * align;
+        for (let i = 1; i < n - 1; i++) {
+          const px = path[i].x - Ax;
+          const py = path[i].y - Ay;
+          const t = Math.max(0, Math.min(1, (px * vx + py * vy) / v2));
+          const qx = Ax + t * vx;
+          const qy = Ay + t * vy;
+          path[i].x += (qx - path[i].x) * weight;
+          path[i].y += (qy - path[i].y) * weight;
+        }
+      }
+    } else {
+      // Retângulo seguro
+      const padCfg = Math.max(0, this.cfg.boundsPadding ?? 16);
+      const effectivePad = Math.min(padCfg, Math.max(0, (lengthX / 2) - 4));
+      const minX = startX + effectivePad;
+      const maxX = endX - effectivePad;
+      const minY = effectivePad;
+      const maxY = height - effectivePad;
 
-      // Fatores de escala para manter dentro da caixa
-      let sX = 1;
-      if (ox0 < 0 && allowNegX < Math.abs(ox0)) sX = allowNegX / Math.max(1e-6, Math.abs(ox0));
-      else if (ox0 > 0 && allowPosX < Math.abs(ox0)) sX = allowPosX / Math.max(1e-6, Math.abs(ox0));
+      // Fator de “bagunça” com decaimento (snap total em 1.0)
+      const fall = Math.max(0.6, this.cfg.globalFalloff ?? 1.0);
+      let wave = Math.pow(1 - this.progress, fall);
+      if (this.progress >= 0.999) {
+        wave = 0; // linha 100% reta ao chegar no fim
+      }
 
-      let sY = 1;
-      if (oy0 < 0 && allowNegY < Math.abs(oy0)) sY = allowNegY / Math.max(1e-6, Math.abs(oy0));
-      else if (oy0 > 0 && allowPosY < Math.abs(oy0)) sY = allowPosY / Math.max(1e-6, Math.abs(oy0));
+      // Jitter temporal só aparece quando ainda há “bagunça”
+      const jitterGlobalAmp = (this.cfg.timeJitterAmplitude ?? 0) * Math.pow(wave, 0.85);
+      const jitterSpeed = Math.max(0.05, this.cfg.timeJitterSpeed ?? 0.8);
+      const time = this.timeAcc * jitterSpeed;
 
-      const s = Math.max(0, Math.min(1, Math.min(sX, sY)));
+      const segments = Math.min(this.offsetsX.length - 1, Math.max(2, this.cfg.segments | 0));
+      path = new Array(segments + 1);
 
-      const x = baseX + ox0 * s;
-      const y = baseY + oy0 * s;
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const baseX = startX + t * lengthX;
+        const baseY = centerY;
 
-      path[i] = { x, y };
+        // Offsets “base”
+        let ox0 = this.offsetsX[i] * wave;
+        let oy0 = this.offsetsY[i] * wave;
+
+        // Jitter temporal (orgânico, congelado quando idle)
+        if (jitterGlobalAmp > 0) {
+          const jx = jitterGlobalAmp * this.jAmpX[i] * Math.sin(time * (1.2 + this.jFreqX[i]) + this.jPhaseX[i] + t * (2.0 + 5.0 * this.jFreqX[i]));
+          const jy = jitterGlobalAmp * this.jAmpY[i] * Math.cos(time * (1.1 + this.jFreqY[i]) + this.jPhaseY[i] + t * (1.5 + 4.5 * this.jFreqY[i]));
+          ox0 += jx;
+          oy0 += jy;
+        }
+
+        // Limites permitidos a partir do ponto base
+        const allowNegX = baseX - minX;
+        const allowPosX = maxX - baseX;
+        const allowNegY = baseY - minY;
+        const allowPosY = maxY - baseY;
+
+        // Fatores de escala para manter dentro da caixa
+        let sX = 1;
+        if (ox0 < 0 && allowNegX < Math.abs(ox0)) sX = allowNegX / Math.max(1e-6, Math.abs(ox0));
+        else if (ox0 > 0 && allowPosX < Math.abs(ox0)) sX = allowPosX / Math.max(1e-6, Math.abs(ox0));
+
+        let sY = 1;
+        if (oy0 < 0 && allowNegY < Math.abs(oy0)) sY = allowNegY / Math.max(1e-6, Math.abs(oy0));
+        else if (oy0 > 0 && allowPosY < Math.abs(oy0)) sY = allowPosY / Math.max(1e-6, Math.abs(oy0));
+
+        const s = Math.max(0, Math.min(1, Math.min(sX, sY)));
+
+        const x = baseX + ox0 * s;
+        const y = baseY + oy0 * s;
+
+        path[i] = { x, y };
+      }
     }
 
     // Aparência
@@ -602,8 +678,8 @@ export class KnotCanvasService {
 
   // RAF: só avança tempo quando há movimento (para congelar jitter no idle)
   private startRafIfNeeded(): void {
-    const needJitter = (this.cfg.animate && (this.cfg.timeJitterAmplitude ?? 0) > 0);
-    if (!needJitter) {
+    const needRaf = (this.cfg.animate && (this.cfg.timeJitterAmplitude ?? 0) > 0) || (this.cfg.usePhysics ?? false);
+    if (!needRaf) {
       if (this.rafId) cancelAnimationFrame(this.rafId);
       this.rafId = 0;
       return;
@@ -622,6 +698,18 @@ export class KnotCanvasService {
       if (moving) {
         // Avança o tempo apenas quando há movimento
         this.timeAcc += dt;
+      }
+      if (this.cfg.usePhysics && this.rPos.length > 0) {
+        const agitation = this.physState.agitationNow ?? this.agitationMax;
+        const safeDt = Math.min(dt > 0 ? dt : 1 / 60, 1 / 30);
+        if (moving || this.physNeedsStep > 0) {
+          this.physicsStep(safeDt, agitation);
+          if (moving) {
+            this.physNeedsStep = Math.max(this.physNeedsStep, 5);
+          } else if (this.physNeedsStep > 0) {
+            this.physNeedsStep--;
+          }
+        }
       }
       // Redesenha (inclui jitter temporal)
       this.draw();
@@ -662,5 +750,189 @@ export class KnotCanvasService {
 
   private clamp01(v: number): number {
     return Math.max(0, Math.min(1, v));
+  }
+
+  private initRope(): void {
+    if (!this.canvas) return;
+    const width = this.cssWidth() || (this.canvas.width / this.dpr);
+    const height = this.cssHeight() || (this.canvas.height / this.dpr);
+    const nodeCount = Math.max(6, this.cfg.physicsNodes ?? 60);
+
+    const centerY = height / 2;
+    const startX = width * 0.06;
+    const endX = width * 0.94;
+
+    this.rPos = new Float32Array(nodeCount * 2);
+    this.rPrev = new Float32Array(nodeCount * 2);
+    this.rInv = new Float32Array(nodeCount).fill(1);
+
+    for (let i = 0; i < nodeCount; i++) {
+      const t = i / (nodeCount - 1 || 1);
+      const x = startX * (1 - t) + endX * t;
+      const y = centerY;
+      this.rPos[2 * i] = this.rPrev[2 * i] = x;
+      this.rPos[2 * i + 1] = this.rPrev[2 * i + 1] = y;
+    }
+
+    if (nodeCount >= 2) {
+      const dx = this.rPos[2] - this.rPos[0];
+      const dy = this.rPos[3] - this.rPos[1];
+      this.segLen = Math.hypot(dx, dy);
+    } else {
+      this.segLen = 0;
+    }
+
+    this.anchorL = { x: startX, y: centerY };
+    this.anchorR = { x: endX, y: centerY };
+    this.physNeedsStep = 12;
+  }
+
+  private updatePhysicsTargets(): void {
+    if (!this.cfg.usePhysics || this.rPos.length === 0) {
+      return;
+    }
+
+    const width = this.cssWidth() || (this.canvas?.width || 0) / (this.dpr || 1);
+    const height = this.cssHeight() || (this.canvas?.height || 0) / (this.dpr || 1);
+    const centerY = height / 2;
+    const startX = width * 0.06;
+    const endX = width * 0.94;
+    const mid = (startX + endX) * 0.5;
+    const spread = (endX - startX) * 0.48;
+
+    const ease = (t: number) => 1 - Math.pow(1 - t, 2);
+    const eased = ease(this.progress);
+
+    const jitter = (j: number) => (Math.random() * 2 - 1) * j;
+    const nearMidL = {
+      x: mid - (1 - eased) * spread * 0.8 + jitter(6),
+      y: centerY + jitter(6)
+    };
+    const nearMidR = {
+      x: mid + (1 - eased) * spread * 0.8 + jitter(6),
+      y: centerY + jitter(6)
+    };
+
+    const destL = { x: startX, y: centerY };
+    const destR = { x: endX, y: centerY };
+
+    this.anchorL.x = nearMidL.x * (1 - eased) + destL.x * eased;
+    this.anchorL.y = nearMidL.y * (1 - eased) + destL.y * eased;
+    this.anchorR.x = nearMidR.x * (1 - eased) + destR.x * eased;
+    this.anchorR.y = nearMidR.y * (1 - eased) + destR.y * eased;
+
+    this.physState.agitationNow = this.agitationMax * Math.pow(1 - this.progress, 1.1);
+    this.physState.alignLine = this.progress > 0.92 ? (this.progress - 0.92) / 0.08 : 0;
+    this.physNeedsStep = Math.max(this.physNeedsStep, 18);
+  }
+
+  private physicsStep(dt: number, agitation: number): void {
+    const n = this.rInv.length;
+    if (!this.cfg.usePhysics || n === 0) {
+      return;
+    }
+
+    for (let i = 0; i < n; i++) {
+      const ix = 2 * i;
+      const iy = ix + 1;
+      const x = this.rPos[ix];
+      const y = this.rPos[iy];
+      let vx = (x - this.rPrev[ix]) * this.friction;
+      let vy = (y - this.rPrev[iy]) * this.friction + this.gravity * dt * dt;
+
+      if (agitation > 0) {
+        vx += (Math.random() - 0.5) * agitation;
+        vy += (Math.random() - 0.5) * agitation;
+      }
+
+      this.rPrev[ix] = x;
+      this.rPrev[iy] = y;
+      this.rPos[ix] = x + vx;
+      this.rPos[iy] = y + vy;
+    }
+
+    const width = this.cssWidth() || (this.canvas?.width || 0) / (this.dpr || 1);
+    const height = this.cssHeight() || (this.canvas?.height || 0) / (this.dpr || 1);
+    const pad = Math.max(0, this.cfg.boundsPadding ?? 16);
+    const minX = width * 0.06 + pad;
+    const maxX = width * 0.94 - pad;
+    const minY = pad;
+    const maxY = height - pad;
+
+    for (let iteration = 0; iteration < this.iter; iteration++) {
+      for (let i = 0; i < n - 1; i++) {
+        const a = 2 * i;
+        const b = 2 * (i + 1);
+        const dx = this.rPos[b] - this.rPos[a];
+        const dy = this.rPos[b + 1] - this.rPos[a + 1];
+        const d = Math.hypot(dx, dy) || 1e-6;
+        const diff = (d - this.segLen) / d;
+        const w1 = this.rInv[i];
+        const w2 = this.rInv[i + 1];
+        const w = w1 + w2 || 1e-6;
+        const cx = dx * diff;
+        const cy = dy * diff;
+        if (w1 > 0) {
+          this.rPos[a] -= cx * (w1 / w);
+          this.rPos[a + 1] -= cy * (w1 / w);
+        }
+        if (w2 > 0) {
+          this.rPos[b] += cx * (w2 / w);
+          this.rPos[b + 1] += cy * (w2 / w);
+        }
+      }
+
+      if (this.useSoftPins && n >= 2) {
+        const alpha = this.pinAlphaBase / this.iter;
+        if (this.rInv[0] > 0) {
+          const ax = this.anchorL.x - this.rPos[0];
+          const ay = this.anchorL.y - this.rPos[1];
+          this.rPos[0] += ax * alpha;
+          this.rPos[1] += ay * alpha;
+        }
+        const idx = n - 1;
+        const b = 2 * idx;
+        if (this.rInv[idx] > 0) {
+          const bx = this.anchorR.x - this.rPos[b];
+          const by = this.anchorR.y - this.rPos[b + 1];
+          this.rPos[b] += bx * alpha;
+          this.rPos[b + 1] += by * alpha;
+        }
+      }
+
+      const radiusSq = this.selfRadius * this.selfRadius;
+      for (let i = 0; i < n; i++) {
+        const ai = 2 * i;
+        for (let j = i + 2; j < n; j++) {
+          const bi = 2 * j;
+          const dx = this.rPos[bi] - this.rPos[ai];
+          const dy = this.rPos[bi + 1] - this.rPos[ai + 1];
+          const distSq = dx * dx + dy * dy;
+          if (distSq < radiusSq) {
+            const dist = Math.sqrt(distSq) || 1e-6;
+            const penetration = (this.selfRadius - dist) * 0.5;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            if (this.rInv[i] > 0) {
+              this.rPos[ai] -= nx * penetration;
+              this.rPos[ai + 1] -= ny * penetration;
+            }
+            if (this.rInv[j] > 0) {
+              this.rPos[bi] += nx * penetration;
+              this.rPos[bi + 1] += ny * penetration;
+            }
+          }
+        }
+      }
+
+      for (let i = 0; i < n; i++) {
+        const ix = 2 * i;
+        const iy = ix + 1;
+        if (this.rPos[ix] < minX) this.rPos[ix] = minX;
+        if (this.rPos[ix] > maxX) this.rPos[ix] = maxX;
+        if (this.rPos[iy] < minY) this.rPos[iy] = minY;
+        if (this.rPos[iy] > maxY) this.rPos[iy] = maxY;
+      }
+    }
   }
 }
