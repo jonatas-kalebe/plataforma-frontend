@@ -74,11 +74,20 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private dragging = false;
   private pointerId: number | null = null;
   private lastPointerX = 0;
+  private lastPointerY = 0;
   private startPointerX = 0;
   private startPointerY = 0;
   private gesture: 'idle' | 'pending' | 'rotate' | 'scroll' = 'idle';
   private lastMoveTS = 0;
   private lastDragEndTS = 0; // Track when drag ended to delay snap
+
+  private ringBounds: DOMRect | null = null;
+  private lastPointerAngle = 0;
+  private pointerAngleValid = false;
+  private smoothedDragDelta = 0;
+  private readonly dragSmoothing = 0.25;
+  private velocitySamples: { time: number; velocity: number }[] = [];
+  private readonly velocityWindowMs = 140;
 
   private rafId: number | null = null;
   private prevTS = 0;
@@ -113,6 +122,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.dynamicRadius = this.baseRadiusEffective;
     this.layoutCards(true);
     this.attachEvents();
+    this.updateRingBounds();
 
     this.zone.runOutsideAngular(() => {
       this.prevTS = performance.now();
@@ -166,10 +176,16 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.startPointerX = ev.clientX;
     this.startPointerY = ev.clientY;
     this.lastPointerX = ev.clientX;
+    this.lastPointerY = ev.clientY;
     this.lastMoveTS = ev.timeStamp || performance.now();
     this.desiredRotationDeg = null;
     this.gesture = 'pending';
     this.dragging = false;
+    this.updateRingBounds();
+    this.lastPointerAngle = this.computePointerAngle(ev.clientX, ev.clientY);
+    this.pointerAngleValid = Number.isFinite(this.lastPointerAngle);
+    this.smoothedDragDelta = 0;
+    this.velocitySamples = [];
     // Don't reset angular velocity - let natural friction handle it
     this.ringEl.style.cursor = 'grab';
     this.ringEl.style.touchAction = 'pan-y';
@@ -211,12 +227,40 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     if (this.gesture !== 'rotate') return;
 
     const dx = ev.clientX - this.lastPointerX;
-    const deltaDeg = dx * this.dragSensitivity;
-    this.rotationDeg += deltaDeg;
-    this.angularVelocity = deltaDeg / dt;
+    const dy = ev.clientY - this.lastPointerY;
+
+    let deltaDeg = dx * this.dragSensitivity;
+
+    if (this.pointerAngleValid) {
+      const currentAngle = this.computePointerAngle(ev.clientX, ev.clientY);
+      if (Number.isFinite(currentAngle)) {
+        let deltaRad = currentAngle - this.lastPointerAngle;
+        if (deltaRad < -Math.PI) deltaRad += Math.PI * 2;
+        if (deltaRad > Math.PI) deltaRad -= Math.PI * 2;
+        const angleDeg = deltaRad * (180 / Math.PI);
+        const blend = 0.65;
+        deltaDeg = deltaDeg * (1 - blend) + angleDeg * this.dragSensitivity * blend;
+        this.lastPointerAngle = currentAngle;
+      } else {
+        this.pointerAngleValid = false;
+      }
+    }
+
+    const verticalAssist = dy * this.dragSensitivity * 0.18;
+    deltaDeg += verticalAssist;
+
+    this.smoothedDragDelta = this.smoothedDragDelta * (1 - this.dragSmoothing) + deltaDeg * this.dragSmoothing;
+    const appliedDelta = this.smoothedDragDelta;
+
+    this.rotationDeg += appliedDelta;
+    const velocity = appliedDelta / dt;
+    this.angularVelocity = velocity;
+    this.recordVelocitySample(now, velocity);
 
     this.lastPointerX = ev.clientX;
+    this.lastPointerY = ev.clientY;
     this.lastMoveTS = now;
+    ev.preventDefault();
   };
 
   onPointerUp = (ev: PointerEvent) => {
@@ -232,10 +276,10 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       this.ringEl.style.cursor = 'grab';
 
       // If angular velocity is very high, cap it to prevent extreme spinning
+      const releaseVelocity = this.computeReleaseVelocity();
       const maxReleaseVelocity = 200; // degrees per second
-      if (Math.abs(this.angularVelocity) > maxReleaseVelocity) {
-        this.angularVelocity = Math.sign(this.angularVelocity) * maxReleaseVelocity;
-      }
+      const cappedVelocity = Math.max(-maxReleaseVelocity, Math.min(maxReleaseVelocity, releaseVelocity));
+      this.angularVelocity = cappedVelocity;
     }
 
     this.dragging = false;
@@ -318,11 +362,11 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   }
 
   private attachEvents() {
-    this.ringEl.addEventListener('pointerdown', this.onPointerDown, { passive: true });
-    this.ringEl.addEventListener('pointermove', this.onPointerMove, { passive: true });
-    this.ringEl.addEventListener('pointerup', this.onPointerUp, { passive: true });
-    this.ringEl.addEventListener('pointercancel', this.onPointerCancel, { passive: true });
-    this.ringEl.addEventListener('pointerleave', this.onPointerUp, { passive: true });
+    this.ringEl.addEventListener('pointerdown', this.onPointerDown);
+    this.ringEl.addEventListener('pointermove', this.onPointerMove);
+    this.ringEl.addEventListener('pointerup', this.onPointerUp);
+    this.ringEl.addEventListener('pointercancel', this.onPointerCancel);
+    this.ringEl.addEventListener('pointerleave', this.onPointerUp);
     this.ringEl.addEventListener('wheel', this.wheelHandler, { passive: !this.interceptWheel });
   }
 
@@ -457,5 +501,42 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       this.lastRadiusApplied = -1;
       this.layoutCards(true);
     }
+    this.updateRingBounds();
+  }
+
+  private updateRingBounds() {
+    this.ringBounds = this.ringEl?.getBoundingClientRect() ?? null;
+  }
+
+  private computePointerAngle(x: number, y: number): number {
+    if (!this.ringBounds) this.updateRingBounds();
+    const bounds = this.ringBounds;
+    if (!bounds) return Number.NaN;
+    const cx = bounds.left + bounds.width / 2;
+    const cy = bounds.top + bounds.height / 2;
+    return Math.atan2(y - cy, x - cx);
+  }
+
+  private recordVelocitySample(time: number, velocity: number) {
+    const now = time;
+    this.velocitySamples.push({ time: now, velocity });
+    const cutoff = now - this.velocityWindowMs;
+    while (this.velocitySamples.length && this.velocitySamples[0].time < cutoff) {
+      this.velocitySamples.shift();
+    }
+  }
+
+  private computeReleaseVelocity(): number {
+    if (!this.velocitySamples.length) return this.angularVelocity;
+    const latestTime = this.velocitySamples[this.velocitySamples.length - 1].time;
+    let weightSum = 0;
+    let total = 0;
+    for (const sample of this.velocitySamples) {
+      const age = Math.max(0, latestTime - sample.time);
+      const weight = Math.max(0.05, 1 - age / this.velocityWindowMs);
+      total += sample.velocity * weight;
+      weightSum += weight;
+    }
+    return weightSum > 0 ? total / weightSum : this.angularVelocity;
   }
 }
