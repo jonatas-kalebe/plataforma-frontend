@@ -40,12 +40,12 @@ const SCROLL_SECTION_SELECTORS = SCROLL_SECTION_IDS.map(id => `#${id}`);
 
 const SNAP_SCROLL_BEHAVIOR: SnapScrollConfig = {
   snapDurationMs: 920,
-  snapDelayMs: 180,  // Increased from 110 to be more conservative
-  backwardSnapExtraDelayMs: 180,  // Increased from 140
+  snapDelayMs: 110,
+  backwardSnapExtraDelayMs: 140,
   backwardSnapDurationMultiplier: 1.3,
-  idleSnapDelayMs: 280,  // Increased from 210 to wait longer for true idle
+  idleSnapDelayMs: 210,
   velocityIgnoreThreshold: 1.8,
-  settleVelocityThreshold: 0.3,  // Reduced from 0.45 - must be MORE still to snap
+  settleVelocityThreshold: 0.45,
   flingVelocityThreshold: 140,
   progressForwardSnap: 0.82,
   progressBackwardSnap: 0.18,
@@ -261,11 +261,10 @@ export class ScrollOrchestrationService {
     // Atualiza direção do scroll
     this.scrollDirection = velocity > 0 ? 'down' : velocity < 0 ? 'up' : 'none';
     
-    // CRITICAL: Always notify scroll activity FIRST, before any other checks
+    // CRITICAL: Always notify scroll activity FIRST, before any other logic
     // This ensures any pending snaps are cancelled immediately when user scrolls
     this.magneticScrollManager.notifyScrollActivity();
     
-    // Update last scroll position
     this.lastScrollY = currentScrollY;
 
     // Detecta intenção e verifica snap magnético

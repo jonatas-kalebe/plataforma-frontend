@@ -117,7 +117,7 @@ export class MagneticScrollManager {
       this.idleTimeoutId = null;
     }
     
-    // If animation is running, cancel it - user wants control
+    // If animation is running, cancel it immediately - user wants control
     if (this.isAnimating) {
       this.cancelPendingSnap();
     }
@@ -181,25 +181,18 @@ export class MagneticScrollManager {
     const prev = sections[index - 1];
 
     const timeSinceActivity = now - this.lastUserActivityTs;
-    
-    // CRITICAL: Be much more conservative about velocity checks
-    // User must be TRULY idle before we consider snapping
-    const veryLowVelocity = Math.abs(this.lastVelocity) <= this.config.settleVelocityThreshold;
+    const lowVelocity = Math.abs(this.lastVelocity) <= this.config.settleVelocityThreshold * 1.5;
     const nearIdle = timeSinceActivity >= this.config.snapDelayMs;
-    
-    // IMPORTANT: Only consider settled if velocity is VERY low AND enough time has passed
-    // This prevents snapping while user is still actively scrolling
-    const settled = veryLowVelocity && timeSinceActivity >= this.config.snapDelayMs;
+    const settled = lowVelocity && timeSinceActivity >= this.config.snapDelayMs / 2;
 
     const leaps = this.lastDominantIndex === null ? 0 : Math.abs(index - this.lastDominantIndex);
     this.lastDominantIndex = index;
 
-    // If user is still moving (not idle and not settled), NEVER snap
     if (!nearIdle && !settled) {
       return false;
     }
 
-    const shouldAssistIdle = nearIdle && settled;
+    const shouldAssistIdle = nearIdle;
 
     if (shouldAssistIdle) {
       const assistTarget = this.resolveIdleAssist(dominant, prev, next);
@@ -208,7 +201,6 @@ export class MagneticScrollManager {
       }
     }
 
-    // Only snap if truly settled (no active scrolling)
     if (settled && leaps <= 1 && this.direction === 'forward' && progress >= this.config.progressForwardSnap && next) {
       return this.queueSnap(next, SnapReason.ForwardProgress);
     }
@@ -267,15 +259,7 @@ export class MagneticScrollManager {
       return false;
     }
 
-    // If we already have a pending snap to the same target, don't queue again
     if (this.snapTimeoutId && this.lastSnapTargetId === section.id) {
-      return false;
-    }
-
-    // Double-check that user is truly idle before queueing
-    const timeSinceActivity = this.now() - this.lastUserActivityTs;
-    if (timeSinceActivity < this.config.snapDelayMs) {
-      // User is still active, don't snap
       return false;
     }
 
@@ -286,15 +270,6 @@ export class MagneticScrollManager {
     this.lastSnapTargetId = section.id;
     this.snapTimeoutId = window.setTimeout(() => {
       this.snapTimeoutId = null;
-      
-      // Final check: ensure user hasn't started scrolling again before executing snap
-      const finalCheck = this.now() - this.lastUserActivityTs;
-      if (finalCheck < this.config.snapDelayMs) {
-        // User started scrolling again, abort snap
-        this.lastSnapTargetId = null;
-        return;
-      }
-      
       if (reason === SnapReason.Idle || reason === SnapReason.LowVelocity) {
         this.lastAssistTs = this.now();
       }
