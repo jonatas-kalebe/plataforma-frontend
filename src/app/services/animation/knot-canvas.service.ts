@@ -93,13 +93,13 @@ export class KnotCanvasService {
 
   setProgress(progress: number): void {
     // Allow unlocking if scrolling back significantly (below 80%)
-    if (this.isFullyStraight && progress < 0.8) {
+    if (this.isFullyStraight && progress < 0.97) {
       this.isFullyStraight = false;
     }
-    
+
     // Once line is fully straight, keep it straight unless scrolling back
     if (this.isFullyStraight) return;
-    
+
     this.progress = this.clamp01(progress);
     if (!this.ready) return;
     this.renderProgress(this.progress);
