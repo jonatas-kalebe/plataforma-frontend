@@ -152,6 +152,45 @@ export class TrabalhosSectionAnimationService {
     if (!ringElement) return;
     this.ringEl = ringElement;
     ringElement.style.cursor = 'grab';
+
+    if (typeof workCardRingComponent.registerInteractionBridge === 'function') {
+      workCardRingComponent.registerInteractionBridge({
+        onDragStart: () => {
+          this.isDragging = true;
+          workCardRingComponent.isDragging = true;
+          ringElement.style.cursor = 'grabbing';
+          ringElement.classList.add('ring-dragging');
+          if (navigator.vibrate) navigator.vibrate(30);
+        },
+        onDragMove: (rotation: number, velocity: number) => {
+          this.dragVelocity = velocity;
+          if (this.currentRingComponent && 'rotationDeg' in this.currentRingComponent) {
+            this.currentRingComponent.rotationDeg = rotation;
+          }
+          ringElement.classList.remove('snap-transition');
+          ringElement.style.setProperty('--rotation', `${-rotation}deg`);
+        },
+        onDragEnd: (velocity: number) => {
+          this.isDragging = false;
+          workCardRingComponent.isDragging = false;
+          this.dragVelocity = velocity;
+          ringElement.style.cursor = 'grab';
+          ringElement.classList.remove('ring-dragging');
+          if (navigator.vibrate) navigator.vibrate(20);
+        },
+        onActiveIndexChange: (index: number) => {
+          this.highlightActiveCard(index);
+          if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+        }
+      });
+
+      this.disposers.push(() => {
+        workCardRingComponent.registerInteractionBridge(null);
+      });
+
+      return;
+    }
+
     const onPointerDown = (ev: PointerEvent) => {
       this.isDragging = true;
       workCardRingComponent.isDragging = true;
