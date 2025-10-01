@@ -83,6 +83,9 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private rafId: number | null = null;
   private prevTS = 0;
 
+  private readonly maxPointerStepDeg = 45;
+  private readonly velocitySmoothing = 0.25;
+
   private ringEl!: HTMLDivElement;
   private cardEls: HTMLDivElement[] = [];
 
@@ -162,6 +165,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     // Prevent multiple simultaneous drags
     if (this.pointerId != null) return;
 
+    ev.preventDefault();
+
     this.pointerId = ev.pointerId;
     this.startPointerX = ev.clientX;
     this.startPointerY = ev.clientY;
@@ -210,10 +215,14 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
     if (this.gesture !== 'rotate') return;
 
+    ev.preventDefault();
+
     const dx = ev.clientX - this.lastPointerX;
-    const deltaDeg = dx * this.dragSensitivity;
+    const rawDeltaDeg = dx * this.dragSensitivity;
+    const deltaDeg = this.clampDragDelta(rawDeltaDeg, dt);
     this.rotationDeg += deltaDeg;
-    this.angularVelocity = deltaDeg / dt;
+    const rawVelocity = deltaDeg / dt;
+    this.angularVelocity = this.blendAngularVelocity(rawVelocity);
 
     this.lastPointerX = ev.clientX;
     this.lastMoveTS = now;
@@ -221,6 +230,10 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
   onPointerUp = (ev: PointerEvent) => {
     if (ev.pointerId !== this.pointerId) return;
+
+    if (this.gesture === 'rotate') {
+      ev.preventDefault();
+    }
 
     if (this.gesture === 'rotate' && this.pointerId != null) {
       try {
@@ -318,11 +331,11 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   }
 
   private attachEvents() {
-    this.ringEl.addEventListener('pointerdown', this.onPointerDown, { passive: true });
-    this.ringEl.addEventListener('pointermove', this.onPointerMove, { passive: true });
-    this.ringEl.addEventListener('pointerup', this.onPointerUp, { passive: true });
-    this.ringEl.addEventListener('pointercancel', this.onPointerCancel, { passive: true });
-    this.ringEl.addEventListener('pointerleave', this.onPointerUp, { passive: true });
+    this.ringEl.addEventListener('pointerdown', this.onPointerDown);
+    this.ringEl.addEventListener('pointermove', this.onPointerMove);
+    this.ringEl.addEventListener('pointerup', this.onPointerUp);
+    this.ringEl.addEventListener('pointercancel', this.onPointerCancel);
+    this.ringEl.addEventListener('pointerleave', this.onPointerUp);
     this.ringEl.addEventListener('wheel', this.wheelHandler, { passive: !this.interceptWheel });
   }
 
@@ -333,6 +346,19 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.ringEl.removeEventListener('pointercancel', this.onPointerCancel);
     this.ringEl.removeEventListener('pointerleave', this.onPointerUp);
     this.ringEl.removeEventListener('wheel', this.wheelHandler);
+  }
+
+  private clampDragDelta(deltaDeg: number, dt: number): number {
+    const frameScale = Math.max(0.5, Math.min(2, dt * 60));
+    const limit = this.maxPointerStepDeg * frameScale;
+    return Math.max(-limit, Math.min(limit, deltaDeg));
+  }
+
+  private blendAngularVelocity(rawVelocity: number): number {
+    if (!Number.isFinite(rawVelocity)) return this.angularVelocity;
+    const keep = this.velocitySmoothing;
+    const add = 1 - keep;
+    return this.angularVelocity * keep + rawVelocity * add;
   }
 
   private setupReducedMotion() {
