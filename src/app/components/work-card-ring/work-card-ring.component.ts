@@ -31,7 +31,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   @Input() cardHeight = 140;
   @Input() perspective = 1200;
 
-  @Input() dragSensitivity = 0.35;
+  @Input() dragSensitivity = 0.6;
   @Input() wheelSpeed = 0.2;
   @Input() friction = 2.8;
   @Input() inertiaEnabled = true;
@@ -170,8 +170,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.desiredRotationDeg = null;
     this.gesture = 'pending';
     this.dragging = false;
-    // Reset angular velocity to prevent leftover inertia from interfering
-    this.angularVelocity = 0;
+    // Don't reset angular velocity - let natural friction handle it
     this.ringEl.style.cursor = 'grab';
     this.ringEl.style.touchAction = 'pan-y';
   };
@@ -363,9 +362,9 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       }
 
       if (this.snapEnabled && !this.dragging && Math.abs(this.angularVelocity) < this.snapVelocityThreshold) {
-        // Wait 300ms after drag ends before allowing snap to activate
+        // Wait 150ms after drag ends before allowing snap to activate
         const timeSinceDragEnd = now - this.lastDragEndTS;
-        if (timeSinceDragEnd < 300) {
+        if (timeSinceDragEnd < 150) {
           // Skip snap logic while in cooldown period
         } else {
           const snapTarget = this.nearestSnapAngle(this.rotationDeg);
