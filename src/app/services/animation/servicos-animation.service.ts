@@ -60,60 +60,11 @@ export class ServicosAnimationService {
 
   /**
    * Create subtle parallax effect for service cards
-   * Driven by scroll position instead of GSAP
+   * DISABLED: Can cause visual stuttering/flickering
    */
   createParallaxEffect(cards: NodeListOf<Element> | Element[]): void {
-    if (!this.isBrowser || this.prefersReducedMotion) {
-      return;
-    }
-
-    const cardElements = Array.from(cards) as HTMLElement[];
-    const section = document.getElementById('servicos');
-
-    if (!section || cardElements.length === 0) {
-      return;
-    }
-
-    const updateParallax = () => {
-      const rect = section.getBoundingClientRect();
-      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-      const totalDistance = rect.height + viewportHeight;
-      const progress = Math.min(1, Math.max(0, (viewportHeight - rect.top) / totalDistance));
-
-      cardElements.forEach((card, index) => {
-        const speed = 1 + index * 0.1;
-        const baseMove = (progress - 0.5) * 20 * speed;
-        const extraDrift = progress > 0.5 ? (progress - 0.5) * 30 : 0;
-        const totalMove = baseMove - extraDrift;
-
-        card.style.setProperty('--card-parallax', `${totalMove}px`);
-        card.style.setProperty('--card-rotate-x', `${(progress - 0.5) * 1.5}deg`);
-      });
-    };
-
-    let ticking = false;
-    const requestUpdate = () => {
-      if (!ticking) {
-        ticking = true;
-        window.requestAnimationFrame(() => {
-          updateParallax();
-          ticking = false;
-        });
-      }
-    };
-
-    requestUpdate();
-
-    const onScroll = () => requestUpdate();
-    const onResize = () => requestUpdate();
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onResize);
-
-    this.cleanupFns.push(() => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onResize);
-    });
+    // Parallax effect disabled to prevent flickering
+    return;
   }
 
   /**
@@ -191,76 +142,12 @@ export class ServicosAnimationService {
 
   /**
    * Create scroll-based section snapping with vanilla CSS adjustments
+   * DISABLED: Causing flickering issues
    */
   createSectionSnapping(): void {
-    if (!this.isBrowser || this.prefersReducedMotion) {
-      return;
-    }
-
-    const section = document.getElementById('servicos');
-
-    if (!section) {
-      return;
-    }
-
-    const root = document.documentElement;
-    const initialSnapType = root.style.scrollSnapType;
-    const initialSnapAlign = section.style.scrollSnapAlign;
-    const initialSnapStop = section.style.scrollSnapStop;
-
-    if (!initialSnapType) {
-      root.style.scrollSnapType = 'y proximity';
-    }
-
-    if (!initialSnapAlign) {
-      section.style.scrollSnapAlign = 'center';
-    }
-
-    if (!initialSnapStop) {
-      section.style.scrollSnapStop = 'always';
-    }
-
-    section.classList.add('servicos-snapping');
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.9) {
-            section.classList.add('is-focused');
-          } else {
-            section.classList.remove('is-focused');
-          }
-        });
-      },
-      {
-        threshold: [0.45, 0.9]
-      }
-    );
-
-    observer.observe(section);
-    this.observers.push(observer);
-
-    this.cleanupFns.push(() => {
-      section.classList.remove('servicos-snapping', 'is-focused');
-
-      if (!initialSnapType) {
-        root.style.removeProperty('scrollSnapType');
-      } else {
-        root.style.scrollSnapType = initialSnapType;
-      }
-
-      if (!initialSnapAlign) {
-        section.style.removeProperty('scrollSnapAlign');
-      } else {
-        section.style.scrollSnapAlign = initialSnapAlign;
-      }
-
-      if (!initialSnapStop) {
-        section.style.removeProperty('scrollSnapStop');
-      } else {
-        section.style.scrollSnapStop = initialSnapStop;
-      }
-    });
+    // Snap behavior disabled to prevent flickering
+    // The section will scroll normally without snap effects
+    return;
   }
 
   /**

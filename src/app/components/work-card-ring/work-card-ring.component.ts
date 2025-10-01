@@ -78,6 +78,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private startPointerY = 0;
   private gesture: 'idle' | 'pending' | 'rotate' | 'scroll' = 'idle';
   private lastMoveTS = 0;
+  private lastDragEndTS = 0; // Track when drag ended to delay snap
 
   private rafId: number | null = null;
   private prevTS = 0;
@@ -242,6 +243,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.pointerId = null;
     this.gesture = 'idle';
     this.ringEl.style.touchAction = 'pan-y';
+    // Record when drag ended to delay snap activation
+    this.lastDragEndTS = performance.now();
   };
 
   onPointerCancel = (ev: PointerEvent) => {
@@ -360,15 +363,21 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       }
 
       if (this.snapEnabled && !this.dragging && Math.abs(this.angularVelocity) < this.snapVelocityThreshold) {
-        const snapTarget = this.nearestSnapAngle(this.rotationDeg);
-        const diff = this.shortestAngleDist(this.rotationDeg, snapTarget);
-        const accel = this.snapStrength * Math.sign(diff) * Math.min(1, Math.abs(diff) / this.stepDeg);
-        const damp = 6;
-        this.angularVelocity += (accel - damp * this.angularVelocity) * dt;
+        // Wait 300ms after drag ends before allowing snap to activate
+        const timeSinceDragEnd = now - this.lastDragEndTS;
+        if (timeSinceDragEnd < 300) {
+          // Skip snap logic while in cooldown period
+        } else {
+          const snapTarget = this.nearestSnapAngle(this.rotationDeg);
+          const diff = this.shortestAngleDist(this.rotationDeg, snapTarget);
+          const accel = this.snapStrength * Math.sign(diff) * Math.min(1, Math.abs(diff) / this.stepDeg);
+          const damp = 6;
+          this.angularVelocity += (accel - damp * this.angularVelocity) * dt;
 
-        if (Math.abs(diff) < 0.02 && Math.abs(this.angularVelocity) < 0.05) {
-          this.rotationDeg = snapTarget;
-          this.angularVelocity = 0;
+          if (Math.abs(diff) < 0.02 && Math.abs(this.angularVelocity) < 0.05) {
+            this.rotationDeg = snapTarget;
+            this.angularVelocity = 0;
+          }
         }
       }
     }

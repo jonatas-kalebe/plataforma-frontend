@@ -50,6 +50,7 @@ export class KnotCanvasService {
   private cfg: KnotConfig = { ...this.DEFAULT_CONFIG };
   private ready = false;
   private progress = 0;
+  private isFullyStraight = false; // Lock progress at 1 once reached
   /**
    * Percentual do progresso (0-1) que mantém a linha ainda embolada
    * antes de começar a se alinhar visualmente.
@@ -91,6 +92,9 @@ export class KnotCanvasService {
   }
 
   setProgress(progress: number): void {
+    // Once line is fully straight, don't allow it to go back
+    if (this.isFullyStraight) return;
+    
     this.progress = this.clamp01(progress);
     if (!this.ready) return;
     this.renderProgress(this.progress);
@@ -237,9 +241,10 @@ export class KnotCanvasService {
       return;
     }
 
-    // Once the line is straight (progress >= 1), keep it straight
+    // Once the line is straight (progress >= 1), keep it straight permanently
     // Don't allow it to wave back when scrolling down
     if (mappedProgress >= 1 || progress >= 1) {
+      this.isFullyStraight = true; // Lock at straight position
       const d = this.buildPath(this.straightPoints);
       this.pathEl.setAttribute('d', d);
       return;

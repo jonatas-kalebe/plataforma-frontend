@@ -27,7 +27,7 @@
   transition-delay: var(--card-stagger-delay);
   transform-style: preserve-3d;
   backface-visibility: hidden;
-  will-change: transform, opacity, box-shadow;
+  /* Removed will-change to prevent flickering */
   border: 1px solid transparent;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   cursor: pointer;
