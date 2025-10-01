@@ -4,6 +4,12 @@
 #hero-cta {
   transform: translateZ(0);
   backface-visibility: hidden;
+}
+
+/* Only use will-change during transitions to avoid paint issues */
+#hero-title.animating,
+#hero-subtitle.animating,
+#hero-cta.animating {
   will-change: transform, opacity;
 }
 
@@ -30,6 +36,9 @@
 #hero-cta {
   transform: translateY(20px);
   transition: all 0.8s ease 0.4s;
+  /* Ensure button remains visible and interactive */
+  min-height: 48px;
+  min-width: 120px;
 }
 
 #hero-cta.visible {

@@ -102,6 +102,8 @@ export class ServicosAnimationService extends BaseAnimation {
     });
   }
 
+  private lastSnapProgress = -1;
+
   /**
    * Cria snap magnético entre seções (simplificado)
    */
@@ -116,9 +118,12 @@ export class ServicosAnimationService extends BaseAnimation {
       onUpdate: (self) => {
         const progress = self.progress;
         
-        // Snap suave no meio da seção (50%)
-        if (progress > 0.45 && progress < 0.55) {
+        // Snap suave no meio da seção (50%) - only once
+        if (progress > 0.45 && progress < 0.55 && this.lastSnapProgress < 0.45) {
           this.applySectionSnap();
+          this.lastSnapProgress = progress;
+        } else if (progress < 0.45 || progress > 0.55) {
+          this.lastSnapProgress = progress;
         }
       }
     });
@@ -128,9 +133,9 @@ export class ServicosAnimationService extends BaseAnimation {
    * Aplica snap suave na seção
    */
   private applySectionSnap(): void {
-    // Implementação simplificada do snap
+    // Implementação simplificada do snap com debounce
     const servicesSection = document.querySelector('#servicos');
-    if (servicesSection) {
+    if (servicesSection && !servicesSection.classList.contains('snapped')) {
       servicesSection.classList.add('snapped');
       setTimeout(() => servicesSection.classList.remove('snapped'), 300);
     }

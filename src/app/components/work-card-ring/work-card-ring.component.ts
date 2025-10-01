@@ -158,6 +158,9 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   get stepDeg(): number { return 360 / this.count; }
 
   onPointerDown = (ev: PointerEvent) => {
+    // Prevent multiple simultaneous drags
+    if (this.pointerId != null) return;
+    
     this.pointerId = ev.pointerId;
     this.startPointerX = ev.clientX;
     this.startPointerY = ev.clientY;
@@ -183,7 +186,13 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         if (Math.abs(dx0) * this.horizontalBias > Math.abs(dy0)) {
           this.gesture = 'rotate';
           this.dragging = true;
-          this.ringEl.setPointerCapture(this.pointerId);
+          // Only capture pointer if we're definitely rotating
+          try {
+            this.ringEl.setPointerCapture(this.pointerId);
+          } catch (e) {
+            // Pointer capture may fail in some cases, continue anyway
+            console.warn('Failed to capture pointer:', e);
+          }
           this.ringEl.style.cursor = 'grabbing';
           this.ringEl.style.touchAction = 'none';
           this.lastPointerX = ev.clientX;
@@ -210,14 +219,26 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
   onPointerUp = (ev: PointerEvent) => {
     if (ev.pointerId !== this.pointerId) return;
-    if (this.gesture === 'rotate') {
-      this.ringEl.releasePointerCapture(ev.pointerId);
+    
+    if (this.gesture === 'rotate' && this.pointerId != null) {
+      try {
+        this.ringEl.releasePointerCapture(this.pointerId);
+      } catch (e) {
+        // Pointer release may fail, ignore
+        console.warn('Failed to release pointer:', e);
+      }
       this.ringEl.style.cursor = 'grab';
     }
+    
     this.dragging = false;
     this.pointerId = null;
     this.gesture = 'idle';
     this.ringEl.style.touchAction = 'pan-y';
+  };
+
+  onPointerCancel = (ev: PointerEvent) => {
+    // Handle pointer cancel same as pointer up to prevent stuck state
+    this.onPointerUp(ev);
   };
 
   private wheelHandler = (ev: WheelEvent) => {
@@ -290,7 +311,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.ringEl.addEventListener('pointerdown', this.onPointerDown, { passive: true });
     this.ringEl.addEventListener('pointermove', this.onPointerMove, { passive: true });
     this.ringEl.addEventListener('pointerup', this.onPointerUp, { passive: true });
-    this.ringEl.addEventListener('pointercancel', this.onPointerUp, { passive: true });
+    this.ringEl.addEventListener('pointercancel', this.onPointerCancel, { passive: true });
     this.ringEl.addEventListener('pointerleave', this.onPointerUp, { passive: true });
     this.ringEl.addEventListener('wheel', this.wheelHandler, { passive: !this.interceptWheel });
   }
@@ -299,7 +320,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.ringEl.removeEventListener('pointerdown', this.onPointerDown);
     this.ringEl.removeEventListener('pointermove', this.onPointerMove);
     this.ringEl.removeEventListener('pointerup', this.onPointerUp);
-    this.ringEl.removeEventListener('pointercancel', this.onPointerUp);
+    this.ringEl.removeEventListener('pointercancel', this.onPointerCancel);
     this.ringEl.removeEventListener('pointerleave', this.onPointerUp);
     this.ringEl.removeEventListener('wheel', this.wheelHandler);
   }

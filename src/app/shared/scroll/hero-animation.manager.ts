@@ -121,9 +121,54 @@ export class HeroAnimationManager {
       scrub: 1,
       animation: this.heroTimeline,
       onUpdate: (self) => {
-        // Lógica adicional durante scroll se necessário
         const progress = self.progress;
         this.updateHeroEffects(progress);
+        
+        // Reset button visibility when scrolling back to hero
+        if (progress < 0.1) {
+          this.ensureHeroElementsVisible();
+        }
+      },
+      onLeave: () => {
+        // Clean up will-change when leaving section
+        this.removeWillChange();
+      },
+      onEnterBack: () => {
+        // Ensure elements are visible when scrolling back
+        this.ensureHeroElementsVisible();
+      }
+    });
+  }
+
+  /**
+   * Ensure hero elements are fully visible and interactive
+   */
+  private ensureHeroElementsVisible(): void {
+    const heroCta = document.querySelector('#hero-cta');
+    const heroTitle = document.querySelector('#hero-title');
+    const heroSubtitle = document.querySelector('#hero-subtitle');
+    
+    if (heroCta) {
+      (heroCta as HTMLElement).style.opacity = '1';
+      (heroCta as HTMLElement).style.pointerEvents = 'auto';
+    }
+    if (heroTitle) {
+      (heroTitle as HTMLElement).style.opacity = '1';
+    }
+    if (heroSubtitle) {
+      (heroSubtitle as HTMLElement).style.opacity = '1';
+    }
+  }
+
+  /**
+   * Remove will-change to prevent paint issues
+   */
+  private removeWillChange(): void {
+    const elements = ['#hero-title', '#hero-subtitle', '#hero-cta'];
+    elements.forEach(selector => {
+      const el = document.querySelector(selector);
+      if (el) {
+        el.classList.remove('animating');
       }
     });
   }

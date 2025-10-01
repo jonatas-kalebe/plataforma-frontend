@@ -111,13 +111,20 @@ export class TrabalhosSectionAnimationService extends BaseAnimation {
     }
   }
 
+  private lastSnapEffect = 0;
+
   /**
    * Efeito visual de snap (simplificado)
    */
   private applySnapEffect(): void {
+    // Debounce snap effect to prevent multiple rapid calls
+    const now = performance.now();
+    if (now - this.lastSnapEffect < 200) return;
+    this.lastSnapEffect = now;
+    
     // Efeito sutil de snap via CSS se possível, ou GSAP mínimo
     const ringElement = document.querySelector('.trabalhos-ring');
-    if (ringElement) {
+    if (ringElement && !ringElement.classList.contains('snapped')) {
       ringElement.classList.add('snapped');
       setTimeout(() => ringElement.classList.remove('snapped'), 150);
     }

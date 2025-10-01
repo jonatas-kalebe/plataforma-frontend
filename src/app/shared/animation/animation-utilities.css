@@ -96,22 +96,34 @@
 .fade-in-stagger:nth-child(5) { animation-delay: 0.5s; }
 
 /* Trabalhos section specific animations */
+.trabalhos-ring {
+  transition: transform 0.1s ease-out;
+}
+
 .trabalhos-ring.snapped {
   animation: snapPulse 0.15s ease-out;
 }
 
 .trabalhos-card {
   transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .trabalhos-card.active {
-  transform: scale(1.1);
+  transform: scale(1.1) translateZ(0);
   filter: brightness(1.2);
 }
 
 /* Servicos section animations */
 .service-card {
   transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+#servicos {
+  transition: opacity 0.15s ease-out;
 }
 
 #servicos.snapped {
@@ -192,13 +204,13 @@
 
 @keyframes snapPulse {
   0% { transform: scale(1); }
-  50% { transform: scale(1.02); }
+  50% { transform: scale(1.005); }
   100% { transform: scale(1); }
 }
 
 @keyframes sectionSnap {
   0% { opacity: 1; }
-  50% { opacity: 0.95; }
+  50% { opacity: 0.98; }
   100% { opacity: 1; }
 }
 
