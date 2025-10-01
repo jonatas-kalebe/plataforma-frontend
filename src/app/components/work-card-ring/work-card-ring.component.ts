@@ -80,6 +80,11 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private lastMoveTS = 0;
   private lastDragEndTS = 0; // Track when drag ended to delay snap
 
+  private dragDeltaHistory: number[] = [];
+  private dragVelocityHistory: number[] = [];
+  private readonly dragDeltaWindow = 5;
+  private readonly dragVelocityWindow = 6;
+
   private rafId: number | null = null;
   private prevTS = 0;
 
@@ -159,8 +164,13 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   get stepDeg(): number { return 360 / this.count; }
 
   onPointerDown = (ev: PointerEvent) => {
+    // Only respond to primary button / touch contact
+    if (ev.button != null && ev.button !== 0) return;
+
     // Prevent multiple simultaneous drags
     if (this.pointerId != null) return;
+
+    ev.preventDefault();
 
     this.pointerId = ev.pointerId;
     this.startPointerX = ev.clientX;
@@ -170,6 +180,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.desiredRotationDeg = null;
     this.gesture = 'pending';
     this.dragging = false;
+    this.dragDeltaHistory.length = 0;
+    this.dragVelocityHistory.length = 0;
     // Don't reset angular velocity - let natural friction handle it
     this.ringEl.style.cursor = 'grab';
     this.ringEl.style.touchAction = 'pan-y';
@@ -210,10 +222,18 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
     if (this.gesture !== 'rotate') return;
 
+    ev.preventDefault();
+
     const dx = ev.clientX - this.lastPointerX;
-    const deltaDeg = dx * this.dragSensitivity;
+    this.pushDragDelta(dx);
+
+    const smoothedDx = this.getSmoothedDelta();
+    const deltaDeg = smoothedDx * this.dragSensitivity;
     this.rotationDeg += deltaDeg;
-    this.angularVelocity = deltaDeg / dt;
+
+    const instantaneousVelocity = deltaDeg / dt;
+    this.pushDragVelocity(instantaneousVelocity);
+    this.angularVelocity = this.getSmoothedVelocity();
 
     this.lastPointerX = ev.clientX;
     this.lastMoveTS = now;
@@ -244,11 +264,22 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.ringEl.style.touchAction = 'pan-y';
     // Record when drag ended to delay snap activation
     this.lastDragEndTS = performance.now();
+
+    this.dragDeltaHistory.length = 0;
+    this.dragVelocityHistory.length = 0;
   };
 
   onPointerCancel = (ev: PointerEvent) => {
     // Handle pointer cancel same as pointer up to prevent stuck state
     this.onPointerUp(ev);
+  };
+
+  onPointerLeave = (ev: PointerEvent) => {
+    if (ev.pointerId !== this.pointerId) return;
+    // Only treat as pointer up if the pointer actually ended
+    if (ev.buttons === 0) {
+      this.onPointerUp(ev);
+    }
   };
 
   private wheelHandler = (ev: WheelEvent) => {
@@ -318,11 +349,11 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   }
 
   private attachEvents() {
-    this.ringEl.addEventListener('pointerdown', this.onPointerDown, { passive: true });
-    this.ringEl.addEventListener('pointermove', this.onPointerMove, { passive: true });
-    this.ringEl.addEventListener('pointerup', this.onPointerUp, { passive: true });
-    this.ringEl.addEventListener('pointercancel', this.onPointerCancel, { passive: true });
-    this.ringEl.addEventListener('pointerleave', this.onPointerUp, { passive: true });
+    this.ringEl.addEventListener('pointerdown', this.onPointerDown, { passive: false });
+    this.ringEl.addEventListener('pointermove', this.onPointerMove, { passive: false });
+    this.ringEl.addEventListener('pointerup', this.onPointerUp, { passive: false });
+    this.ringEl.addEventListener('pointercancel', this.onPointerCancel, { passive: false });
+    this.ringEl.addEventListener('pointerleave', this.onPointerLeave, { passive: false });
     this.ringEl.addEventListener('wheel', this.wheelHandler, { passive: !this.interceptWheel });
   }
 
@@ -331,8 +362,34 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.ringEl.removeEventListener('pointermove', this.onPointerMove);
     this.ringEl.removeEventListener('pointerup', this.onPointerUp);
     this.ringEl.removeEventListener('pointercancel', this.onPointerCancel);
-    this.ringEl.removeEventListener('pointerleave', this.onPointerUp);
+    this.ringEl.removeEventListener('pointerleave', this.onPointerLeave);
     this.ringEl.removeEventListener('wheel', this.wheelHandler);
+  }
+
+  private pushDragDelta(delta: number) {
+    this.dragDeltaHistory.push(delta);
+    if (this.dragDeltaHistory.length > this.dragDeltaWindow) {
+      this.dragDeltaHistory.shift();
+    }
+  }
+
+  private getSmoothedDelta(): number {
+    if (!this.dragDeltaHistory.length) return 0;
+    const total = this.dragDeltaHistory.reduce((acc, value) => acc + value, 0);
+    return total / this.dragDeltaHistory.length;
+  }
+
+  private pushDragVelocity(velocity: number) {
+    this.dragVelocityHistory.push(velocity);
+    if (this.dragVelocityHistory.length > this.dragVelocityWindow) {
+      this.dragVelocityHistory.shift();
+    }
+  }
+
+  private getSmoothedVelocity(): number {
+    if (!this.dragVelocityHistory.length) return 0;
+    const total = this.dragVelocityHistory.reduce((acc, value) => acc + value, 0);
+    return total / this.dragVelocityHistory.length;
   }
 
   private setupReducedMotion() {
