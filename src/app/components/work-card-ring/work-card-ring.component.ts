@@ -31,7 +31,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   @Input() cardHeight = 140;
   @Input() perspective = 1200;
 
-  @Input() dragSensitivity = 0.6;
+  @Input() dragSensitivity = 0.35;
   @Input() wheelSpeed = 0.2;
   @Input() friction = 2.8;
   @Input() inertiaEnabled = true;
@@ -161,7 +161,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   onPointerDown = (ev: PointerEvent) => {
     // Prevent multiple simultaneous drags
     if (this.pointerId != null) return;
-    
+
     this.pointerId = ev.pointerId;
     this.startPointerX = ev.clientX;
     this.startPointerY = ev.clientY;
@@ -221,7 +221,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
   onPointerUp = (ev: PointerEvent) => {
     if (ev.pointerId !== this.pointerId) return;
-    
+
     if (this.gesture === 'rotate' && this.pointerId != null) {
       try {
         this.ringEl.releasePointerCapture(this.pointerId);
@@ -230,14 +230,14 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         console.warn('Failed to release pointer:', e);
       }
       this.ringEl.style.cursor = 'grab';
-      
+
       // If angular velocity is very high, cap it to prevent extreme spinning
       const maxReleaseVelocity = 200; // degrees per second
       if (Math.abs(this.angularVelocity) > maxReleaseVelocity) {
         this.angularVelocity = Math.sign(this.angularVelocity) * maxReleaseVelocity;
       }
     }
-    
+
     this.dragging = false;
     this.pointerId = null;
     this.gesture = 'idle';
