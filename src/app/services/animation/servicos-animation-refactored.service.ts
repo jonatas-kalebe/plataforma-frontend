@@ -102,43 +102,13 @@ export class ServicosAnimationService extends BaseAnimation {
     });
   }
 
-  private lastSnapProgress = -1;
-
   /**
-   * Cria snap magnético entre seções (simplificado)
+   * Cria snap magnético entre seções (desabilitado para evitar flickering)
    */
   public createSectionSnapping(): void {
-    if (this.prefersReducedMotion) return;
-
-    this.createScrollTrigger({
-      trigger: '#servicos',
-      start: 'top top',
-      end: 'bottom bottom',
-      scrub: 0.5,
-      onUpdate: (self) => {
-        const progress = self.progress;
-        
-        // Snap suave no meio da seção (50%) - only once
-        if (progress > 0.45 && progress < 0.55 && this.lastSnapProgress < 0.45) {
-          this.applySectionSnap();
-          this.lastSnapProgress = progress;
-        } else if (progress < 0.45 || progress > 0.55) {
-          this.lastSnapProgress = progress;
-        }
-      }
-    });
-  }
-
-  /**
-   * Aplica snap suave na seção
-   */
-  private applySectionSnap(): void {
-    // Implementação simplificada do snap com debounce
-    const servicesSection = document.querySelector('#servicos');
-    if (servicesSection && !servicesSection.classList.contains('snapped')) {
-      servicesSection.classList.add('snapped');
-      setTimeout(() => servicesSection.classList.remove('snapped'), 300);
-    }
+    // Snap animation disabled due to flickering issues
+    // The section will scroll normally without visual snap effects
+    return;
   }
 
   /**

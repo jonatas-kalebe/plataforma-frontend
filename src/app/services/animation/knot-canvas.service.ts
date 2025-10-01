@@ -237,7 +237,9 @@ export class KnotCanvasService {
       return;
     }
 
-    if (mappedProgress >= 1) {
+    // Once the line is straight (progress >= 1), keep it straight
+    // Don't allow it to wave back when scrolling down
+    if (mappedProgress >= 1 || progress >= 1) {
       const d = this.buildPath(this.straightPoints);
       this.pathEl.setAttribute('d', d);
       return;

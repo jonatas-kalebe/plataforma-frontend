@@ -169,6 +169,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.desiredRotationDeg = null;
     this.gesture = 'pending';
     this.dragging = false;
+    // Reset angular velocity to prevent leftover inertia from interfering
+    this.angularVelocity = 0;
     this.ringEl.style.cursor = 'grab';
     this.ringEl.style.touchAction = 'pan-y';
   };
@@ -228,6 +230,12 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         console.warn('Failed to release pointer:', e);
       }
       this.ringEl.style.cursor = 'grab';
+      
+      // If angular velocity is very high, cap it to prevent extreme spinning
+      const maxReleaseVelocity = 200; // degrees per second
+      if (Math.abs(this.angularVelocity) > maxReleaseVelocity) {
+        this.angularVelocity = Math.sign(this.angularVelocity) * maxReleaseVelocity;
+      }
     }
     
     this.dragging = false;
