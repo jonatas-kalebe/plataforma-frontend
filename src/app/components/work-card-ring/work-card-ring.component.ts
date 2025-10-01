@@ -4,6 +4,13 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 type Item = any;
 type OrientationMode = 'outward' | 'inward' | 'camera';
 
+type InteractionBridge = {
+  onDragStart?: () => void;
+  onDragMove?: (rotation: number, velocity: number) => void;
+  onDragEnd?: (velocity: number) => void;
+  onActiveIndexChange?: (index: number) => void;
+} | null;
+
 @Component({
   selector: 'app-work-card-ring',
   standalone: true,
@@ -66,6 +73,9 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private angularVelocity = 0;
   private desiredRotationDeg: number | null = null;
 
+  private velocitySamples: number[] = [];
+  private readonly velocityWindow = 6;
+
   private dynamicRadius = this.baseRadius;
   private baseRadiusEffective = this.baseRadius;
   private radiusVelocity = 0;
@@ -79,12 +89,15 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private gesture: 'idle' | 'pending' | 'rotate' | 'scroll' = 'idle';
   private lastMoveTS = 0;
   private lastDragEndTS = 0; // Track when drag ended to delay snap
+  private snapPending = false;
+  private pointerCaptured = false;
 
   private rafId: number | null = null;
   private prevTS = 0;
 
   private ringEl!: HTMLDivElement;
   private cardEls: HTMLDivElement[] = [];
+  private interactionBridge: InteractionBridge = null;
 
   constructor(
     private zone: NgZone,
@@ -161,6 +174,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   onPointerDown = (ev: PointerEvent) => {
     // Prevent multiple simultaneous drags
     if (this.pointerId != null) return;
+    if (ev.button != null && ev.button !== 0) return;
+    if (ev.isPrimary === false) return;
 
     this.pointerId = ev.pointerId;
     this.startPointerX = ev.clientX;
@@ -168,8 +183,11 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.lastPointerX = ev.clientX;
     this.lastMoveTS = ev.timeStamp || performance.now();
     this.desiredRotationDeg = null;
+    this.snapPending = false;
     this.gesture = 'pending';
     this.dragging = false;
+    this.pointerCaptured = false;
+    this.resetVelocitySamples();
     // Don't reset angular velocity - let natural friction handle it
     this.ringEl.style.cursor = 'grab';
     this.ringEl.style.touchAction = 'pan-y';
@@ -186,23 +204,12 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       const dy0 = ev.clientY - this.startPointerY;
       if (Math.abs(dx0) > this.gestureThreshold || Math.abs(dy0) > this.gestureThreshold) {
         if (Math.abs(dx0) * this.horizontalBias > Math.abs(dy0)) {
-          this.gesture = 'rotate';
-          this.dragging = true;
-          // Only capture pointer if we're definitely rotating
-          try {
-            this.ringEl.setPointerCapture(this.pointerId);
-          } catch (e) {
-            // Pointer capture may fail in some cases, continue anyway
-            console.warn('Failed to capture pointer:', e);
-          }
-          this.ringEl.style.cursor = 'grabbing';
-          this.ringEl.style.touchAction = 'none';
-          this.lastPointerX = ev.clientX;
-          this.lastMoveTS = now;
+          this.beginRotateGesture(ev, now);
         } else {
           this.gesture = 'scroll';
           this.dragging = false;
           this.ringEl.style.touchAction = 'pan-y';
+          this.releasePointerCapture();
         }
       }
       return;
@@ -210,31 +217,50 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
     if (this.gesture !== 'rotate') return;
 
-    const dx = ev.clientX - this.lastPointerX;
-    const deltaDeg = dx * this.dragSensitivity;
+    ev.preventDefault?.();
+
+    const dxRaw = this.computePointerDelta(ev);
+    const deltaDeg = this.applyDragCurve(dxRaw * this.dragSensitivity);
+    const safeDt = Math.max(1 / 240, dt);
+    const instantaneousVelocity = deltaDeg / safeDt;
+
     this.rotationDeg += deltaDeg;
-    this.angularVelocity = deltaDeg / dt;
+    this.recordVelocitySample(instantaneousVelocity);
+    const smoothedVelocity = this.getSmoothedVelocity();
+    this.angularVelocity = this.angularVelocity * 0.6 + smoothedVelocity * 0.4;
 
     this.lastPointerX = ev.clientX;
     this.lastMoveTS = now;
+
+    this.interactionBridge?.onDragMove?.(this.rotationDeg, this.angularVelocity);
   };
 
   onPointerUp = (ev: PointerEvent) => {
     if (ev.pointerId !== this.pointerId) return;
 
-    if (this.gesture === 'rotate' && this.pointerId != null) {
-      try {
-        this.ringEl.releasePointerCapture(this.pointerId);
-      } catch (e) {
-        // Pointer release may fail, ignore
-        console.warn('Failed to release pointer:', e);
-      }
+    const wasRotating = this.gesture === 'rotate';
+
+    if (wasRotating && this.pointerId != null) {
+      this.releasePointerCapture();
       this.ringEl.style.cursor = 'grab';
 
       // If angular velocity is very high, cap it to prevent extreme spinning
-      const maxReleaseVelocity = 200; // degrees per second
-      if (Math.abs(this.angularVelocity) > maxReleaseVelocity) {
-        this.angularVelocity = Math.sign(this.angularVelocity) * maxReleaseVelocity;
+      const releaseVelocity = this.getSmoothedVelocity();
+      const velocityAbs = Math.abs(releaseVelocity);
+      if (velocityAbs > 8) {
+        const boost = 1.35;
+        const minCarry = 110;
+        const maxReleaseVelocity = 360; // degrees per second
+        const boosted = releaseVelocity * boost;
+        const ensured =
+          Math.sign(boosted) *
+          Math.max(
+            Math.min(Math.abs(boosted), maxReleaseVelocity),
+            Math.min(velocityAbs, minCarry)
+          );
+        this.angularVelocity = ensured;
+      } else {
+        this.angularVelocity = 0;
       }
     }
 
@@ -244,6 +270,10 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.ringEl.style.touchAction = 'pan-y';
     // Record when drag ended to delay snap activation
     this.lastDragEndTS = performance.now();
+    this.snapPending = wasRotating;
+    if (wasRotating) {
+      this.interactionBridge?.onDragEnd?.(this.angularVelocity);
+    }
   };
 
   onPointerCancel = (ev: PointerEvent) => {
@@ -319,7 +349,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
   private attachEvents() {
     this.ringEl.addEventListener('pointerdown', this.onPointerDown, { passive: true });
-    this.ringEl.addEventListener('pointermove', this.onPointerMove, { passive: true });
+    this.ringEl.addEventListener('pointermove', this.onPointerMove, { passive: false });
     this.ringEl.addEventListener('pointerup', this.onPointerUp, { passive: true });
     this.ringEl.addEventListener('pointercancel', this.onPointerCancel, { passive: true });
     this.ringEl.addEventListener('pointerleave', this.onPointerUp, { passive: true });
@@ -361,22 +391,31 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         this.angularVelocity = 0;
       }
 
-      if (this.snapEnabled && !this.dragging && Math.abs(this.angularVelocity) < this.snapVelocityThreshold) {
-        // Wait 150ms after drag ends before allowing snap to activate
+      if (this.snapEnabled && !this.dragging) {
         const timeSinceDragEnd = now - this.lastDragEndTS;
-        if (timeSinceDragEnd < 150) {
-          // Skip snap logic while in cooldown period
-        } else {
-          const snapTarget = this.nearestSnapAngle(this.rotationDeg);
-          const diff = this.shortestAngleDist(this.rotationDeg, snapTarget);
-          const accel = this.snapStrength * Math.sign(diff) * Math.min(1, Math.abs(diff) / this.stepDeg);
-          const damp = 6;
+        const snapDelay = 120;
+        const forceSnapDelay = 900;
+        const snapTarget = this.nearestSnapAngle(this.rotationDeg);
+        const diff = this.shortestAngleDist(this.rotationDeg, snapTarget);
+        const belowVelocityThreshold = Math.abs(this.angularVelocity) < this.snapVelocityThreshold;
+        if (this.snapPending && timeSinceDragEnd >= snapDelay && (belowVelocityThreshold || timeSinceDragEnd >= forceSnapDelay)) {
+          const strength = this.snapStrength;
+          const damp = timeSinceDragEnd >= forceSnapDelay ? strength * 0.45 : 6;
+          const accel = strength * Math.sign(diff) * Math.min(1, Math.abs(diff) / this.stepDeg);
           this.angularVelocity += (accel - damp * this.angularVelocity) * dt;
+
+          if (timeSinceDragEnd >= forceSnapDelay && !belowVelocityThreshold) {
+            this.angularVelocity *= Math.exp(-this.friction * dt * 0.65);
+          }
 
           if (Math.abs(diff) < 0.02 && Math.abs(this.angularVelocity) < 0.05) {
             this.rotationDeg = snapTarget;
             this.angularVelocity = 0;
+            this.snapPending = false;
           }
+        } else if (this.snapPending && timeSinceDragEnd >= snapDelay) {
+          // keep inertia alive but gently bleed energy so we eventually cross the threshold
+          this.angularVelocity *= Math.exp(-this.friction * dt * 0.12);
         }
       }
     }
@@ -403,6 +442,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
   private applyRingTransform() {
     this.ringEl.style.transform = `translateZ(0) rotateY(${this.rotationDeg}deg)`;
+    this.ringEl.style.setProperty('--rotation', `${-this.rotationDeg}deg`);
   }
 
   private nearestSnapAngle(currentDeg: number): number {
@@ -439,6 +479,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     if (idx !== this.lastEmittedIndex) {
       this.lastEmittedIndex = idx;
       this.activeIndexChange.emit(idx);
+      this.interactionBridge?.onActiveIndexChange?.(idx);
     }
   }
   private emitActiveIndex() {
@@ -457,5 +498,75 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       this.lastRadiusApplied = -1;
       this.layoutCards(true);
     }
+  }
+
+  registerInteractionBridge(bridge: InteractionBridge) {
+    this.interactionBridge = bridge;
+  }
+
+  private beginRotateGesture(ev: PointerEvent, now: number) {
+    this.gesture = 'rotate';
+    this.dragging = true;
+    this.resetVelocitySamples();
+    this.capturePointer();
+    this.ringEl.style.cursor = 'grabbing';
+    this.ringEl.style.touchAction = 'none';
+    this.lastPointerX = ev.clientX;
+    this.lastMoveTS = now;
+    this.interactionBridge?.onDragStart?.();
+  }
+
+  private capturePointer() {
+    if (this.pointerId == null || this.pointerCaptured) return;
+    try {
+      this.ringEl.setPointerCapture(this.pointerId);
+      this.pointerCaptured = true;
+    } catch (e) {
+      console.warn('Failed to capture pointer:', e);
+      this.pointerCaptured = false;
+    }
+  }
+
+  private releasePointerCapture() {
+    if (this.pointerId == null || !this.pointerCaptured) return;
+    try {
+      this.ringEl.releasePointerCapture(this.pointerId);
+    } catch (e) {
+      console.warn('Failed to release pointer:', e);
+    }
+    this.pointerCaptured = false;
+  }
+
+  private resetVelocitySamples() {
+    this.velocitySamples = [];
+  }
+
+  private recordVelocitySample(value: number) {
+    if (!Number.isFinite(value)) return;
+    this.velocitySamples.push(value);
+    if (this.velocitySamples.length > this.velocityWindow) {
+      this.velocitySamples.shift();
+    }
+  }
+
+  private getSmoothedVelocity(): number {
+    if (!this.velocitySamples.length) return 0;
+    const sum = this.velocitySamples.reduce((acc, v) => acc + v, 0);
+    return sum / this.velocitySamples.length;
+  }
+
+  private computePointerDelta(ev: PointerEvent): number {
+    const movementX = (ev as any).movementX;
+    if (typeof movementX === 'number' && Number.isFinite(movementX) && movementX !== 0) {
+      return movementX;
+    }
+    return ev.clientX - this.lastPointerX;
+  }
+
+  private applyDragCurve(delta: number): number {
+    const maxDelta = this.stepDeg * 1.5;
+    const clamped = Math.max(-maxDelta, Math.min(maxDelta, delta));
+    const eased = Math.sign(clamped) * Math.pow(Math.abs(clamped), 0.9);
+    return eased;
   }
 }

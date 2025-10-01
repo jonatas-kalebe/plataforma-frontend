@@ -14,7 +14,7 @@
   height: clamp(280px, 80vmin, 420px);
   position: relative;
   overflow: visible;
-  touch-action: none;
+  touch-action: pan-y;
 }
 
 .ring {
