@@ -90,6 +90,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private lastMoveTS = 0;
   private lastDragEndTS = 0; // Track when drag ended to delay snap
   private snapPending = false;
+  private snapTarget: number | null = null;
   private pointerCaptured = false;
 
   private lastDragVelocity = 0;
@@ -104,6 +105,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private ringEl!: HTMLDivElement;
   private cardEls: HTMLDivElement[] = [];
   private interactionBridge: InteractionBridge = null;
+  private lastWheelTS = 0;
 
   constructor(
     private zone: NgZone,
@@ -165,6 +167,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     if (changes['scrollProgress'] && this.scrollProgress != null && !this.dragging) {
       const target = -this.scrollProgress * 360 * this.scrollRotations;
       this.desiredRotationDeg = target;
+      this.snapTarget = null;
+      this.snapPending = true;
     }
   }
 
@@ -190,6 +194,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.lastMoveTS = ev.timeStamp || performance.now();
     this.desiredRotationDeg = null;
     this.snapPending = false;
+    this.snapTarget = null;
     this.gesture = 'pending';
     this.dragging = false;
     this.pointerCaptured = false;
@@ -246,6 +251,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.peakDragVelocity = Math.max(this.peakDragVelocity, Math.abs(instantaneousVelocity));
 
     this.rotationDeg += deltaDeg;
+    this.snapTarget = null;
     this.recordVelocitySample(instantaneousVelocity);
     const smoothedVelocity = this.getSmoothedVelocity();
     const isSlowDrag =
@@ -285,6 +291,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     // Record when drag ended to delay snap activation
     this.lastDragEndTS = performance.now();
     this.snapPending = wasRotating;
+    this.snapTarget = null;
     if (wasRotating && this.slowDragFrames > 12 && Math.abs(this.angularVelocity) < this.stepDeg * 1.25) {
       this.angularVelocity = 0;
       this.desiredRotationDeg = this.nearestSnapAngle(this.rotationDeg);
@@ -312,14 +319,27 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     const direction = Math.sign(delta);
     if (!direction) return;
 
-    const step = this.stepDeg;
-    const currentAnchor = this.desiredRotationDeg ?? this.nearestSnapAngle(this.rotationDeg);
-    const target = currentAnchor - direction * step;
+    const now = performance.now();
+    const dt = now - this.lastWheelTS;
+    this.lastWheelTS = now;
 
-    this.desiredRotationDeg = target;
-    this.angularVelocity = 0;
+    const step = this.stepDeg;
+    const anchor = this.snapTarget ?? this.nearestSnapAngle(this.rotationDeg);
+    this.snapTarget = anchor - direction * step;
+
+    const fastFactor = Number.isFinite(dt) && dt > 0 ? Math.min(6, 240 / Math.max(18, dt)) : 1;
+    const boostBase = this.stepDeg * 18;
+    const newVelocity = direction * boostBase * fastFactor;
+
+    if (Math.sign(this.angularVelocity) === direction) {
+      this.angularVelocity += newVelocity;
+    } else {
+      this.angularVelocity = newVelocity;
+    }
+
+    this.desiredRotationDeg = null;
     this.snapPending = true;
-    this.lastDragEndTS = performance.now();
+    this.lastDragEndTS = now;
   };
 
   private setupDOM() {
@@ -427,8 +447,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         const timeSinceDragEnd = now - this.lastDragEndTS;
         const snapDelay = 120;
         const forceSnapDelay = 900;
-        const snapTarget = this.nearestSnapAngle(this.rotationDeg);
-        const diff = this.shortestAngleDist(this.rotationDeg, snapTarget);
+        const liveTarget = this.snapTarget ?? this.nearestSnapAngle(this.rotationDeg);
+        const diff = this.shortestAngleDist(this.rotationDeg, liveTarget);
         const velocityThreshold = Math.max(this.snapVelocityThreshold, this.stepDeg * 1.05);
         const belowVelocityThreshold = Math.abs(this.angularVelocity) < velocityThreshold;
         const almostAligned = Math.abs(diff) < this.stepDeg * 0.55;
@@ -436,13 +456,19 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         if (!this.snapPending && belowVelocityThreshold && almostAligned) {
           this.snapPending = true;
           this.lastDragEndTS = now - snapDelay;
+          this.snapTarget = liveTarget;
         }
 
         if (this.snapPending && timeSinceDragEnd >= snapDelay && (belowVelocityThreshold || timeSinceDragEnd >= forceSnapDelay)) {
-          const proximity = Math.min(1, Math.abs(diff) / this.stepDeg);
+          if (this.snapTarget == null && belowVelocityThreshold) {
+            this.snapTarget = this.nearestSnapAngle(this.rotationDeg);
+          }
+          const target = this.snapTarget ?? this.nearestSnapAngle(this.rotationDeg);
+          const targetDiff = this.shortestAngleDist(this.rotationDeg, target);
+          const proximity = Math.min(1, Math.abs(targetDiff) / this.stepDeg);
           const strength = this.snapStrength * (0.85 + (1 - proximity) * 0.45);
           const damp = timeSinceDragEnd >= forceSnapDelay ? strength * 0.55 : 6 + proximity * 6;
-          const accel = strength * Math.sign(diff) * Math.max(0.1, proximity);
+          const accel = strength * Math.sign(targetDiff) * Math.max(0.1, proximity);
           this.angularVelocity += (accel - damp * this.angularVelocity) * dt;
 
           if (timeSinceDragEnd >= forceSnapDelay && !belowVelocityThreshold) {
@@ -451,10 +477,11 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
           const settleVelocity = Math.max(0.04, velocityThreshold * 0.12);
           const settleOffset = Math.max(0.01, this.stepDeg * 0.018);
-          if (Math.abs(diff) < settleOffset && Math.abs(this.angularVelocity) < settleVelocity) {
-            this.rotationDeg = snapTarget;
+          if (Math.abs(targetDiff) < settleOffset && Math.abs(this.angularVelocity) < settleVelocity) {
+            this.rotationDeg = target;
             this.angularVelocity = 0;
             this.snapPending = false;
+            this.snapTarget = null;
           }
         } else if (this.snapPending && timeSinceDragEnd >= snapDelay) {
           // keep inertia alive but gently bleed energy so we eventually cross the threshold
