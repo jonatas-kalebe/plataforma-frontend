@@ -3,6 +3,14 @@
   overflow: hidden; /* Prevent parallax overflow */
 }
 
+@media (max-width: 896px) and (orientation: landscape) {
+  #servicos .section-content {
+    /* Allow the services grid to expand naturally on small landscape viewports */
+    max-height: none;
+    overflow: visible;
+  }
+}
+
 .servicos-grid {
   opacity: 1;
   transform: none;
