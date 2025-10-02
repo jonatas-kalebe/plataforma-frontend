@@ -288,14 +288,9 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.pointerId = null;
     this.gesture = 'idle';
     this.ringEl.style.touchAction = 'pan-y';
-    // Record when drag ended to delay snap activation
+    // Record when drag ended so inertia can decay naturally before any snap engages
     this.lastDragEndTS = performance.now();
-    this.snapPending = wasRotating;
-    this.snapTarget = null;
-    if (wasRotating && this.slowDragFrames > 12 && Math.abs(this.angularVelocity) < this.stepDeg * 1.25) {
-      this.angularVelocity = 0;
-      this.desiredRotationDeg = this.nearestSnapAngle(this.rotationDeg);
-    }
+    this.snapPending = this.snapTarget != null;
     if (wasRotating) {
       this.interactionBridge?.onDragEnd?.(this.angularVelocity);
     }
@@ -443,49 +438,41 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         this.angularVelocity = 0;
       }
 
-      if (this.snapEnabled && !this.dragging) {
-        const timeSinceDragEnd = now - this.lastDragEndTS;
-        const snapDelay = 120;
-        const forceSnapDelay = 900;
-        const liveTarget = this.snapTarget ?? this.nearestSnapAngle(this.rotationDeg);
-        const diff = this.shortestAngleDist(this.rotationDeg, liveTarget);
-        const velocityThreshold = Math.max(this.snapVelocityThreshold, this.stepDeg * 1.05);
-        const belowVelocityThreshold = Math.abs(this.angularVelocity) < velocityThreshold;
-        const almostAligned = Math.abs(diff) < this.stepDeg * 0.55;
+      if (this.snapEnabled && !this.dragging && this.desiredRotationDeg == null) {
+        const velocityThreshold = Math.max(this.snapVelocityThreshold, this.stepDeg * 0.75);
+        const slowEnough = Math.abs(this.angularVelocity) <= velocityThreshold;
+        const hasExplicitTarget = this.snapTarget != null;
+        const canReachNext = hasExplicitTarget ? false : this.willReachAnotherCard(this.rotationDeg, this.angularVelocity);
 
-        if (!this.snapPending && belowVelocityThreshold && almostAligned) {
-          this.snapPending = true;
-          this.lastDragEndTS = now - snapDelay;
-          this.snapTarget = liveTarget;
+        if (!hasExplicitTarget) {
+          if (slowEnough && !canReachNext) {
+            this.snapTarget = this.computeCenterAngleForRotation(this.rotationDeg);
+            this.snapPending = true;
+          } else {
+            this.snapPending = false;
+          }
         }
 
-        if (this.snapPending && timeSinceDragEnd >= snapDelay && (belowVelocityThreshold || timeSinceDragEnd >= forceSnapDelay)) {
-          if (this.snapTarget == null && belowVelocityThreshold) {
-            this.snapTarget = this.nearestSnapAngle(this.rotationDeg);
-          }
-          const target = this.snapTarget ?? this.nearestSnapAngle(this.rotationDeg);
-          const targetDiff = this.shortestAngleDist(this.rotationDeg, target);
-          const proximity = Math.min(1, Math.abs(targetDiff) / this.stepDeg);
-          const strength = this.snapStrength * (0.85 + (1 - proximity) * 0.45);
-          const damp = timeSinceDragEnd >= forceSnapDelay ? strength * 0.55 : 6 + proximity * 6;
-          const accel = strength * Math.sign(targetDiff) * Math.max(0.1, proximity);
-          this.angularVelocity += (accel - damp * this.angularVelocity) * dt;
+        if (this.snapPending && this.snapTarget != null) {
+          const target = this.alignAngleToRotation(this.snapTarget, this.rotationDeg);
+          const diff = this.shortestAngleDist(this.rotationDeg, target);
+          const proximity = Math.min(1, Math.abs(diff) / Math.max(1, this.stepDeg));
+          const stiffness = this.snapStrength * (0.6 + (1 - proximity) * 0.4);
+          const damping = this.snapStrength * 0.55;
+          this.angularVelocity += (stiffness * Math.sign(diff) - damping * this.angularVelocity) * dt;
 
-          if (timeSinceDragEnd >= forceSnapDelay && !belowVelocityThreshold) {
-            this.angularVelocity *= Math.exp(-this.friction * dt * 0.65);
-          }
-
-          const settleVelocity = Math.max(0.04, velocityThreshold * 0.12);
-          const settleOffset = Math.max(0.01, this.stepDeg * 0.018);
-          if (Math.abs(targetDiff) < settleOffset && Math.abs(this.angularVelocity) < settleVelocity) {
+          const settleVelocity = Math.max(0.05, velocityThreshold * 0.18);
+          const settleOffset = Math.max(0.01, this.stepDeg * 0.015);
+          if (Math.abs(diff) < settleOffset && Math.abs(this.angularVelocity) < settleVelocity) {
             this.rotationDeg = target;
             this.angularVelocity = 0;
-            this.snapPending = false;
-            this.snapTarget = null;
+            if (!hasExplicitTarget) {
+              this.snapPending = false;
+              this.snapTarget = null;
+            }
           }
-        } else if (this.snapPending && timeSinceDragEnd >= snapDelay) {
-          // keep inertia alive but gently bleed energy so we eventually cross the threshold
-          this.angularVelocity *= Math.exp(-this.friction * dt * 0.12);
+        } else if (!hasExplicitTarget) {
+          this.snapTarget = null;
         }
       }
     }
@@ -513,6 +500,64 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private applyRingTransform() {
     this.ringEl.style.transform = `translateZ(0) rotateY(${this.rotationDeg}deg)`;
     this.ringEl.style.setProperty('--rotation', `${-this.rotationDeg}deg`);
+  }
+
+  private computeCenterAngleForRotation(rotation: number): number {
+    const step = this.stepDeg || 360;
+    const nearestIndex = this.computeNearestIndexForRotation(rotation);
+    const baseAngle = -nearestIndex * step;
+    return this.alignAngleToRotation(baseAngle, rotation);
+  }
+
+  private computeNearestIndexForRotation(rotation: number): number {
+    const step = this.stepDeg || 360;
+    if (!Number.isFinite(step) || step === 0) return 0;
+    return Math.round(-rotation / step);
+  }
+
+  private alignAngleToRotation(angle: number, reference: number): number {
+    let aligned = angle;
+    while (aligned - reference > 180) aligned -= 360;
+    while (aligned - reference < -180) aligned += 360;
+    return aligned;
+  }
+
+  private projectedRestingRotation(rotation: number, velocity: number): number {
+    if (!Number.isFinite(velocity) || velocity === 0) return rotation;
+    if (!this.inertiaEnabled) {
+      return rotation + velocity * (1 / 60);
+    }
+    const friction = Math.max(0.0001, this.friction);
+    return rotation + velocity / friction;
+  }
+
+  private willReachAnotherCard(rotation: number, velocity: number): boolean {
+    if (!Number.isFinite(velocity) || Math.abs(velocity) < 0.001) return false;
+
+    const projected = this.projectedRestingRotation(rotation, velocity);
+    const currentIndex = this.computeNearestIndexForRotation(rotation);
+    const projectedIndex = this.computeNearestIndexForRotation(projected);
+    if (projectedIndex !== currentIndex) {
+      return true;
+    }
+
+    const direction = Math.sign(velocity);
+    if (!direction) return false;
+
+    const currentCenter = this.computeCenterAngleForRotation(rotation);
+    let nextCenter = this.alignAngleToRotation(currentCenter + direction * this.stepDeg, rotation);
+    let currentToNext = this.shortestAngleDist(rotation, nextCenter);
+
+    if (currentToNext === 0) return true;
+    if (Math.sign(currentToNext) !== direction) {
+      nextCenter = this.alignAngleToRotation(nextCenter + direction * 360, rotation);
+      currentToNext = this.shortestAngleDist(rotation, nextCenter);
+    }
+
+    const projectedToNext = this.shortestAngleDist(projected, nextCenter);
+    if (Math.sign(projectedToNext) !== Math.sign(currentToNext)) return true;
+    const proximityThreshold = Math.max(0.05, this.stepDeg * 0.05);
+    return Math.abs(projectedToNext) <= proximityThreshold;
   }
 
   private nearestSnapAngle(currentDeg: number): number {
