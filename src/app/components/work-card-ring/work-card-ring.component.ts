@@ -453,10 +453,13 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         const belowVelocityThreshold = Math.abs(this.angularVelocity) < velocityThreshold;
         const almostAligned = Math.abs(diff) < this.stepDeg * 0.55;
 
-        if (!this.snapPending && belowVelocityThreshold && almostAligned) {
+        const lowMomentumSnap = belowVelocityThreshold && this.shouldSnapBecauseLowMomentum();
+
+        if (!this.snapPending && (belowVelocityThreshold && almostAligned || lowMomentumSnap)) {
+          const targetForSnap = lowMomentumSnap ? this.nearestSnapAngle(this.rotationDeg) : liveTarget;
           this.snapPending = true;
           this.lastDragEndTS = now - snapDelay;
-          this.snapTarget = liveTarget;
+          this.snapTarget = targetForSnap;
         }
 
         if (this.snapPending && timeSinceDragEnd >= snapDelay && (belowVelocityThreshold || timeSinceDragEnd >= forceSnapDelay)) {
@@ -513,6 +516,43 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private applyRingTransform() {
     this.ringEl.style.transform = `translateZ(0) rotateY(${this.rotationDeg}deg)`;
     this.ringEl.style.setProperty('--rotation', `${-this.rotationDeg}deg`);
+  }
+
+  private shouldSnapBecauseLowMomentum(): boolean {
+    if (this.count <= 1) return true;
+
+    const velocity = Math.abs(this.angularVelocity);
+    if (!Number.isFinite(velocity) || velocity <= 0.0001) {
+      return true;
+    }
+
+    const direction = Math.sign(this.angularVelocity);
+    const step = this.stepDeg;
+    if (direction === 0) {
+      return true;
+    }
+
+    const nearest = this.nearestSnapAngle(this.rotationDeg);
+    const distanceToNearest = Math.abs(this.shortestAngleDist(this.rotationDeg, nearest));
+    const nextTarget = nearest + direction * step;
+    const distanceToNext = Math.abs(this.shortestAngleDist(this.rotationDeg, nextTarget));
+
+    const projectedTravel = this.estimateRemainingTravel(velocity);
+    const tolerance = Math.max(step * 0.08, distanceToNearest * 0.4, 0.5);
+
+    if (distanceToNearest <= tolerance) {
+      return true;
+    }
+
+    return projectedTravel + tolerance < distanceToNext;
+  }
+
+  private estimateRemainingTravel(currentVelocity: number): number {
+    if (!Number.isFinite(currentVelocity) || currentVelocity <= 0) {
+      return 0;
+    }
+    const friction = Math.max(0.0001, Math.abs(this.friction));
+    return currentVelocity / friction;
   }
 
   private nearestSnapAngle(currentDeg: number): number {
