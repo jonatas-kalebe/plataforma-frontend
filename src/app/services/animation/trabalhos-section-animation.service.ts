@@ -255,32 +255,35 @@ export class TrabalhosSectionAnimationService {
     if (this.momentumId) cancelAnimationFrame(this.momentumId);
     const friction = 0.92;
     const cardAngle = 45;
+    
     const step = () => {
-      const curr = this.currentRingComponent?.rotationDeg ?? 0;
+      // Apply friction
+      this.dragVelocity *= friction;
       
-      // Calculate distance to nearest snap point
-      const nearestCardIndex = Math.round(-curr / cardAngle);
-      const targetRotation = -nearestCardIndex * cardAngle;
-      const distanceToSnap = Math.abs(targetRotation - curr);
+      const absVelocity = Math.abs(this.dragVelocity);
       
-      // Estimate if current velocity can reach the next card
-      // Using kinematic equation: distance = velocity / (1 - friction)
-      const estimatedDistance = Math.abs(this.dragVelocity / (1 - friction));
-      const canReachNextCard = estimatedDistance >= cardAngle * 0.3;
-      
-      // Snap conditions:
-      // 1. Very low velocity (< 0.05) - almost stopped
-      // 2. Low velocity and close to snap point - prevent slow spinning
-      // 3. Cannot reach next card with current velocity
-      const veryLowVelocity = Math.abs(this.dragVelocity) < 0.05;
-      const slowAndClose = Math.abs(this.dragVelocity) < 0.5 && distanceToSnap < cardAngle * 0.4;
-      const shouldSnap = veryLowVelocity || slowAndClose || !canReachNextCard;
-      
-      if (shouldSnap) {
+      // If velocity is very low, snap immediately
+      if (absVelocity < 0.1) {
         this.snapToNearestCard();
         return;
       }
       
+      // For slow velocities, check if we should snap based on proximity
+      if (absVelocity < 0.8) {
+        const curr = this.currentRingComponent?.rotationDeg ?? 0;
+        const nearestCardIndex = Math.round(-curr / cardAngle);
+        const targetRotation = -nearestCardIndex * cardAngle;
+        const distanceToSnap = Math.abs(targetRotation - curr);
+        
+        // If we're within 20% of a card angle and moving slowly, snap
+        if (distanceToSnap < cardAngle * 0.2) {
+          this.snapToNearestCard();
+          return;
+        }
+      }
+      
+      // Continue with momentum
+      const curr = this.currentRingComponent?.rotationDeg ?? 0;
       const next = curr + this.dragVelocity;
       if (this.currentRingComponent && 'rotationDeg' in this.currentRingComponent) {
         this.currentRingComponent.rotationDeg = next;
@@ -288,7 +291,6 @@ export class TrabalhosSectionAnimationService {
       if (this.ringEl) {
         this.ringEl.style.setProperty('--rotation', `${-next}deg`);
       }
-      this.dragVelocity *= friction;
       this.momentumId = requestAnimationFrame(step);
     };
     this.momentumId = requestAnimationFrame(step);
