@@ -1,6 +1,22 @@
+:host {
+  display: block;
+}
+
 #servicos {
   background: linear-gradient(135deg, var(--athenity-blue-deep) 0%, rgba(17, 34, 64, 0.95) 100%);
   overflow: hidden; /* Prevent parallax overflow */
+}
+
+.section-content {
+  max-height: none;
+  overflow: visible;
+}
+
+@media (max-width: 896px) and (orientation: landscape) {
+  .section-content {
+    max-height: none;
+    overflow: visible;
+  }
 }
 
 .servicos-grid {
