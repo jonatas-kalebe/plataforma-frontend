@@ -23,7 +23,7 @@ export class CtaSectionComponent implements AfterViewInit, OnDestroy {
   @Input() subtitle?: string;
   @Input() primaryCta: { label: string; href: string; variant?: string; onClick?: () => void } = {
     label: 'Fale Conosco',
-    href: 'mailto:athenity@gmail.com'
+    href: 'mailto:athenitydev@gmail.com'
   };
   @Input() secondaryCta?: { label: string; href: string };
   @Input() showAdditionalContent: boolean = false;
@@ -48,7 +48,7 @@ export class CtaSectionComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     this.sectionReady.emit(this.sectionElement);
-    
+
     if (isPlatformBrowser(this.platformId)) {
       this.initializePulseAnimation();
     }
@@ -69,15 +69,15 @@ export class CtaSectionComponent implements AfterViewInit, OnDestroy {
 
     const primaryButton = document.querySelector('[data-testid="cta-buttons"] a:first-child') as HTMLElement;
     const secondaryButton = document.querySelector('[data-testid="cta-buttons"] a:last-child') as HTMLElement;
-    
+
     const gsapInstance = (window as any).gsap || gsap;
 
     // Enhanced magnetic effects for all buttons
     const buttons = [primaryButton, secondaryButton].filter(Boolean);
-    
+
     buttons.forEach((button, index) => {
       const isPrimary = index === 0;
-      
+
       // Continuous pulse for primary button (even with reduced motion, but simpler)
       if (isPrimary) {
         if (prefersReducedMotion) {
@@ -107,7 +107,7 @@ export class CtaSectionComponent implements AfterViewInit, OnDestroy {
         if (isPrimary && this.pulseAnimation) {
           this.pulseAnimation.pause();
         }
-        
+
         if (prefersReducedMotion) {
           // Simple hover for reduced motion
           gsapInstance.to(button, {
@@ -150,10 +150,10 @@ export class CtaSectionComponent implements AfterViewInit, OnDestroy {
           const rect = button.getBoundingClientRect();
           const centerX = rect.left + rect.width / 2;
           const centerY = rect.top + rect.height / 2;
-          
+
           const deltaX = (e.clientX - centerX) / (rect.width / 2);
           const deltaY = (e.clientY - centerY) / (rect.height / 2);
-          
+
           gsapInstance.to(button, {
             rotateX: deltaY * -3,
             rotateY: deltaX * 3,
@@ -169,7 +169,7 @@ export class CtaSectionComponent implements AfterViewInit, OnDestroy {
         if (navigator.vibrate) {
           navigator.vibrate(50);
         }
-        
+
         gsapInstance.to(button, {
           scale: prefersReducedMotion ? 1.01 : 1.02,
           duration: 0.2,
@@ -198,7 +198,7 @@ export class CtaSectionComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * Handle secondary CTA click  
+   * Handle secondary CTA click
    */
   onSecondaryCtaClick(event: Event): void {
     this.secondaryCtaClicked.emit(event);
@@ -209,7 +209,7 @@ export class CtaSectionComponent implements AfterViewInit, OnDestroy {
    */
   getSectionClasses(): string {
     const classes: string[] = [];
-    
+
     switch (this.backgroundColor) {
       case 'deep':
         classes.push('bg-athenity-blue-deep');
@@ -227,7 +227,7 @@ export class CtaSectionComponent implements AfterViewInit, OnDestroy {
     } else {
       classes.push('flex-row');
     }
-    
+
     return classes.join(' ');
   }
 
