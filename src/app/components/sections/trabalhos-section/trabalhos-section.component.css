@@ -1,7 +1,8 @@
 #trabalhos {
   position: relative;
-  height: 100vh;
+  height: auto;
   overflow-x: hidden;
+
 }
 
 .section-content {
@@ -126,7 +127,7 @@
   .trabalhos-showcase {
     transform: scale(0.98);
   }
-  
+
   .trabalhos-showcase.visible {
     transform: scale(1);
   }
@@ -175,7 +176,7 @@
   border: 1px solid rgba(255,255,255,0.15);
   opacity: 0.85;
   transform: scale(1);
-  
+
   /* Better touch interactions */
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
@@ -205,7 +206,7 @@
     transform: scale(1.05);
     box-shadow: 0 0 20px rgba(64,224,208,0.4), 0 0 40px rgba(64,224,208,0.2);
   }
-  
+
   .work-card.card-inactive {
     transform: scale(0.95);
     box-shadow: 0 0 10px rgba(0,0,0,0.2);
@@ -231,11 +232,11 @@
     padding: var(--spacing-sm) var(--spacing-md);
     gap: var(--spacing-sm);
   }
-  
+
   .trabalhos-showcase {
     transform: scale(0.9);
   }
-  
+
   .trabalhos-showcase.visible {
     transform: scale(0.95);
   }
@@ -253,14 +254,14 @@
     transition: none !important;
     animation: none !important;
   }
-  
+
   .trabalhos-title.enter-play-title,
   .ring-container.enter-play,
   .drag-hint.enter-play-hint {
     opacity: 1 !important;
     transform: none !important;
   }
-  
+
   .work-card.card-active,
   :host ::ng-deep .work-card.active {
     transform: none !important;
