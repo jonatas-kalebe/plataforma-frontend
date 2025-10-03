@@ -4,6 +4,7 @@
   --ring-viewport: clamp(260px, 80vmin, 320px);
   --font-size: clamp(0.875rem, 2.8vmin, 1.1rem);
   display: block;
+  overflow: hidden; /* Prevent any scrollbars on the host element */
 }
 
 .ring-wrap {
@@ -13,7 +14,7 @@
   width: 100%;
   height: clamp(280px, 80vmin, 420px);
   position: relative;
-  overflow: visible;
+  overflow: hidden; /* Changed from visible to hidden to prevent scrollbars */
   touch-action: pan-y;
 }
 
@@ -98,4 +99,37 @@
     --font-size: clamp(1rem, 2.5vmin, 1.1rem);
   }
   .ring-wrap { height: clamp(320px, 70vmin, 420px); }
+}
+
+/* Landscape mobile optimizations to prevent scrollbars */
+@media (max-width: 896px) and (orientation: landscape) {
+  :host {
+    --card-w: clamp(140px, 35vmin, 200px);
+    --card-h: calc(var(--card-w) * 0.6);
+    --ring-viewport: clamp(220px, 70vmin, 280px);
+    --font-size: clamp(0.75rem, 2.5vmin, 0.95rem);
+  }
+  
+  .ring-wrap {
+    height: clamp(200px, 60vmin, 300px);
+    overflow: hidden;
+  }
+  
+  .work-card-inner {
+    padding: 0.5rem;
+    font-size: var(--font-size);
+  }
+}
+
+/* Extra small screens - ensure no scrollbars */
+@media (max-width: 480px) {
+  :host {
+    --card-w: clamp(140px, 38vmin, 200px);
+    --font-size: clamp(0.8rem, 2.6vmin, 1rem);
+  }
+  
+  .ring-wrap {
+    height: clamp(240px, 75vmin, 360px);
+    overflow: hidden;
+  }
 }

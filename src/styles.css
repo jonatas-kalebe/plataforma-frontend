@@ -81,6 +81,15 @@
     
     /* Prevent text selection on touch devices for UI elements */
     -webkit-touch-callout: none;
+    
+    /* Hide scrollbars while maintaining scroll functionality */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+  
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  body::-webkit-scrollbar {
+    display: none;
   }
 
   /* Typography with fluid scaling */
