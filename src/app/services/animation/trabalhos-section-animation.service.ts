@@ -254,11 +254,35 @@ export class TrabalhosSectionAnimationService {
   private startMomentum(): void {
     if (this.momentumId) cancelAnimationFrame(this.momentumId);
     const friction = 0.92;
+    const cardAngle = 45;
+    
     const step = () => {
-      if (Math.abs(this.dragVelocity) < 0.05) {
+      // Apply friction
+      this.dragVelocity *= friction;
+      
+      const absVelocity = Math.abs(this.dragVelocity);
+      
+      // If velocity is very low, snap immediately
+      if (absVelocity < 0.1) {
         this.snapToNearestCard();
         return;
       }
+      
+      // For slow velocities, check if we should snap based on proximity
+      if (absVelocity < 0.8) {
+        const curr = this.currentRingComponent?.rotationDeg ?? 0;
+        const nearestCardIndex = Math.round(-curr / cardAngle);
+        const targetRotation = -nearestCardIndex * cardAngle;
+        const distanceToSnap = Math.abs(targetRotation - curr);
+        
+        // If we're within 20% of a card angle and moving slowly, snap
+        if (distanceToSnap < cardAngle * 0.2) {
+          this.snapToNearestCard();
+          return;
+        }
+      }
+      
+      // Continue with momentum
       const curr = this.currentRingComponent?.rotationDeg ?? 0;
       const next = curr + this.dragVelocity;
       if (this.currentRingComponent && 'rotationDeg' in this.currentRingComponent) {
@@ -267,7 +291,6 @@ export class TrabalhosSectionAnimationService {
       if (this.ringEl) {
         this.ringEl.style.setProperty('--rotation', `${-next}deg`);
       }
-      this.dragVelocity *= friction;
       this.momentumId = requestAnimationFrame(step);
     };
     this.momentumId = requestAnimationFrame(step);
