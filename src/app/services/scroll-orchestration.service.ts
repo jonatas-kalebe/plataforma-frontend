@@ -310,6 +310,7 @@ export class ScrollOrchestrationService {
       this.heroAnimationManager = new HeroAnimationManager(this.prefersReducedMotion);
     }
   }
+
   /**
    * Detecta dispositivos móveis
    */
