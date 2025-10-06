@@ -268,6 +268,46 @@
     position: relative;
   }
 
+  /* Unified background gradient system - smooth transitions between sections */
+  #hero {
+    background: linear-gradient(180deg, 
+      var(--athenity-blue-deep) 0%, 
+      rgba(10, 25, 47, 0.98) 100%
+    );
+  }
+
+  #filosofia {
+    background: linear-gradient(180deg, 
+      rgba(10, 25, 47, 0.98) 0%, 
+      rgba(12, 28, 52, 0.97) 50%,
+      rgba(14, 31, 56, 0.96) 100%
+    );
+  }
+
+  #servicos {
+    background: linear-gradient(180deg, 
+      rgba(14, 31, 56, 0.96) 0%,
+      rgba(15, 33, 60, 0.95) 50%,
+      var(--athenity-blue-card) 100%
+    ) !important;
+  }
+
+  #trabalhos {
+    background: linear-gradient(180deg, 
+      var(--athenity-blue-card) 0%,
+      rgba(16, 35, 62, 0.94) 50%,
+      rgba(14, 32, 58, 0.96) 100%
+    );
+  }
+
+  #cta {
+    background: linear-gradient(180deg, 
+      rgba(14, 32, 58, 0.96) 0%,
+      rgba(12, 28, 52, 0.97) 50%,
+      var(--athenity-blue-deep) 100%
+    ) !important;
+  }
+
   .section-content {
     @apply max-w-7xl mx-auto w-full;
     padding-left: var(--spacing-sm);

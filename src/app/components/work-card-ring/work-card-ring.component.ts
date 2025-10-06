@@ -39,6 +39,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   @Input() perspective = 1200;
 
   @Input() dragSensitivity = 0.35;
+  @Input() mobileDragSensitivity = 0.18; // Reduced sensitivity for mobile/touch
   @Input() wheelSpeed = 0.2; // legacy - kept for backwards compat but overridden by discrete wheel steps
   @Input() friction = 2.8;
   @Input() inertiaEnabled = true;
@@ -68,6 +69,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
   private isBrowser = false;
   private reducedMotion = false;
+  private isMobileOrTouch = false;
 
   private rotationDeg = 0;
   private angularVelocity = 0;
@@ -122,6 +124,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.cardEls = this.cardRefs.toArray().map(r => r.nativeElement);
 
     this.setupReducedMotion();
+    this.detectMobileOrTouch();
 
     const style = getComputedStyle(this.hostRef.nativeElement);
     const vp = parseFloat(style.getPropertyValue('--ring-viewport'));
@@ -238,8 +241,12 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     const safeDt = Math.max(1 / 240, dt);
     const dxRaw = this.computePointerDelta(ev);
     const pointerSpeed = Math.abs(dxRaw) / safeDt;
+    
+    // Use appropriate sensitivity based on device type
+    const effectiveSensitivity = this.isMobileOrTouch ? this.mobileDragSensitivity : this.dragSensitivity;
+    
     const intensity = this.computePointerIntensity(pointerSpeed);
-    const deltaDeg = this.applyDragCurve(dxRaw * this.dragSensitivity * intensity, intensity);
+    const deltaDeg = this.applyDragCurve(dxRaw * effectiveSensitivity * intensity, intensity);
     const instantaneousVelocity = deltaDeg / safeDt;
     const accel = (instantaneousVelocity - this.lastDragVelocity) / safeDt;
 
@@ -424,6 +431,14 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     mq.addEventListener?.('change', (e) => (this.reducedMotion = e.matches));
   }
 
+  private detectMobileOrTouch() {
+    // Detect if device is mobile or has touch capability
+    this.isMobileOrTouch = 
+      ('ontouchstart' in window) || 
+      (navigator.maxTouchPoints > 0) ||
+      window.innerWidth < 768;
+  }
+
   private tick = (now: number) => {
     const dt = Math.min(0.05, (now - (this.prevTS || now)) / 1000);
     this.prevTS = now;
@@ -436,22 +451,25 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       this.rotationDeg += this.angularVelocity * dt;
 
       if (this.inertiaEnabled && !this.dragging) {
-        const decay = Math.exp(-this.friction * dt);
+        // Apply higher friction to make cards stop more naturally
+        const effectiveFriction = this.friction * (this.isMobileOrTouch ? 1.3 : 1.0);
+        const decay = Math.exp(-effectiveFriction * dt);
         this.angularVelocity *= decay;
-        if (Math.abs(this.angularVelocity) < 0.01) this.angularVelocity = 0;
+        // Stop completely at a lower threshold to prevent infinite slow spinning
+        if (Math.abs(this.angularVelocity) < 0.5) this.angularVelocity = 0;
       } else if (!this.inertiaEnabled && !this.dragging) {
         this.angularVelocity = 0;
       }
 
       if (this.snapEnabled && !this.dragging) {
         const timeSinceDragEnd = now - this.lastDragEndTS;
-        const snapDelay = 120;
-        const forceSnapDelay = 900;
+        const snapDelay = 80; // Reduced delay for quicker snap response
+        const forceSnapDelay = 600; // Reduced to snap sooner
         const liveTarget = this.snapTarget ?? this.nearestSnapAngle(this.rotationDeg);
         const diff = this.shortestAngleDist(this.rotationDeg, liveTarget);
-        const velocityThreshold = Math.max(this.snapVelocityThreshold, this.stepDeg * 1.05);
+        const velocityThreshold = Math.max(this.snapVelocityThreshold, this.stepDeg * 0.8);
         const belowVelocityThreshold = Math.abs(this.angularVelocity) < velocityThreshold;
-        const almostAligned = Math.abs(diff) < this.stepDeg * 0.55;
+        const almostAligned = Math.abs(diff) < this.stepDeg * 0.6;
 
         if (!this.snapPending && belowVelocityThreshold && almostAligned) {
           this.snapPending = true;
@@ -466,17 +484,17 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
           const target = this.snapTarget ?? this.nearestSnapAngle(this.rotationDeg);
           const targetDiff = this.shortestAngleDist(this.rotationDeg, target);
           const proximity = Math.min(1, Math.abs(targetDiff) / this.stepDeg);
-          const strength = this.snapStrength * (0.85 + (1 - proximity) * 0.45);
-          const damp = timeSinceDragEnd >= forceSnapDelay ? strength * 0.55 : 6 + proximity * 6;
-          const accel = strength * Math.sign(targetDiff) * Math.max(0.1, proximity);
+          const strength = this.snapStrength * (0.9 + (1 - proximity) * 0.5);
+          const damp = timeSinceDragEnd >= forceSnapDelay ? strength * 0.6 : 7 + proximity * 8;
+          const accel = strength * Math.sign(targetDiff) * Math.max(0.15, proximity);
           this.angularVelocity += (accel - damp * this.angularVelocity) * dt;
 
           if (timeSinceDragEnd >= forceSnapDelay && !belowVelocityThreshold) {
-            this.angularVelocity *= Math.exp(-this.friction * dt * 0.65);
+            this.angularVelocity *= Math.exp(-this.friction * dt * 0.7);
           }
 
-          const settleVelocity = Math.max(0.04, velocityThreshold * 0.12);
-          const settleOffset = Math.max(0.01, this.stepDeg * 0.018);
+          const settleVelocity = Math.max(0.06, velocityThreshold * 0.15);
+          const settleOffset = Math.max(0.015, this.stepDeg * 0.025);
           if (Math.abs(targetDiff) < settleOffset && Math.abs(this.angularVelocity) < settleVelocity) {
             this.rotationDeg = target;
             this.angularVelocity = 0;
@@ -485,7 +503,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
           }
         } else if (this.snapPending && timeSinceDragEnd >= snapDelay) {
           // keep inertia alive but gently bleed energy so we eventually cross the threshold
-          this.angularVelocity *= Math.exp(-this.friction * dt * 0.12);
+          this.angularVelocity *= Math.exp(-this.friction * dt * 0.15);
         }
       }
     }
