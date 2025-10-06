@@ -126,14 +126,15 @@ export class MagneticScrollManager {
     }
     this.idleTimeoutId = window.setTimeout(() => {
       this.idleTimeoutId = null;
-      // Check if direction is still relevant (within 2 seconds of last activity)
+      // Check if direction is still relevant (within 1.5 seconds of last activity)
       const timeSinceActivity = this.now() - this.lastUserActivityTs;
-      const directionStillRelevant = timeSinceActivity < 2000;
+      const directionStillRelevant = timeSinceActivity < 1500;
       if (directionStillRelevant && this.direction !== null) {
+        // Use directional snap - will only snap if close enough to next/prev
         this.snapToClosestInDirection(SnapReason.Idle, this.direction);
-      } else {
-        this.snapToClosest(SnapReason.Idle);
       }
+      // If no direction or not close enough, don't snap at all
+      // User wanted: only snap in scroll direction, or small adjustments when almost centered
     }, this.config.idleSnapDelayMs);
   }
 
@@ -305,50 +306,47 @@ export class MagneticScrollManager {
     const dominant = this.findDominantSection(this.lastSectionsSnapshot);
     
     if (!dominant) {
-      return this.snapToClosest(reason);
+      return false; // Don't snap if no dominant section
     }
 
     const { section: currentSection, index } = dominant;
-    const currentTargetY = currentSection.element ? this.getTargetY(currentSection.element) : currentY;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 0;
+    const closeEnoughThreshold = Math.max(100, viewportHeight * 0.15); // Only snap if within 15% of viewport
 
-    // Determine snap target based on direction
+    // Determine snap target based on direction - only snap if close enough
     let targetSection: ScrollSection | null = null;
 
     if (direction === 'forward') {
-      // When scrolling forward, prefer snapping forward or to current section
+      // When scrolling forward, ONLY consider next section, and only if close enough
       const nextSection = this.lastSectionsSnapshot[index + 1];
       if (nextSection && nextSection.element) {
         const nextTargetY = this.getTargetY(nextSection.element);
-        // Only snap to next if we're moving toward it
-        if (nextTargetY > currentY) {
+        const distance = nextTargetY - currentY;
+        // Only snap to next if we're moving toward it AND close enough
+        if (distance > 0 && distance < closeEnoughThreshold) {
           targetSection = nextSection;
         }
       }
-      // Fallback to current section if no valid next section
-      if (!targetSection && currentSection.element) {
-        targetSection = currentSection;
-      }
+      // No fallback - if we can't snap forward, don't snap at all
     } else if (direction === 'backward') {
-      // When scrolling backward, prefer snapping backward or to current section
+      // When scrolling backward, ONLY consider prev section, and only if close enough
       const prevSection = this.lastSectionsSnapshot[index - 1];
       if (prevSection && prevSection.element) {
         const prevTargetY = this.getTargetY(prevSection.element);
-        // Only snap to prev if we're moving toward it
-        if (prevTargetY < currentY) {
+        const distance = currentY - prevTargetY;
+        // Only snap to prev if we're moving toward it AND close enough
+        if (distance > 0 && distance < closeEnoughThreshold) {
           targetSection = prevSection;
         }
       }
-      // Fallback to current section if no valid prev section
-      if (!targetSection && currentSection.element) {
-        targetSection = currentSection;
-      }
+      // No fallback - if we can't snap backward, don't snap at all
     } else {
-      // No clear direction, use closest section
-      return this.snapToClosest(reason);
+      // No clear direction, don't snap
+      return false;
     }
 
     if (!targetSection || !targetSection.element) {
-      return this.snapToClosest(reason);
+      return false; // Don't snap if no valid target
     }
 
     const targetY = this.getTargetY(targetSection.element);
@@ -565,42 +563,61 @@ export class MagneticScrollManager {
       return null;
     }
 
-    // Filter candidates based on scroll direction to avoid snapping backwards
-    const candidates: Array<ScrollSection | undefined> = [];
+    const currentY = window.scrollY;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 0;
+    const closeEnoughThreshold = Math.max(100, viewportHeight * 0.15); // Only snap if within 15% of viewport
+
+    // Filter candidates based on scroll direction - only consider next/prev, never current
+    let targetSection: ScrollSection | null = null;
     
     if (this.direction === 'forward') {
-      // When scrolling forward, only consider current and next sections
-      candidates.push(dominant.section, next);
+      // When scrolling forward, ONLY consider next section
+      if (next && next.element) {
+        const nextTargetY = this.getTargetY(next.element);
+        const distance = nextTargetY - currentY;
+        // Only snap if close enough
+        if (distance > 0 && distance < closeEnoughThreshold) {
+          targetSection = next;
+        }
+      }
     } else if (this.direction === 'backward') {
-      // When scrolling backward, only consider prev and current sections
-      candidates.push(prev, dominant.section);
+      // When scrolling backward, ONLY consider prev section
+      if (prev && prev.element) {
+        const prevTargetY = this.getTargetY(prev.element);
+        const distance = currentY - prevTargetY;
+        // Only snap if close enough
+        if (distance > 0 && distance < closeEnoughThreshold) {
+          targetSection = prev;
+        }
+      }
     } else {
-      // No clear direction, consider all candidates
-      candidates.push(prev, dominant.section, next);
+      // No clear direction - check if we're very close to any section
+      const candidates: Array<ScrollSection | undefined> = [prev, dominant.section, next];
+      const candidate = this.findBestAlignmentCandidate(candidates);
+      
+      if (candidate) {
+        const { section, distance } = candidate;
+        // Only snap if very close (within 12% of viewport)
+        if (distance >= 12 && distance < viewportHeight * 0.12) {
+          targetSection = section;
+        }
+      }
     }
 
-    const candidate = this.findBestAlignmentCandidate(candidates);
-
-    if (!candidate) {
+    if (!targetSection || !targetSection.element) {
       return null;
     }
 
-    const { section, distance } = candidate;
+    const distance = Math.abs(this.getTargetY(targetSection.element) - currentY);
     if (distance < 12) {
       return null;
     }
 
-    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 0;
-    const comfortableDistance = Math.max(180, viewportHeight * 0.28);
-    if (distance > comfortableDistance) {
+    if (this.lastSnapTargetId === targetSection.id) {
       return null;
     }
 
-    if (this.lastSnapTargetId === section.id) {
-      return null;
-    }
-
-    return section;
+    return targetSection;
   }
 
   private findBestAlignmentCandidate(
