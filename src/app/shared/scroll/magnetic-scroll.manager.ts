@@ -120,22 +120,8 @@ export class MagneticScrollManager {
   }
 
   startScrollStopCheck(): void {
-    if (this.prefersReducedMotion) return;
-    if (this.idleTimeoutId) {
-      clearTimeout(this.idleTimeoutId);
-    }
-    this.idleTimeoutId = window.setTimeout(() => {
-      this.idleTimeoutId = null;
-      // Check if direction is still relevant (within 1.5 seconds of last activity)
-      const timeSinceActivity = this.now() - this.lastUserActivityTs;
-      const directionStillRelevant = timeSinceActivity < 1500;
-      if (directionStillRelevant && this.direction !== null) {
-        // Use directional snap - will only snap if close enough to next/prev
-        this.snapToClosestInDirection(SnapReason.Idle, this.direction);
-      }
-      // If no direction or not close enough, don't snap at all
-      // User wanted: only snap in scroll direction, or small adjustments when almost centered
-    }, this.config.idleSnapDelayMs);
+    // Magnetic snap completely disabled per user request
+    return;
   }
 
   detectScrollIntention(velocity: number): void {
@@ -159,61 +145,7 @@ export class MagneticScrollManager {
   }
 
   checkMagneticSnap(sections: ScrollSection[]): boolean {
-    if (this.prefersReducedMotion) return false;
-
-    this.updateSectionsSnapshot(sections);
-
-    if (!sections.length || this.isAnimating) {
-      return false;
-    }
-
-    const now = this.now();
-    if (now < this.skipSnapUntil) {
-      return false;
-    }
-
-    const dominant = this.findDominantSection(sections);
-    if (!dominant) {
-      return false;
-    }
-
-    const { index, progress } = dominant;
-    const next = sections[index + 1];
-    const prev = sections[index - 1];
-
-    const timeSinceActivity = now - this.lastUserActivityTs;
-    const lowVelocity = Math.abs(this.lastVelocity) <= this.config.settleVelocityThreshold * 1.5;
-    const nearIdle = timeSinceActivity >= this.config.snapDelayMs;
-    const settled = lowVelocity && timeSinceActivity >= this.config.snapDelayMs / 2;
-
-    const leaps = this.lastDominantIndex === null ? 0 : Math.abs(index - this.lastDominantIndex);
-    this.lastDominantIndex = index;
-
-    if (!nearIdle && !settled) {
-      return false;
-    }
-
-    const shouldAssistIdle = nearIdle;
-
-    if (shouldAssistIdle) {
-      const assistTarget = this.resolveIdleAssist(dominant, prev, next);
-      if (assistTarget) {
-        return this.queueSnap(assistTarget, SnapReason.Idle);
-      }
-    }
-
-    if (settled && leaps <= 1 && this.direction === 'forward' && progress >= this.config.progressForwardSnap && next) {
-      return this.queueSnap(next, SnapReason.ForwardProgress);
-    }
-
-    if (settled && leaps <= 1 && this.direction === 'backward' && progress <= this.config.progressBackwardSnap && prev) {
-      return this.queueSnap(prev, SnapReason.BackwardProgress);
-    }
-
-    if (settled) {
-      return this.snapToClosestInDirection(SnapReason.LowVelocity, this.direction);
-    }
-
+    // Magnetic snap completely disabled per user request
     return false;
   }
 
