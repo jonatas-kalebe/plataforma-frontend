@@ -70,7 +70,6 @@ export class MagneticScrollManager {
   private rafScrollId: number | null = null;
 
   private direction: Dir = null;
-  private initialDirection: Dir = null;
   private lastVelocity = 0;
   private skipSnapUntil = 0;
   private isAnimating = false;
@@ -85,7 +84,6 @@ export class MagneticScrollManager {
 
   private prevScrollBehaviorHtml: string | null = null;
   private prevScrollBehaviorBody: string | null = null;
-
 
   constructor(prefersReducedMotion: boolean = false, config: Partial<SnapScrollConfig> = {}) {
     this.prefersReducedMotion = prefersReducedMotion;
@@ -142,12 +140,6 @@ export class MagneticScrollManager {
     const absVelocity = Math.abs(velocity);
     if (absVelocity > this.config.velocityIgnoreThreshold) {
       const newDir: Dir = velocity > 0 ? 'forward' : 'backward';
-      if (!this.initialDirection) {
-        this.initialDirection = newDir;
-      } else if (this.initialDirection !== newDir && absVelocity > this.config.flingVelocityThreshold * 0.7) {
-        // Only allow reversing the preferred direction when the user clearly flings
-        this.initialDirection = newDir;
-      }
       if (newDir !== this.direction) {
         this.direction = newDir;
       }
@@ -186,10 +178,6 @@ export class MagneticScrollManager {
     const nearIdle = timeSinceActivity >= this.config.snapDelayMs;
     const settled = lowVelocity && timeSinceActivity >= this.config.snapDelayMs / 2;
 
-    if (timeSinceActivity >= this.config.idleSnapDelayMs * 2) {
-      this.initialDirection = null;
-    }
-
     const leaps = this.lastDominantIndex === null ? 0 : Math.abs(index - this.lastDominantIndex);
     this.lastDominantIndex = index;
 
@@ -200,8 +188,7 @@ export class MagneticScrollManager {
     const shouldAssistIdle = nearIdle;
 
     if (shouldAssistIdle) {
-      const preferredDirection = this.initialDirection ?? this.direction;
-      const assistTarget = this.resolveIdleAssist(dominant, prev, next, preferredDirection);
+      const assistTarget = this.resolveIdleAssist(dominant, prev, next);
       if (assistTarget) {
         return this.queueSnap(assistTarget, SnapReason.Idle);
       }
@@ -273,15 +260,6 @@ export class MagneticScrollManager {
 
     const targetElement = section.element;
     const delay = this.getSnapDelay(reason);
-    if (reason !== SnapReason.Programmatic) {
-      const preferredDirection = this.initialDirection ?? this.direction;
-      if (preferredDirection) {
-        const directionToTarget = this.resolveElementDirection(targetElement);
-        if (directionToTarget && directionToTarget !== preferredDirection) {
-          return false;
-        }
-      }
-    }
     this.lastSnapTargetId = section.id;
     this.snapTimeoutId = window.setTimeout(() => {
       this.snapTimeoutId = null;
@@ -299,8 +277,7 @@ export class MagneticScrollManager {
       return false;
     }
 
-    const preferredDirection = reason === SnapReason.Programmatic ? null : (this.initialDirection ?? this.direction);
-    const closest = this.findClosestSection(this.lastSectionsSnapshot, preferredDirection);
+    const closest = this.findClosestSection(this.lastSectionsSnapshot);
     if (!closest || !closest.section.element) {
       return false;
     }
@@ -372,10 +349,6 @@ export class MagneticScrollManager {
     if (reason === SnapReason.Idle || reason === SnapReason.LowVelocity) {
       this.lastAssistTs = this.now();
     }
-    if (reason !== SnapReason.Programmatic) {
-      this.direction = null;
-      this.initialDirection = null;
-    }
   }
 
   private cancelPendingSnap(): void {
@@ -415,28 +388,16 @@ export class MagneticScrollManager {
     };
   }
 
-  private findClosestSection(
-    sections: ScrollSection[],
-    preferredDirection: Dir | null
-  ): { section: ScrollSection; index: number } | null {
+  private findClosestSection(sections: ScrollSection[]): { section: ScrollSection; index: number } | null {
     const currentY = window.scrollY;
     let bestSection: ScrollSection | null = null;
     let bestIndex = -1;
     let bestDistance = Infinity;
 
-    const tolerance = 2;
-
     sections.forEach((section, index) => {
       if (!section.element) return;
       const targetY = this.getTargetY(section.element);
       const distance = Math.abs(targetY - currentY);
-      const delta = targetY - currentY;
-      const dir: Dir = delta > tolerance ? 'forward' : delta < -tolerance ? 'backward' : null;
-
-      if (preferredDirection && dir && dir !== preferredDirection) {
-        return;
-      }
-
       if (distance < bestDistance) {
         bestDistance = distance;
         bestSection = section;
@@ -527,8 +488,7 @@ export class MagneticScrollManager {
   private resolveIdleAssist(
     dominant: { section: ScrollSection; index: number; progress: number },
     prev?: ScrollSection,
-    next?: ScrollSection,
-    preferredDirection: Dir | null = null
+    next?: ScrollSection
   ): ScrollSection | null {
     const now = this.now();
     if (now - this.lastAssistTs < this.config.snapDelayMs) {
@@ -539,7 +499,7 @@ export class MagneticScrollManager {
       prev,
       dominant.section,
       next
-    ], preferredDirection);
+    ]);
 
     if (!candidate) {
       return null;
@@ -564,33 +524,18 @@ export class MagneticScrollManager {
   }
 
   private findBestAlignmentCandidate(
-    candidates: Array<ScrollSection | undefined>,
-    preferredDirection: Dir | null
+    candidates: Array<ScrollSection | undefined>
   ): { section: ScrollSection; distance: number } | null {
     const currentY = window.scrollY;
-    const normalized = candidates
+    const scored = candidates
       .filter((section): section is ScrollSection => !!section && !!section.element)
       .map(section => ({
         section,
         distance: Math.abs(this.getTargetY(section.element as HTMLElement) - currentY)
       }))
-      .filter(candidate => {
-        if (!preferredDirection) return true;
-        const delta = this.getTargetY(candidate.section.element as HTMLElement) - currentY;
-        const dir: Dir = delta > 2 ? 'forward' : delta < -2 ? 'backward' : null;
-        return !dir || dir === preferredDirection;
-      });
-
-    const scored = normalized.sort((a, b) => a.distance - b.distance);
+      .sort((a, b) => a.distance - b.distance);
 
     return scored[0] ?? null;
-  }
-
-  private resolveElementDirection(element: HTMLElement): Dir {
-    const delta = this.getTargetY(element) - window.scrollY;
-    if (delta > 2) return 'forward';
-    if (delta < -2) return 'backward';
-    return null;
   }
 
   private now(): number {
