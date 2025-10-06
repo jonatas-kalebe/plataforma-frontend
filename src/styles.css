@@ -12,24 +12,6 @@
   --athenity-text-title: #CCD6F6;
   --athenity-text-body: #8892B0;
 
-  --page-gradient-start: #050b18;
-  --page-gradient-mid: #08152a;
-  --page-gradient-highlight: #0b1f3a;
-  --page-gradient-end: #040813;
-  --page-gradient: linear-gradient(
-    180deg,
-    var(--page-gradient-start) 0%,
-    var(--page-gradient-mid) 28%,
-    var(--page-gradient-highlight) 68%,
-    var(--page-gradient-end) 100%
-  );
-  --section-surface-gradient: linear-gradient(
-    180deg,
-    rgba(9, 20, 38, 0.92) 0%,
-    rgba(7, 17, 33, 0.94) 55%,
-    rgba(5, 12, 24, 0.97) 100%
-  );
-
   /* Fluid Spacing System (responsive to viewport) */
   --spacing-xs: clamp(0.25rem, 0.2rem + 0.25vw, 0.375rem);    /* 4px - 6px */
   --spacing-sm: clamp(0.5rem, 0.4rem + 0.5vw, 0.75rem);       /* 8px - 12px */
@@ -84,10 +66,6 @@
 
   body {
     @apply bg-athenity-blue-deep text-athenity-text-body font-sans;
-    background: var(--page-gradient);
-    background-attachment: fixed;
-    background-repeat: no-repeat;
-    background-size: 100% 100%;
     margin: 0;
     padding: 0;
     line-height: 1.6;
