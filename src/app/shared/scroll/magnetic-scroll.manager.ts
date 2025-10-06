@@ -143,26 +143,28 @@ export class MagneticScrollManager {
     if (absVelocity > this.config.velocityIgnoreThreshold) {
       const newDir: Dir = velocity > 0 ? 'forward' : 'backward';
       
-      // Track initial scroll direction to prevent counter-direction snapping
-      if (this.initialScrollDirection === null || now - this.directionChangeTs > 800) {
+      // Simplify direction tracking: set initial direction only if null or after long idle period
+      if (this.initialScrollDirection === null || now - this.directionChangeTs > 1200) {
         this.initialScrollDirection = newDir;
         this.directionChangeTs = now;
-      }
-      
-      if (newDir !== this.direction) {
         this.direction = newDir;
-        // If direction changes, update timestamp but keep initial direction for a period
-        if (this.initialScrollDirection !== newDir && now - this.directionChangeTs < 500) {
-          // User is changing direction quickly - this might be trying to escape snap
-          // Keep the initial direction to prevent trapping
-        } else if (now - this.directionChangeTs >= 500) {
-          // Enough time has passed, update initial direction
+      } else if (newDir === this.initialScrollDirection) {
+        // User continues in the same initial direction - update current direction
+        this.direction = newDir;
+      } else if (newDir !== this.direction) {
+        // Direction changed but keep initialScrollDirection to prevent counter-snapping
+        // Only update current direction for tracking, not initial direction
+        this.direction = newDir;
+        
+        // If user persistently scrolls in opposite direction for a while, accept the new direction
+        if (now - this.directionChangeTs > 600) {
           this.initialScrollDirection = newDir;
           this.directionChangeTs = now;
         }
       }
     }
 
+    // High velocity scroll (fling) should lock out snaps temporarily
     if (absVelocity > this.config.flingVelocityThreshold) {
       this.skipSnapUntil = now + this.config.directionLockMs;
     }
@@ -299,16 +301,41 @@ export class MagneticScrollManager {
       return false;
     }
 
-    const closest = this.findClosestSection(this.lastSectionsSnapshot);
-    if (!closest || !closest.section.element) {
+    const dominant = this.findDominantSection(this.lastSectionsSnapshot);
+    if (!dominant) {
       return false;
     }
 
-    if (Math.abs(this.getTargetY(closest.section.element) - window.scrollY) < 1) {
+    const { index } = dominant;
+    const next = this.lastSectionsSnapshot[index + 1];
+    const prev = this.lastSectionsSnapshot[index - 1];
+
+    // Filter candidates based on initial scroll direction
+    let candidates: Array<ScrollSection | undefined> = [dominant.section];
+    
+    if (this.initialScrollDirection === 'forward') {
+      // When scrolling forward, prefer dominant or next
+      candidates = [dominant.section, next];
+    } else if (this.initialScrollDirection === 'backward') {
+      // When scrolling backward, prefer dominant or prev
+      candidates = [dominant.section, prev];
+    } else {
+      // No clear direction, allow all nearby sections
+      candidates = [prev, dominant.section, next];
+    }
+
+    const candidate = this.findBestAlignmentCandidate(candidates);
+    if (!candidate || !candidate.section.element) {
       return false;
     }
 
-    return this.queueSnap(closest.section, reason);
+    const closest = candidate.section;
+    const closestElement = closest.element;
+    if (!closestElement || Math.abs(this.getTargetY(closestElement) - window.scrollY) < 1) {
+      return false;
+    }
+
+    return this.queueSnap(closest, reason);
   }
 
   private performSnap(element: HTMLElement, reason: SnapReason): void {
@@ -368,6 +395,12 @@ export class MagneticScrollManager {
     this.rafScrollId = null;
     this.restoreNativeSmooth();
     this.lastSnapTargetId = null;
+    
+    // Reset initial direction after snap completes to allow fresh direction detection
+    // This prevents the user from being "locked" into a direction after a snap
+    this.initialScrollDirection = null;
+    this.directionChangeTs = this.now();
+    
     if (reason === SnapReason.Idle || reason === SnapReason.LowVelocity) {
       this.lastAssistTs = this.now();
     }
@@ -517,11 +550,21 @@ export class MagneticScrollManager {
       return null;
     }
 
-    const candidate = this.findBestAlignmentCandidate([
-      prev,
-      dominant.section,
-      next
-    ]);
+    // Filter candidates based on initial scroll direction to prevent counter-direction snapping
+    let candidates: Array<ScrollSection | undefined> = [dominant.section];
+    
+    if (this.initialScrollDirection === 'forward') {
+      // When scrolling forward, only consider dominant and next
+      candidates = [dominant.section, next];
+    } else if (this.initialScrollDirection === 'backward') {
+      // When scrolling backward, only consider dominant and prev
+      candidates = [dominant.section, prev];
+    } else {
+      // No clear direction yet, allow all
+      candidates = [prev, dominant.section, next];
+    }
+
+    const candidate = this.findBestAlignmentCandidate(candidates);
 
     if (!candidate) {
       return null;
