@@ -203,7 +203,7 @@ export class MagneticScrollManager {
     }
 
     if (settled) {
-      return this.snapToClosest(SnapReason.LowVelocity);
+      return this.snapToClosestInDirection(SnapReason.LowVelocity, this.direction);
     }
 
     return false;
@@ -287,6 +287,69 @@ export class MagneticScrollManager {
     }
 
     return this.queueSnap(closest.section, reason);
+  }
+
+  private snapToClosestInDirection(reason: SnapReason, direction: Dir): boolean {
+    if (!this.lastSectionsSnapshot.length || this.isAnimating) {
+      return false;
+    }
+
+    const currentY = window.scrollY;
+    const dominant = this.findDominantSection(this.lastSectionsSnapshot);
+    
+    if (!dominant) {
+      return this.snapToClosest(reason);
+    }
+
+    const { section: currentSection, index } = dominant;
+    const currentTargetY = currentSection.element ? this.getTargetY(currentSection.element) : currentY;
+
+    // Determine snap target based on direction
+    let targetSection: ScrollSection | null = null;
+
+    if (direction === 'forward') {
+      // When scrolling forward, prefer snapping forward or to current section
+      const nextSection = this.lastSectionsSnapshot[index + 1];
+      if (nextSection && nextSection.element) {
+        const nextTargetY = this.getTargetY(nextSection.element);
+        // Only snap to next if we're moving toward it
+        if (nextTargetY > currentY) {
+          targetSection = nextSection;
+        }
+      }
+      // Fallback to current section if no valid next section
+      if (!targetSection && currentSection.element) {
+        targetSection = currentSection;
+      }
+    } else if (direction === 'backward') {
+      // When scrolling backward, prefer snapping backward or to current section
+      const prevSection = this.lastSectionsSnapshot[index - 1];
+      if (prevSection && prevSection.element) {
+        const prevTargetY = this.getTargetY(prevSection.element);
+        // Only snap to prev if we're moving toward it
+        if (prevTargetY < currentY) {
+          targetSection = prevSection;
+        }
+      }
+      // Fallback to current section if no valid prev section
+      if (!targetSection && currentSection.element) {
+        targetSection = currentSection;
+      }
+    } else {
+      // No clear direction, use closest section
+      return this.snapToClosest(reason);
+    }
+
+    if (!targetSection || !targetSection.element) {
+      return this.snapToClosest(reason);
+    }
+
+    const targetY = this.getTargetY(targetSection.element);
+    if (Math.abs(targetY - currentY) < 1) {
+      return false;
+    }
+
+    return this.queueSnap(targetSection, reason);
   }
 
   private performSnap(element: HTMLElement, reason: SnapReason): void {
@@ -495,11 +558,21 @@ export class MagneticScrollManager {
       return null;
     }
 
-    const candidate = this.findBestAlignmentCandidate([
-      prev,
-      dominant.section,
-      next
-    ]);
+    // Filter candidates based on scroll direction to avoid snapping backwards
+    const candidates: Array<ScrollSection | undefined> = [];
+    
+    if (this.direction === 'forward') {
+      // When scrolling forward, only consider current and next sections
+      candidates.push(dominant.section, next);
+    } else if (this.direction === 'backward') {
+      // When scrolling backward, only consider prev and current sections
+      candidates.push(prev, dominant.section);
+    } else {
+      // No clear direction, consider all candidates
+      candidates.push(prev, dominant.section, next);
+    }
+
+    const candidate = this.findBestAlignmentCandidate(candidates);
 
     if (!candidate) {
       return null;
