@@ -70,8 +70,6 @@ export class MagneticScrollManager {
   private rafScrollId: number | null = null;
 
   private direction: Dir = null;
-  private initialScrollDirection: Dir = null; // Track initial direction to prevent counter-direction snapping
-  private directionChangeTs = 0;
   private lastVelocity = 0;
   private skipSnapUntil = 0;
   private isAnimating = false;
@@ -142,24 +140,8 @@ export class MagneticScrollManager {
     const absVelocity = Math.abs(velocity);
     if (absVelocity > this.config.velocityIgnoreThreshold) {
       const newDir: Dir = velocity > 0 ? 'forward' : 'backward';
-      
-      // Track initial scroll direction to prevent counter-direction snapping
-      if (this.initialScrollDirection === null || now - this.directionChangeTs > 800) {
-        this.initialScrollDirection = newDir;
-        this.directionChangeTs = now;
-      }
-      
       if (newDir !== this.direction) {
         this.direction = newDir;
-        // If direction changes, update timestamp but keep initial direction for a period
-        if (this.initialScrollDirection !== newDir && now - this.directionChangeTs < 500) {
-          // User is changing direction quickly - this might be trying to escape snap
-          // Keep the initial direction to prevent trapping
-        } else if (now - this.directionChangeTs >= 500) {
-          // Enough time has passed, update initial direction
-          this.initialScrollDirection = newDir;
-          this.directionChangeTs = now;
-        }
       }
     }
 
@@ -212,13 +194,11 @@ export class MagneticScrollManager {
       }
     }
 
-    // Only snap if we're going in the initial scroll direction to prevent trapping users
-    // This prevents snap from pulling users back when they're trying to leave a section
-    if (settled && leaps <= 1 && this.direction === 'forward' && this.initialScrollDirection === 'forward' && progress >= this.config.progressForwardSnap && next) {
+    if (settled && leaps <= 1 && this.direction === 'forward' && progress >= this.config.progressForwardSnap && next) {
       return this.queueSnap(next, SnapReason.ForwardProgress);
     }
 
-    if (settled && leaps <= 1 && this.direction === 'backward' && this.initialScrollDirection === 'backward' && progress <= this.config.progressBackwardSnap && prev) {
+    if (settled && leaps <= 1 && this.direction === 'backward' && progress <= this.config.progressBackwardSnap && prev) {
       return this.queueSnap(prev, SnapReason.BackwardProgress);
     }
 
@@ -259,8 +239,6 @@ export class MagneticScrollManager {
     this.restoreNativeSmooth();
     this.lastSectionsSnapshot = [];
     this.direction = null;
-    this.initialScrollDirection = null;
-    this.directionChangeTs = 0;
     this.lastVelocity = 0;
     this.skipSnapUntil = 0;
     this.lastDominantIndex = null;
