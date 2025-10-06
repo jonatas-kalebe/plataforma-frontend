@@ -44,12 +44,12 @@ const SNAP_SCROLL_BEHAVIOR: SnapScrollConfig = {
   backwardSnapExtraDelayMs: 140,
   backwardSnapDurationMultiplier: 1.3,
   idleSnapDelayMs: 210,
-  velocityIgnoreThreshold: 2.5,  // Increased from 1.8 to be less sensitive to tiny movements
-  settleVelocityThreshold: 0.4,  // Lowered from 0.45 to require more settling before snap
-  flingVelocityThreshold: 150,   // Increased from 140 to better detect intentional fast scrolls
+  velocityIgnoreThreshold: 1.8,
+  settleVelocityThreshold: 0.45,
+  flingVelocityThreshold: 140,
   progressForwardSnap: 0.82,
   progressBackwardSnap: 0.18,
-  directionLockMs: 400,          // Increased from 320 for better fling protection
+  directionLockMs: 320,
   topOffsetPx: 0,
   align: 'start',
   easingFn: (t: number) => 1 - Math.pow(1 - t, 3),
