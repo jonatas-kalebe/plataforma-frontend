@@ -48,7 +48,7 @@
   height: var(--card-h);
   display: grid;
   place-items: center;
-  background: #112240;
+  background: linear-gradient(155deg, rgba(17, 34, 64, 0.92) 0%, rgba(11, 24, 46, 0.88) 100%);
   border: 2px solid #64ffda;
   color: #ccd6f6;
   border-radius: 1rem;

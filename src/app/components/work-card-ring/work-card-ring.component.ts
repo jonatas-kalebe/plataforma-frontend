@@ -93,6 +93,9 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private snapTarget: number | null = null;
   private pointerCaptured = false;
 
+  private activeDragSensitivity = this.dragSensitivity;
+  private pointerMode: 'mouse' | 'touch' | 'pen' | 'unknown' = 'unknown';
+
   private lastDragVelocity = 0;
   private peakDragVelocity = 0;
   private peakDragAcceleration = 0;
@@ -155,6 +158,10 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       });
     }
 
+    if (changes['dragSensitivity']) {
+      this.activeDragSensitivity = this.dragSensitivity;
+    }
+
     if (changes['ringViewport']) {
       this.hostRef.nativeElement.style.setProperty('--ring-viewport', `${this.ringViewport}px`);
     }
@@ -188,6 +195,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     if (ev.isPrimary === false) return;
 
     this.pointerId = ev.pointerId;
+    this.pointerMode = this.normalizePointerType(ev.pointerType);
+    this.activeDragSensitivity = this.computeActiveSensitivity();
     this.startPointerX = ev.clientX;
     this.startPointerY = ev.clientY;
     this.lastPointerX = ev.clientX;
@@ -239,7 +248,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     const dxRaw = this.computePointerDelta(ev);
     const pointerSpeed = Math.abs(dxRaw) / safeDt;
     const intensity = this.computePointerIntensity(pointerSpeed);
-    const deltaDeg = this.applyDragCurve(dxRaw * this.dragSensitivity * intensity, intensity);
+    const deltaDeg = this.applyDragCurve(dxRaw * this.activeDragSensitivity * intensity, intensity);
     const instantaneousVelocity = deltaDeg / safeDt;
     const accel = (instantaneousVelocity - this.lastDragVelocity) / safeDt;
 
@@ -438,7 +447,9 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       if (this.inertiaEnabled && !this.dragging) {
         const decay = Math.exp(-this.friction * dt);
         this.angularVelocity *= decay;
-        if (Math.abs(this.angularVelocity) < 0.01) this.angularVelocity = 0;
+        if (Math.abs(this.angularVelocity) < Math.max(0.01, this.stepDeg * 0.08)) {
+          this.angularVelocity = 0;
+        }
       } else if (!this.inertiaEnabled && !this.dragging) {
         this.angularVelocity = 0;
       }
@@ -448,15 +459,20 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         const snapDelay = 120;
         const forceSnapDelay = 900;
         const liveTarget = this.snapTarget ?? this.nearestSnapAngle(this.rotationDeg);
-        const diff = this.shortestAngleDist(this.rotationDeg, liveTarget);
-        const velocityThreshold = Math.max(this.snapVelocityThreshold, this.stepDeg * 1.05);
-        const belowVelocityThreshold = Math.abs(this.angularVelocity) < velocityThreshold;
-        const almostAligned = Math.abs(diff) < this.stepDeg * 0.55;
+    const diff = this.shortestAngleDist(this.rotationDeg, liveTarget);
+    const velocityThreshold = Math.max(this.snapVelocityThreshold, this.stepDeg * 1.05);
+    const belowVelocityThreshold = Math.abs(this.angularVelocity) < velocityThreshold;
+    const almostAligned = Math.abs(diff) < this.stepDeg * 0.55;
 
-        if (!this.snapPending && belowVelocityThreshold && almostAligned) {
-          this.snapPending = true;
-          this.lastDragEndTS = now - snapDelay;
-          this.snapTarget = liveTarget;
+        if (!this.snapPending) {
+          if (belowVelocityThreshold && almostAligned) {
+            this.snapPending = true;
+            this.lastDragEndTS = now - snapDelay;
+            this.snapTarget = liveTarget;
+          } else if (timeSinceDragEnd >= forceSnapDelay) {
+            this.snapPending = true;
+            this.snapTarget = this.snapTarget ?? this.nearestSnapAngle(this.rotationDeg);
+          }
         }
 
         if (this.snapPending && timeSinceDragEnd >= snapDelay && (belowVelocityThreshold || timeSinceDragEnd >= forceSnapDelay)) {
@@ -467,12 +483,12 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
           const targetDiff = this.shortestAngleDist(this.rotationDeg, target);
           const proximity = Math.min(1, Math.abs(targetDiff) / this.stepDeg);
           const strength = this.snapStrength * (0.85 + (1 - proximity) * 0.45);
-          const damp = timeSinceDragEnd >= forceSnapDelay ? strength * 0.55 : 6 + proximity * 6;
+          const damp = timeSinceDragEnd >= forceSnapDelay ? strength * 0.6 : 6 + proximity * 6;
           const accel = strength * Math.sign(targetDiff) * Math.max(0.1, proximity);
           this.angularVelocity += (accel - damp * this.angularVelocity) * dt;
 
           if (timeSinceDragEnd >= forceSnapDelay && !belowVelocityThreshold) {
-            this.angularVelocity *= Math.exp(-this.friction * dt * 0.65);
+            this.angularVelocity *= Math.exp(-this.friction * dt * 0.8);
           }
 
           const settleVelocity = Math.max(0.04, velocityThreshold * 0.12);
@@ -485,7 +501,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
           }
         } else if (this.snapPending && timeSinceDragEnd >= snapDelay) {
           // keep inertia alive but gently bleed energy so we eventually cross the threshold
-          this.angularVelocity *= Math.exp(-this.friction * dt * 0.12);
+          this.angularVelocity *= Math.exp(-this.friction * dt * 0.22);
         }
       }
     }
@@ -635,8 +651,10 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
   private computePointerIntensity(pointerSpeed: number): number {
     if (!Number.isFinite(pointerSpeed)) return 1;
-    const normalized = Math.min(1, pointerSpeed / 1800);
-    return 1 + normalized * 2.4;
+    const sensitivity = this.pointerMode === 'touch' ? 2100 : this.pointerMode === 'pen' ? 1900 : 1600;
+    const boost = this.pointerMode === 'touch' ? 1.8 : this.pointerMode === 'mouse' ? 2.4 : 2.1;
+    const normalized = Math.min(1, pointerSpeed / sensitivity);
+    return 1 + normalized * boost;
   }
 
   private computeReleaseVelocity(releaseVelocity: number): number {
@@ -650,21 +668,40 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     const direction = Math.sign(directionSource) || 1;
     const baseSpeed = Math.max(Math.abs(releaseVelocity), this.peakDragVelocity * 0.85);
     const accelBoost = this.peakDragAcceleration * 0.08;
-    const energyFactor = Math.min(1.75, this.dragEnergy / (this.stepDeg * 28));
-    let boosted = baseSpeed * (1 + energyFactor * 0.85) + accelBoost;
-    const minCarry = this.stepDeg * 2.5;
+    const energyFactor = Math.min(1.6, this.dragEnergy / (this.stepDeg * 32));
+    let boosted = baseSpeed * (1 + energyFactor * 0.8) + accelBoost;
+    const minCarry = this.pointerMode === 'touch' ? this.stepDeg * 1.6 : this.stepDeg * 2.3;
     if (boosted < minCarry && energyFactor > 0.2) {
       boosted = minCarry + (boosted - minCarry) * 0.5;
     }
-    const maxReleaseVelocity = 840;
+    const maxReleaseVelocity = this.pointerMode === 'touch' ? 680 : this.pointerMode === 'mouse' ? 900 : 780;
     const finalVelocity = Math.min(Math.max(boosted, slowDrag ? 0 : minCarry), maxReleaseVelocity);
     return direction * finalVelocity;
   }
 
   private applyDragCurve(delta: number, intensity = 1): number {
-    const maxDelta = this.stepDeg * (1.2 + intensity * 1.6);
+    const base = this.pointerMode === 'touch' ? 0.9 + intensity * 1.1 : 1.2 + intensity * 1.6;
+    const maxDelta = this.stepDeg * base;
     const clamped = Math.max(-maxDelta, Math.min(maxDelta, delta));
-    const exponent = intensity > 1.4 ? 0.82 : 0.9;
+    const exponent = this.pointerMode === 'touch' ? 0.94 : intensity > 1.4 ? 0.82 : 0.9;
     return Math.sign(clamped) * Math.pow(Math.abs(clamped), exponent);
+  }
+
+  private normalizePointerType(type: string | undefined): 'mouse' | 'touch' | 'pen' | 'unknown' {
+    if (type === 'mouse' || type === 'touch' || type === 'pen') {
+      return type;
+    }
+    return 'unknown';
+  }
+
+  private computeActiveSensitivity(): number {
+    switch (this.pointerMode) {
+      case 'touch':
+        return this.dragSensitivity * 0.58;
+      case 'pen':
+        return this.dragSensitivity * 0.7;
+      default:
+        return this.dragSensitivity;
+    }
   }
 }
