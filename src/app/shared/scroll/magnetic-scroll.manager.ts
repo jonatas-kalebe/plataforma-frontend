@@ -126,7 +126,14 @@ export class MagneticScrollManager {
     }
     this.idleTimeoutId = window.setTimeout(() => {
       this.idleTimeoutId = null;
-      this.snapToClosest(SnapReason.Idle);
+      // Check if direction is still relevant (within 2 seconds of last activity)
+      const timeSinceActivity = this.now() - this.lastUserActivityTs;
+      const directionStillRelevant = timeSinceActivity < 2000;
+      if (directionStillRelevant && this.direction !== null) {
+        this.snapToClosestInDirection(SnapReason.Idle, this.direction);
+      } else {
+        this.snapToClosest(SnapReason.Idle);
+      }
     }, this.config.idleSnapDelayMs);
   }
 
