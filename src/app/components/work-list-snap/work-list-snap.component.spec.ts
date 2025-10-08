@@ -140,6 +140,33 @@ describe('WorkListSnapComponent', () => {
       // Verify the image has the lazyImg directive and src attribute
       expect(img.hasAttribute('lazyimg') || img.getAttribute('ng-reflect-lazy-src') !== null || img.hasAttribute('src')).toBe(true);
     });
+
+    it('should configure LazyImgDirective with rootMargin for optimal UX', () => {
+      const firstImage = fixture.debugElement.query(By.css('img[lazyImg]'));
+      
+      // Verify rootMargin is set via ng-reflect attribute
+      expect(firstImage.nativeElement.getAttribute('ng-reflect-root-margin')).toBe('100px');
+    });
+
+    it('should have loading="lazy" attribute for native browser support', () => {
+      const firstImage = fixture.debugElement.query(By.css('img[lazyImg]'));
+      
+      // The loading attribute should be present in the template
+      expect(firstImage.nativeElement.getAttribute('loading')).toBe('lazy');
+    });
+
+    it('should prevent CLS with fixed dimensions', () => {
+      const images = fixture.debugElement.queryAll(By.css('img[lazyImg]'));
+      
+      images.forEach(img => {
+        const element = img.nativeElement;
+        // Verify that both width and height are set to prevent layout shift
+        expect(element.getAttribute('width')).toBeTruthy();
+        expect(element.getAttribute('height')).toBeTruthy();
+        expect(element.getAttribute('width')).toBe('400');
+        expect(element.getAttribute('height')).toBe('300');
+      });
+    });
   });
 
   describe('Placeholder Rendering', () => {
