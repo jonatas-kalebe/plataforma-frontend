@@ -1,0 +1,238 @@
+/* 
+ * WorkListSnapComponent Styles
+ * Mobile-first design with CSS scroll-snap
+ */
+
+:host {
+  display: block;
+  width: 100%;
+}
+
+/* Container with focus outline */
+.work-list-snap-container {
+  position: relative;
+  width: 100%;
+  outline: none;
+}
+
+.work-list-snap-container:focus-visible {
+  outline: 2px solid #64ffda;
+  outline-offset: 4px;
+  border-radius: 0.5rem;
+}
+
+/* Horizontal scroll container with snap */
+.scroll-container {
+  display: flex;
+  gap: clamp(1rem, 3vw, 1.5rem);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch; /* iOS smooth scrolling */
+  scrollbar-width: thin;
+  scrollbar-color: #64ffda #0a192f;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  /* Prevent scrollbars from affecting layout */
+  box-sizing: border-box;
+}
+
+/* Webkit scrollbar styling */
+.scroll-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.scroll-container::-webkit-scrollbar-track {
+  background: #0a192f;
+  border-radius: 4px;
+}
+
+.scroll-container::-webkit-scrollbar-thumb {
+  background: #64ffda;
+  border-radius: 4px;
+}
+
+.scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #52d4b8;
+}
+
+/* Snap item - mobile-first sizing */
+.snap-item {
+  flex: 0 0 auto;
+  width: clamp(280px, 85vw, 320px);
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  background: #112240;
+  border: 2px solid #233554;
+  border-radius: 1rem;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+  outline: none;
+  position: relative;
+}
+
+/* Tablet sizing */
+@media (min-width: 768px) {
+  .snap-item {
+    width: clamp(320px, 45vw, 400px);
+  }
+}
+
+/* Desktop sizing */
+@media (min-width: 1024px) {
+  .snap-item {
+    width: clamp(350px, 30vw, 450px);
+  }
+}
+
+/* Hover and focus states */
+.snap-item:hover {
+  transform: translateY(-4px);
+  border-color: #64ffda;
+  box-shadow: 0 8px 24px rgba(100, 255, 218, 0.15);
+}
+
+.snap-item:focus-visible {
+  border-color: #64ffda;
+  box-shadow: 0 0 0 3px rgba(100, 255, 218, 0.3);
+  outline: none;
+}
+
+/* Active/pressed state */
+.snap-item:active {
+  transform: translateY(-2px);
+}
+
+/* Image wrapper with aspect ratio */
+.item-image-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #0a192f;
+  overflow: hidden;
+}
+
+/* Image styling */
+.item-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.3s ease;
+}
+
+/* Lazy loading states */
+.item-image.lazy-loading {
+  opacity: 0.7;
+}
+
+.item-image.lazy-loaded {
+  opacity: 1;
+}
+
+.item-image.lazy-error {
+  opacity: 0.5;
+}
+
+/* Placeholder for items without images */
+.item-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0a192f 0%, #112240 100%);
+}
+
+.placeholder-icon {
+  font-size: clamp(3rem, 8vw, 4rem);
+  opacity: 0.3;
+}
+
+/* Content area */
+.item-content {
+  padding: clamp(1rem, 3vw, 1.5rem);
+  color: #ccd6f6;
+}
+
+/* Title */
+.item-title {
+  font-size: clamp(1.125rem, 3vw, 1.375rem);
+  font-weight: 700;
+  color: #e6f1ff;
+  margin: 0 0 0.5rem 0;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Description */
+.item-description {
+  font-size: clamp(0.875rem, 2.5vw, 1rem);
+  color: #8892b0;
+  line-height: 1.5;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+/* Screen reader only content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Reduced motion support - WCAG AA compliance */
+@media (prefers-reduced-motion: reduce) {
+  .scroll-container {
+    scroll-behavior: auto;
+  }
+  
+  .snap-item {
+    transition: none;
+  }
+  
+  .item-image {
+    transition: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .snap-item {
+    border-width: 3px;
+  }
+  
+  .snap-item:focus-visible {
+    outline: 3px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+/* Print styles */
+@media print {
+  .scroll-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+    overflow: visible;
+  }
+  
+  .snap-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
