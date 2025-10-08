@@ -1,0 +1,49 @@
+<!-- Work Card Component Template -->
+<div 
+  [class]="getCardClasses()"
+  [attr.data-testid]="testId"
+  [attr.role]="isClickable ? 'article' : 'article'"
+  [attr.aria-label]="title + (subtitle ? ': ' + subtitle : '')">
+  
+  <!-- Card Link Wrapper (if clickable) -->
+  <a 
+    *ngIf="isClickable"
+    [href]="ctaUrl"
+    class="work-card__link"
+    [attr.aria-label]="'Ver detalhes de ' + title"
+    tabindex="0">
+    
+    <!-- Card Image -->
+    <div *ngIf="imageUrl" class="work-card__image-wrapper">
+      <img 
+        [src]="imageUrl" 
+        [alt]="title"
+        class="work-card__image"
+        loading="lazy">
+    </div>
+    
+    <!-- Card Content -->
+    <div class="work-card__content">
+      <h3 class="work-card__title">{{ title }}</h3>
+      <p *ngIf="subtitle" class="work-card__subtitle">{{ subtitle }}</p>
+    </div>
+  </a>
+  
+  <!-- Non-clickable Card Content -->
+  <ng-container *ngIf="!isClickable">
+    <!-- Card Image -->
+    <div *ngIf="imageUrl" class="work-card__image-wrapper">
+      <img 
+        [src]="imageUrl" 
+        [alt]="title"
+        class="work-card__image"
+        loading="lazy">
+    </div>
+    
+    <!-- Card Content -->
+    <div class="work-card__content">
+      <h3 class="work-card__title">{{ title }}</h3>
+      <p *ngIf="subtitle" class="work-card__subtitle">{{ subtitle }}</p>
+    </div>
+  </ng-container>
+</div>
