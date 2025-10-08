@@ -6,13 +6,14 @@
 import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { WorkCardRingComponent } from '../../work-card-ring/work-card-ring.component';
+import { IoVisibleDirective } from '../../../directives/io-visible.directive';
 import { SECTION_IDS } from '../../../shared/constants/section.constants';
 import { TrabalhosSectionAnimationService } from '../../../services/animation/trabalhos-section-animation.service';
 
 @Component({
   selector: 'app-trabalhos-section',
   standalone: true,
-  imports: [CommonModule, WorkCardRingComponent],
+  imports: [CommonModule, WorkCardRingComponent, IoVisibleDirective],
   templateUrl: './trabalhos-section.component.html',
   styleUrls: ['./trabalhos-section.component.css']
 })
@@ -75,6 +76,22 @@ export class TrabalhosSectionComponent implements AfterViewInit, OnDestroy {
     if (this.workCardRing) {
       this.trabalhosSectionAnimation.enhanceRingInteractions(this.workCardRing);
     }
+  }
+
+  /**
+   * Handle intersection observer entrance
+   * Called by IoVisibleDirective when section enters viewport
+   */
+  onSectionEnter(): void {
+    this.trabalhosSectionAnimation.onIntersectionEnter();
+  }
+
+  /**
+   * Handle intersection observer exit
+   * Called by IoVisibleDirective when section exits viewport
+   */
+  onSectionLeave(): void {
+    this.trabalhosSectionAnimation.onIntersectionLeave();
   }
 
   // Constants
