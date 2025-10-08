@@ -1,10 +1,38 @@
 <div class="ring-wrap" [style.perspective.px]="perspective">
-  <div #ring class="ring">
+  <!-- Screen reader instructions -->
+  <div 
+    id="ring-instructions" 
+    class="sr-only">
+    Use as setas esquerda e direita para navegar pelos projetos. Pressione Enter ou Espaço para selecionar um projeto. Use Home para ir ao primeiro item ou End para ir ao último.
+  </div>
+  
+  <!-- Live region for screen reader announcements -->
+  <div 
+    class="sr-only" 
+    [attr.aria-live]="'polite'" 
+    [attr.aria-atomic]="'true'">
+    {{ liveMessage }}
+  </div>
+  
+  <div 
+    #ring 
+    class="ring"
+    [attr.role]="getGroupAttrs().role"
+    [attr.aria-label]="getGroupAttrs()['aria-label']"
+    [attr.aria-roledescription]="getGroupAttrs()['aria-roledescription']"
+    [attr.aria-describedby]="'ring-instructions'"
+    [attr.tabindex]="0"
+    (keydown)="onKeyDown($event)">
     <div
       #card
       class="work-card"
       *ngFor="let item of items; let i = index"
       [style.--i]="i"
+      [attr.role]="getItemAttrs(i).role"
+      [attr.aria-label]="getItemAttrs(i)['aria-label']"
+      [attr.aria-roledescription]="getItemAttrs(i)['aria-roledescription']"
+      [attr.aria-setsize]="getItemAttrs(i)['aria-setsize']"
+      [attr.aria-posinset]="getItemAttrs(i)['aria-posinset']"
     >
       <div class="work-card-inner">
         {{ item?.title ?? (item | json) }}

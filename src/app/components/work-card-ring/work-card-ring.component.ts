@@ -1,5 +1,6 @@
 import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, EventEmitter, HostListener, Inject, Input, NgZone, OnChanges, OnDestroy, Output, PLATFORM_ID, QueryList, SimpleChanges, ViewChild, ViewChildren } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { getGroupAttrs, getItemAttrs, getLiveMessage } from '../../a11y/aria-ring';
 import { Subscription } from 'rxjs';
 
 // Service imports
@@ -697,6 +698,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       this.lastEmittedIndex = idx;
       this.activeIndexChange.emit(idx);
       this.interactionBridge?.onActiveIndexChange?.(idx);
+      this.updateLiveMessage();
       
       // Update ARIA live message
       this.updateAriaLiveMessage(idx);
@@ -708,6 +710,81 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.maybeEmitIndex();
   }
 
+  // Accessibility helpers
+  liveMessage = '';
+  
+  getGroupAttrs() {
+    return getGroupAttrs(this.count);
+  }
+  
+  getItemAttrs(index: number) {
+    return getItemAttrs(index, this.count);
+  }
+  
+  private updateLiveMessage() {
+    const activeIndex = this.computeActiveIndex();
+    const item = this.items[activeIndex];
+    const itemLabel = item?.title ?? undefined;
+    
+    this.liveMessage = getLiveMessage({
+      activeIndex,
+      total: this.count,
+      itemLabel,
+      isRotating: this.dragging
+    });
+  }
+  
+  onKeyDown(event: KeyboardEvent) {
+    // Prevent default for navigation keys
+    const navKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+    if (navKeys.includes(event.key)) {
+      event.preventDefault();
+    }
+    
+    const step = this.stepDeg;
+    
+    switch (event.key) {
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        // Rotate to previous item
+        this.angularVelocity = step * 3;
+        this.desiredRotationDeg = null;
+        this.snapPending = true;
+        this.lastDragEndTS = performance.now();
+        break;
+      
+      case 'ArrowRight':
+      case 'ArrowDown':
+        // Rotate to next item
+        this.angularVelocity = -step * 3;
+        this.desiredRotationDeg = null;
+        this.snapPending = true;
+        this.lastDragEndTS = performance.now();
+        break;
+      
+      case 'Home':
+        // Jump to first item
+        this.desiredRotationDeg = 0;
+        this.angularVelocity = 0;
+        this.snapPending = false;
+        break;
+      
+      case 'End':
+        // Jump to last item
+        this.desiredRotationDeg = -(this.count - 1) * step;
+        this.angularVelocity = 0;
+        this.snapPending = false;
+        break;
+      
+      case 'Enter':
+      case ' ':
+        // Allow space and enter to trigger selection (emit event)
+        const currentIndex = this.computeActiveIndex();
+        // This allows parent components to handle selection
+        this.activeIndexChange.emit(currentIndex);
+        break;
+    }
+  }
   /**
    * Update ARIA attributes for accessibility
    */
