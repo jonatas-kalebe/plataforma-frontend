@@ -3,6 +3,129 @@ import { isPlatformBrowser } from '@angular/common';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
+// ============================================================================
+// 🎨 ANIMATION CONFIGURATION - Customize all animation settings here
+// ============================================================================
+
+/** Configuration for ring entrance animations */
+const ENTRANCE_CONFIG = {
+  /** Initial scale of ring container */
+  initialScale: 0.8,
+  
+  /** Initial Y offset of ring container (pixels) */
+  initialY: 50,
+  
+  /** Initial Y offset of title (pixels) */
+  titleInitialY: 30,
+  
+  /** Initial Y offset of hint (pixels) */
+  hintInitialY: 20,
+  
+  /** Scroll trigger start point */
+  triggerStart: 'top bottom-=100',
+  
+  /** Scroll trigger end point */
+  triggerEnd: 'top center',
+  
+  /** Scrub smoothness (higher = smoother but slower response) */
+  scrubSmoothness: 1.5,
+  
+  /** Enable/disable entrance animation */
+  enabled: true
+} as const;
+
+/** Configuration for ring rotation controlled by scroll */
+const SCROLL_ROTATION_CONFIG = {
+  /** Total rotation in degrees for full scroll (720 = 2 full rotations) */
+  totalRotationDeg: 720,
+  
+  /** Enable scroll-driven rotation */
+  enabled: true,
+  
+  /** Disable card snapping (per user request) */
+  enableCardSnap: false,
+  
+  /** Snap angle in degrees (only used if enableCardSnap is true) */
+  snapAngleDeg: 45,
+  
+  /** Progress range for snapping (0-1) */
+  snapProgressMin: 0.45,
+  snapProgressMax: 0.55
+} as const;
+
+/** Configuration for drag interactions */
+const DRAG_CONFIG = {
+  /** Drag sensitivity (how much rotation per pixel moved) */
+  sensitivity: 0.5,
+  
+  /** Momentum friction (0-1, closer to 1 = less friction) */
+  momentumFriction: 0.92,
+  
+  /** Minimum velocity to stop momentum */
+  minVelocityThreshold: 0.05,
+  
+  /** Enable/disable drag interactions */
+  enabled: true,
+  
+  /** Enable/disable haptic feedback */
+  enableVibration: true,
+  
+  /** Vibration duration for drag start (milliseconds) */
+  vibrationStartMs: 30,
+  
+  /** Vibration duration for drag end (milliseconds) */
+  vibrationEndMs: 20,
+  
+  /** Vibration pattern for card change [on, off, on] (milliseconds) */
+  vibrationCardChange: [50, 50, 50] as const
+} as const;
+
+/** Configuration for interaction hints */
+const HINT_CONFIG = {
+  /** Show hints when section is pinned */
+  showOnPin: true,
+  
+  /** Hide hints when section is unpinned */
+  hideOnUnpin: true,
+  
+  /** Hint fade duration (seconds) */
+  fadeDuration: 0.3
+} as const;
+
+/** Performance optimization settings */
+const PERFORMANCE_CONFIG = {
+  /** Use GPU acceleration */
+  useGPU: true,
+  
+  /** Force 3D rendering */
+  force3D: true,
+  
+  /** Use requestAnimationFrame for smooth updates */
+  useRAF: true,
+  
+  /** Throttle scroll handler (milliseconds) */
+  scrollThrottle: 16
+} as const;
+
+/** Responsive breakpoints */
+const RESPONSIVE_CONFIG = {
+  /** Mobile breakpoint (pixels) */
+  mobileBreakpoint: 768,
+  
+  /** Tablet breakpoint (pixels) */
+  tabletBreakpoint: 1024,
+  
+  /** Adjust animations for mobile */
+  reduceDragSensitivityOnMobile: true,
+  
+  /** Mobile drag sensitivity multiplier */
+  mobileSensitivityMultiplier: 0.7
+} as const;
+
+// ============================================================================
+// 🎯 SERVICE IMPLEMENTATION - Do not modify unless necessary
+// ============================================================================
+
 @Injectable({ providedIn: 'root' })
 export class TrabalhosSectionAnimationService {
   private readonly platformId = inject(PLATFORM_ID);
@@ -26,13 +149,24 @@ export class TrabalhosSectionAnimationService {
   private sectionStartY = 0;
   private viewportH = 0;
   private lastPinnedState = false;
+  private isMobile = false;
 
   constructor() {
     this.isBrowser = isPlatformBrowser(this.platformId);
     if (this.isBrowser) {
       this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       gsap.registerPlugin(ScrollTrigger);
+      this.detectMobile();
     }
+  }
+
+  private detectMobile(): void {
+    this.isMobile = window.innerWidth < RESPONSIVE_CONFIG.mobileBreakpoint;
+    const onResize = () => {
+      this.isMobile = window.innerWidth < RESPONSIVE_CONFIG.mobileBreakpoint;
+    };
+    window.addEventListener('resize', onResize, { passive: true });
+    this.disposers.push(() => window.removeEventListener('resize', onResize));
   }
 
   createPinnedSection(): void {
@@ -73,29 +207,53 @@ export class TrabalhosSectionAnimationService {
     const end = start + this.viewportH;
     const progress = Math.max(0, Math.min(1, (y - start) / (end - start)));
     const pinnedNow = y >= start && y < end;
+    
+    // Handle pin/unpin state changes
     if (pinnedNow !== this.lastPinnedState) {
       this.lastPinnedState = pinnedNow;
       if (pinnedNow) {
         this.isPinned = true;
-        this.showInteractionHints();
+        if (HINT_CONFIG.showOnPin) {
+          this.showInteractionHints();
+        }
       } else {
         this.isPinned = false;
-        this.hideInteractionHints();
+        if (HINT_CONFIG.hideOnUnpin) {
+          this.hideInteractionHints();
+        }
       }
     }
+    
+    // Don't update rotation while dragging
     if (this.isDragging) return;
+    
     this.scrollProgress = progress;
     this.updateRingScrollProgress(progress);
-    const totalRotation = progress * 720;
-    const snapAngle = 45;
-    const mod = ((totalRotation % snapAngle) + snapAngle) % snapAngle;
-    const isNearSnap = mod < 15 || mod > 30;
-    if (progress > 0.45 && progress < 0.55 && isNearSnap) {
-      const snappedRotation = Math.round(totalRotation / snapAngle) * snapAngle;
-      this.applyRingRotation(snappedRotation, true);
-    } else {
-      this.applyRingRotation(totalRotation, false);
+    
+    // Calculate rotation based on scroll progress
+    if (SCROLL_ROTATION_CONFIG.enabled) {
+      const totalRotation = progress * SCROLL_ROTATION_CONFIG.totalRotationDeg;
+      
+      // Card snapping disabled per user request
+      if (SCROLL_ROTATION_CONFIG.enableCardSnap) {
+        const snapAngle = SCROLL_ROTATION_CONFIG.snapAngleDeg;
+        const mod = ((totalRotation % snapAngle) + snapAngle) % snapAngle;
+        const isNearSnap = mod < 15 || mod > 30;
+        
+        if (progress > SCROLL_ROTATION_CONFIG.snapProgressMin && 
+            progress < SCROLL_ROTATION_CONFIG.snapProgressMax && 
+            isNearSnap) {
+          const snappedRotation = Math.round(totalRotation / snapAngle) * snapAngle;
+          this.applyRingRotation(snappedRotation, true);
+        } else {
+          this.applyRingRotation(totalRotation, false);
+        }
+      } else {
+        // Smooth rotation without snapping
+        this.applyRingRotation(totalRotation, false);
+      }
     }
+    
     if (progress > 0.9) {
       this.prepareForTransition();
     }
@@ -107,7 +265,7 @@ export class TrabalhosSectionAnimationService {
         this.currentRingComponent.scrollProgress = progress;
       }
       if (!this.isDragging && 'rotationDeg' in this.currentRingComponent) {
-        const totalRotation = progress * 720;
+        const totalRotation = progress * SCROLL_ROTATION_CONFIG.totalRotationDeg;
         this.currentRingComponent.rotationDeg = -totalRotation;
       }
     }
@@ -125,8 +283,14 @@ export class TrabalhosSectionAnimationService {
     ring.style.setProperty('--rotation', `${-rotation}deg`);
   }
 
+  /**
+   * Create scroll-driven entrance animation for ring and related elements
+   * Uses GSAP's native animation property to avoid conflicts
+   */
   createRingEntrance(): void {
-    if (!this.isBrowser) return;
+    if (!this.isBrowser || !ENTRANCE_CONFIG.enabled) {
+      return;
+    }
     
     const ringContainer = document.querySelector('#trabalhos .ring-container') as HTMLElement | null;
     const title = document.querySelector('#trabalhos h3') as HTMLElement | null;
@@ -136,61 +300,91 @@ export class TrabalhosSectionAnimationService {
     if (!ringContainer || !title || !section) return;
 
     if (this.prefersReducedMotion) {
-      // For reduced motion, show immediately
-      gsap.set([ringContainer, title, hint].filter(Boolean), { opacity: 1, y: 0, scale: 1 });
+      // For reduced motion, show immediately without animation
+      gsap.set([ringContainer, title, hint].filter(Boolean), { 
+        opacity: 1, 
+        y: 0, 
+        scale: 1,
+        clearProps: 'all'
+      });
       return;
     }
 
     // Set initial state - elements are visible but transformed
-    gsap.set(ringContainer, { opacity: 1, scale: 0.8, y: 50 });
-    gsap.set(title, { opacity: 1, y: 30 });
-    if (hint) gsap.set(hint, { opacity: 1, y: 20 });
+    gsap.set(ringContainer, { 
+      opacity: 1, 
+      scale: ENTRANCE_CONFIG.initialScale, 
+      y: ENTRANCE_CONFIG.initialY,
+      force3D: PERFORMANCE_CONFIG.force3D
+    });
+    gsap.set(title, { 
+      opacity: 1, 
+      y: ENTRANCE_CONFIG.titleInitialY,
+      force3D: PERFORMANCE_CONFIG.force3D
+    });
+    if (hint) {
+      gsap.set(hint, { 
+        opacity: 1, 
+        y: ENTRANCE_CONFIG.hintInitialY,
+        force3D: PERFORMANCE_CONFIG.force3D
+      });
+    }
 
-    // Create scroll-triggered entrance animation
+    // Create GSAP timeline for all entrance animations
+    const timeline = gsap.timeline({ paused: true });
+    
+    timeline.to(ringContainer, {
+      scale: 1,
+      y: 0,
+      ease: 'none'
+    }, 0);
+    
+    timeline.to(title, {
+      y: 0,
+      ease: 'none'
+    }, 0);
+    
+    if (hint) {
+      timeline.to(hint, {
+        y: 0,
+        ease: 'none'
+      }, 0);
+    }
+
+    // Create scroll-triggered animation using the timeline
     const trigger = ScrollTrigger.create({
       trigger: section,
-      start: 'top bottom-=100',
-      end: 'top center',
-      scrub: 1,
-      onUpdate: (self) => {
-        const progress = self.progress;
-        
-        // Animate ring container
-        gsap.to(ringContainer, {
-          scale: 0.8 + (0.2 * progress),
-          y: 50 * (1 - progress),
-          duration: 0.1,
-          ease: 'none'
-        });
-        
-        // Animate title
-        gsap.to(title, {
-          y: 30 * (1 - progress),
-          duration: 0.1,
-          ease: 'none'
-        });
-        
-        // Animate hint
-        if (hint) {
-          gsap.to(hint, {
-            y: 20 * (1 - progress),
-            duration: 0.1,
-            ease: 'none'
-          });
-        }
-      }
+      start: ENTRANCE_CONFIG.triggerStart,
+      end: ENTRANCE_CONFIG.triggerEnd,
+      scrub: ENTRANCE_CONFIG.scrubSmoothness,
+      animation: timeline
     });
 
     this.scrollTriggers.push(trigger);
   }
 
+  /**
+   * Enhance ring interactions with drag and touch support
+   * Includes haptic feedback and responsive sensitivity
+   */
   enhanceRingInteractions(workCardRingComponent: any): void {
-    if (!this.isBrowser || !workCardRingComponent) return;
+    if (!this.isBrowser || !workCardRingComponent || !DRAG_CONFIG.enabled) return;
+    
     const ringElement: HTMLElement | null = workCardRingComponent.ringRef?.nativeElement ?? document.querySelector('#trabalhos .ring');
     if (!ringElement) return;
+    
     this.ringEl = ringElement;
     ringElement.style.cursor = 'grab';
 
+    // Get responsive sensitivity
+    const getSensitivity = () => {
+      if (RESPONSIVE_CONFIG.reduceDragSensitivityOnMobile && this.isMobile) {
+        return DRAG_CONFIG.sensitivity * RESPONSIVE_CONFIG.mobileSensitivityMultiplier;
+      }
+      return DRAG_CONFIG.sensitivity;
+    };
+
+    // Use interaction bridge if available (preferred method)
     if (typeof workCardRingComponent.registerInteractionBridge === 'function') {
       workCardRingComponent.registerInteractionBridge({
         onDragStart: () => {
@@ -198,7 +392,9 @@ export class TrabalhosSectionAnimationService {
           workCardRingComponent.isDragging = true;
           ringElement.style.cursor = 'grabbing';
           ringElement.classList.add('ring-dragging');
-          if (navigator.vibrate) navigator.vibrate(30);
+          if (DRAG_CONFIG.enableVibration && navigator.vibrate) {
+            navigator.vibrate(DRAG_CONFIG.vibrationStartMs);
+          }
         },
         onDragMove: (rotation: number, velocity: number) => {
           this.dragVelocity = velocity;
@@ -214,11 +410,15 @@ export class TrabalhosSectionAnimationService {
           this.dragVelocity = velocity;
           ringElement.style.cursor = 'grab';
           ringElement.classList.remove('ring-dragging');
-          if (navigator.vibrate) navigator.vibrate(20);
+          if (DRAG_CONFIG.enableVibration && navigator.vibrate) {
+            navigator.vibrate(DRAG_CONFIG.vibrationEndMs);
+          }
         },
         onActiveIndexChange: (index: number) => {
           this.highlightActiveCard(index);
-          if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+          if (DRAG_CONFIG.enableVibration && navigator.vibrate) {
+            navigator.vibrate(DRAG_CONFIG.vibrationCardChange);
+          }
         }
       });
 
@@ -229,6 +429,7 @@ export class TrabalhosSectionAnimationService {
       return;
     }
 
+    // Fallback to manual pointer events
     const onPointerDown = (ev: PointerEvent) => {
       this.isDragging = true;
       workCardRingComponent.isDragging = true;
@@ -238,14 +439,17 @@ export class TrabalhosSectionAnimationService {
       this.dragLastTs = performance.now();
       this.dragVelocity = 0;
       ringElement.classList.add('ring-dragging');
-      if (navigator.vibrate) navigator.vibrate(30);
+      if (DRAG_CONFIG.enableVibration && navigator.vibrate) {
+        navigator.vibrate(DRAG_CONFIG.vibrationStartMs);
+      }
     };
+    
     const onPointerMove = (ev: PointerEvent) => {
       if (!this.isDragging) return;
       const now = performance.now();
       const dx = ev.clientX - this.dragLastX;
       const dt = Math.max(16, now - this.dragLastTs);
-      const sensitivity = 0.5;
+      const sensitivity = getSensitivity();
       const deltaDeg = dx * sensitivity;
       const curr = this.currentRingComponent?.rotationDeg ?? 0;
       const next = curr + deltaDeg;
@@ -258,15 +462,19 @@ export class TrabalhosSectionAnimationService {
       this.dragLastX = ev.clientX;
       this.dragLastTs = now;
     };
+    
     const endDrag = () => {
       if (!this.isDragging) return;
       this.isDragging = false;
       workCardRingComponent.isDragging = false;
       ringElement.style.cursor = 'grab';
       ringElement.classList.remove('ring-dragging');
-      if (navigator.vibrate) navigator.vibrate(20);
+      if (DRAG_CONFIG.enableVibration && navigator.vibrate) {
+        navigator.vibrate(DRAG_CONFIG.vibrationEndMs);
+      }
       this.startMomentum();
     };
+    
     ringElement.addEventListener('pointerdown', onPointerDown);
     ringElement.addEventListener('pointermove', onPointerMove);
     ringElement.addEventListener('pointerup', endDrag);
@@ -291,10 +499,15 @@ export class TrabalhosSectionAnimationService {
 
   private startMomentum(): void {
     if (this.momentumId) cancelAnimationFrame(this.momentumId);
-    const friction = 0.92;
+    const friction = DRAG_CONFIG.momentumFriction;
+    const minVelocity = DRAG_CONFIG.minVelocityThreshold;
+    
     const step = () => {
-      if (Math.abs(this.dragVelocity) < 0.05) {
-        this.snapToNearestCard();
+      if (Math.abs(this.dragVelocity) < minVelocity) {
+        // Snap to nearest card disabled per user request
+        if (SCROLL_ROTATION_CONFIG.enableCardSnap) {
+          this.snapToNearestCard();
+        }
         return;
       }
       const curr = this.currentRingComponent?.rotationDeg ?? 0;
@@ -308,7 +521,10 @@ export class TrabalhosSectionAnimationService {
       this.dragVelocity *= friction;
       this.momentumId = requestAnimationFrame(step);
     };
-    this.momentumId = requestAnimationFrame(step);
+    
+    if (PERFORMANCE_CONFIG.useRAF) {
+      this.momentumId = requestAnimationFrame(step);
+    }
   }
 
   private highlightActiveCard(index: number): void {
@@ -326,18 +542,45 @@ export class TrabalhosSectionAnimationService {
   }
 
   private showInteractionHints(): void {
+    if (!HINT_CONFIG.showOnPin) return;
     const hint = document.querySelector('#trabalhos .drag-hint') as HTMLElement | null;
     if (!hint) return;
-    hint.classList.add('hint-on');
+    
+    if (this.prefersReducedMotion) {
+      hint.classList.add('hint-on');
+    } else {
+      gsap.to(hint, {
+        opacity: 1,
+        duration: HINT_CONFIG.fadeDuration,
+        ease: 'power2.out',
+        overwrite: 'auto',
+        onComplete: () => hint.classList.add('hint-on')
+      });
+    }
   }
 
   private hideInteractionHints(): void {
+    if (!HINT_CONFIG.hideOnUnpin) return;
     const hint = document.querySelector('#trabalhos .drag-hint') as HTMLElement | null;
     if (!hint) return;
-    hint.classList.remove('hint-on');
+    
+    if (this.prefersReducedMotion) {
+      hint.classList.remove('hint-on');
+    } else {
+      gsap.to(hint, {
+        opacity: 0,
+        duration: HINT_CONFIG.fadeDuration,
+        ease: 'power2.in',
+        overwrite: 'auto',
+        onComplete: () => hint.classList.remove('hint-on')
+      });
+    }
   }
 
   private snapToNearestCard(): void {
+    // Card snapping disabled per user request
+    if (!SCROLL_ROTATION_CONFIG.enableCardSnap) return;
+    
     if (!this.currentRingComponent || this.prefersReducedMotion) return;
     const currentRotation = this.currentRingComponent.rotationDeg || 0;
     const cardAngle = 45;
