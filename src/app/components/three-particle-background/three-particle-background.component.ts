@@ -2,6 +2,15 @@ import {AfterViewInit, Component, ElementRef, HostListener, Input, NgZone, OnDes
 import { isPlatformBrowser } from '@angular/common';
 import * as THREE from 'three';
 import { ScrollState, ScrollOrchestrationService } from '../../services/scroll-orchestration.service';
+import { ReducedMotionService } from '../../services/reduced-motion.service';
+import { FeatureFlagsService } from '../../services/feature-flags.service';
+import { getParticleConfig, ParticleProfile } from '../../three/particles-config';
+import {
+  ParticleWorkerMessageType,
+  ParticleWorkerOutputMessage,
+  ShockwaveData,
+  ParticlePhysicsConfig
+} from '../../three/three-particles.worker.types';
 
 interface Shockwave {
   pos: THREE.Vector2;
@@ -28,6 +37,9 @@ interface Shockwave {
 })
 export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestroy, OnInit {
   private readonly platformId = inject(PLATFORM_ID);
+  private readonly reducedMotionService = inject(ReducedMotionService);
+  private readonly featureFlagsService = inject(FeatureFlagsService);
+  
   @Input() scrollState: ScrollState | null = null;
 
   private scene!: THREE.Scene;
@@ -62,8 +74,14 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   private tempVector3D = new THREE.Vector3();
   private prefersReducedMotion = false;
   private isMobile = false;
-  private readonly mobileParticleCount = 120;
-  private readonly desktopParticleCount = 120;
+  
+  // Worker-related properties
+  private worker: Worker | null = null;
+  private useWorker = false;
+  private workerInitialized = false;
+  
+  // Particle configuration
+  private particleConfig: ParticleProfile | null = null;
   private readonly gyroPositionGain = 0.02;
   private readonly gyroSpinGain = 0.012;
 
@@ -89,11 +107,22 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     if (!isPlatformBrowser(this.platformId)) return;
 
     this.ngZone.runOutsideAngular(() => {
-      const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-      if (mediaQuery.matches) this.prefersReducedMotion = true;
+      // Get reduced motion preference from service
+      this.prefersReducedMotion = this.reducedMotionService.getCurrentPreference();
+      
+      // Check if particles feature and worker are enabled
+      const particlesEnabled = this.featureFlagsService.isParticlesEnabled();
+      this.useWorker = particlesEnabled && typeof Worker !== 'undefined';
+      
+      // Initialize worker if enabled
+      if (this.useWorker) {
+        this.initWorker();
+      }
+      
       this.initThree();
       this.createParticles();
       this.lastTime = performance.now();
+      
       if (!this.prefersReducedMotion) {
         window.addEventListener('click', this.tryEnableGyro, { once: true, passive: true });
         window.addEventListener('orientationchange', this.onScreenOrientationChange, { passive: true });
@@ -111,6 +140,13 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     window.removeEventListener('click', this.tryEnableGyro as any);
     window.removeEventListener('orientationchange', this.onScreenOrientationChange);
     if (this.gyroEnabled) window.removeEventListener('deviceorientation', this.handleOrientation);
+    
+    // Clean up worker
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
+    
     if (this.renderer) this.renderer.dispose();
     if (this.particles?.geometry) this.particles.geometry.dispose();
     if (this.particles?.material) (this.particles.material as THREE.Material).dispose();
@@ -223,8 +259,89 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.camera.aspect = host.clientWidth / host.clientHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(host.clientWidth, host.clientHeight);
+    
+    // Update particle config based on new viewport size
+    if (isPlatformBrowser(this.platformId)) {
+      const newConfig = getParticleConfig(window.innerWidth, this.prefersReducedMotion);
+      this.updateParticleConfig(newConfig);
+    }
+    
     if (this.prefersReducedMotion) this.renderer.render(this.scene, this.camera);
   };
+
+  /**
+   * Initialize Web Worker for particle physics
+   */
+  private initWorker(): void {
+    try {
+      this.worker = new Worker(
+        new URL('../../three/three-particles.worker', import.meta.url),
+        { type: 'module' }
+      );
+      
+      this.worker.onmessage = (event: MessageEvent<ParticleWorkerOutputMessage>) => {
+        this.handleWorkerMessage(event.data);
+      };
+      
+      this.worker.onerror = (error) => {
+        console.error('Worker error:', error);
+        this.useWorker = false;
+        this.worker = null;
+      };
+    } catch (error) {
+      console.warn('Failed to initialize worker, falling back to main thread:', error);
+      this.useWorker = false;
+      this.worker = null;
+    }
+  }
+
+  /**
+   * Handle messages from the worker
+   */
+  private handleWorkerMessage(message: ParticleWorkerOutputMessage): void {
+    switch (message.type) {
+      case ParticleWorkerMessageType.INIT_COMPLETE:
+        this.workerInitialized = true;
+        break;
+
+      case ParticleWorkerMessageType.STEP_COMPLETE:
+        // Update particle positions with data from worker
+        // Worker transfers ownership back, so we need to update our arrays
+        this.particleVelocities = message.velocities;
+        
+        const posAttr = this.particles.geometry.getAttribute('position') as THREE.BufferAttribute;
+        posAttr.array = message.positions;
+        posAttr.needsUpdate = true;
+        break;
+
+      case ParticleWorkerMessageType.CONFIG_UPDATED:
+        // Configuration update acknowledged
+        break;
+    }
+  }
+
+  /**
+   * Update particle configuration and notify worker
+   */
+  private updateParticleConfig(config: ParticleProfile): void {
+    if (!config) return;
+    
+    this.particleConfig = config;
+    
+    // Send config update to worker if using worker
+    if (this.useWorker && this.worker && this.workerInitialized) {
+      const workerConfig: Partial<ParticlePhysicsConfig> = {
+        friction: config.friction,
+        maxForce: config.maxForce,
+        maxRadius: config.maxInteractionRadius,
+      };
+      
+      this.worker.postMessage({
+        type: ParticleWorkerMessageType.UPDATE_CONFIG,
+        config: workerConfig
+      });
+    }
+  }
 
   @HostListener('document:mousemove', ['$event'])
   onMouseMove(event: MouseEvent) {
@@ -283,7 +400,11 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     // Use window.THREE if available (for tests), otherwise use imported THREE
     const ThreeInstance = (window as any).THREE || THREE;
 
-    const particleCount = this.isMobile ? this.mobileParticleCount : this.desktopParticleCount;
+    // Get particle configuration based on viewport and reduced motion
+    const host = this.el.nativeElement;
+    this.particleConfig = getParticleConfig(host.clientWidth, this.prefersReducedMotion);
+    const particleCount = this.particleConfig.count;
+    
     const geometry = new ThreeInstance.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     this.particleVelocities = new Float32Array(particleCount * 3);
@@ -298,10 +419,10 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     posAttr.setUsage && posAttr.setUsage(ThreeInstance.StreamDrawUsage);
     geometry.setAttribute('position', posAttr);
     const material = new ThreeInstance.PointsMaterial({
-      size: 1.2,
+      size: this.particleConfig.particleSize,
       map: this.createParticleTexture(),
       transparent: true,
-      opacity: 0.6,
+      opacity: this.particleConfig.opacity,
       blending: ThreeInstance.NormalBlending,
       depthWrite: false,
       color: this.baseParticleColor.getHex()
@@ -311,6 +432,35 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.scene.add(this.particles);
     this.particleColor.copy(this.baseParticleColor);
     this.targetParticleColor.copy(this.baseParticleColor);
+    
+    // Initialize worker with particle data if using worker
+    if (this.useWorker && this.worker) {
+      const physicsConfig: ParticlePhysicsConfig = {
+        friction: this.particleConfig.friction,
+        returnSpeed: 0.0005,
+        maxForce: this.particleConfig.maxForce,
+        maxRadius: this.particleConfig.maxInteractionRadius,
+        maxSensibleVelocity: 0.04,
+      };
+      
+      // Create copies for worker (transferable)
+      const workerPositions = new Float32Array(positions);
+      const workerVelocities = new Float32Array(this.particleVelocities);
+      const workerOriginalPositions = new Float32Array(this.originalPositions);
+      
+      this.worker.postMessage({
+        type: ParticleWorkerMessageType.INIT,
+        positions: workerPositions,
+        velocities: workerVelocities,
+        originalPositions: workerOriginalPositions,
+        config: physicsConfig
+      }, [
+        workerPositions.buffer,
+        workerVelocities.buffer,
+        workerOriginalPositions.buffer
+      ]);
+    }
+    
     if (this.prefersReducedMotion) this.renderer.render(this.scene, this.camera);
   }
 
@@ -426,12 +576,49 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
     this.accumulator += dt;
     let sub = 0;
     while (this.accumulator >= this.dtFixed && sub < 3) {
-      this.stepPhysics(this.dtFixed, now);
+      if (this.useWorker && this.worker && this.workerInitialized) {
+        // Use worker for physics
+        this.stepPhysicsWithWorker(this.dtFixed, now);
+      } else {
+        // Fallback to main thread physics
+        this.stepPhysics(this.dtFixed, now);
+      }
       this.accumulator -= this.dtFixed;
       sub++;
     }
     this.renderer.render(this.scene, this.camera);
   };
+
+  /**
+   * Send physics step to worker
+   */
+  private stepPhysicsWithWorker(dt: number, timeNow: number): void {
+    if (!this.worker || !this.workerInitialized) return;
+
+    // Convert shockwaves to worker format
+    const shockwaves: ShockwaveData[] = this.shockwaves.map(sw => ({
+      posX: sw.pos.x,
+      posY: sw.pos.y,
+      startTime: sw.startTime,
+      maxStrength: sw.maxStrength
+    }));
+
+    // Send STEP message to worker
+    this.worker.postMessage({
+      type: ParticleWorkerMessageType.STEP,
+      dt,
+      timeNow,
+      smoothedMouseX: this.smoothedMouse.x,
+      smoothedMouseY: this.smoothedMouse.y,
+      mouseVelocity: this.mouseVelocity,
+      shockwaves,
+      projectionMatrix: new Float32Array(this.camera.projectionMatrix.elements),
+      viewMatrix: new Float32Array(this.camera.matrixWorldInverse.elements),
+    });
+    
+    // Filter expired shockwaves
+    this.shockwaves = this.shockwaves.filter(sw => (timeNow - sw.startTime) < 500);
+  }
 
   private stepPhysics(dt: number, timeNow: number) {
     const positions = this.particles.geometry.getAttribute('position').array as Float32Array;
