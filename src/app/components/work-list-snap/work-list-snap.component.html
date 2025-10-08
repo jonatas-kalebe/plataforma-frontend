@@ -29,9 +29,11 @@
           lazyImg
           [src]="item.imageUrl"
           [alt]="item.title"
+          [rootMargin]="'100px'"
           class="item-image"
           width="400"
-          height="300">
+          height="300"
+          loading="lazy">
         
         <div 
           *ngIf="!item.imageUrl"
