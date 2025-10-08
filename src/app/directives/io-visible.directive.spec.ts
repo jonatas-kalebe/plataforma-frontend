@@ -105,29 +105,22 @@ describe('IoVisibleDirective', () => {
   let component: TestComponent;
   let fixture: ComponentFixture<TestComponent>;
   let directiveElement: DebugElement;
-  let mockObserver: MockIntersectionObserver;
+  let mockObserver: MockIntersectionObserver | undefined;
   let originalIntersectionObserver: any;
-  
-  beforeEach(() => {
-    // Salva o IntersectionObserver original
-    originalIntersectionObserver = (window as any).IntersectionObserver;
-    
-    // Mock do IntersectionObserver
-    (window as any).IntersectionObserver = class {
-      constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
-        mockObserver = new MockIntersectionObserver(callback, options);
-        return mockObserver;
-      }
-    };
-  });
-  
-  afterEach(() => {
-    // Restaura o IntersectionObserver original
-    (window as any).IntersectionObserver = originalIntersectionObserver;
-  });
   
   describe('Browser Environment', () => {
     beforeEach(() => {
+      // Salva o IntersectionObserver original
+      originalIntersectionObserver = (window as any).IntersectionObserver;
+      
+      // Mock do IntersectionObserver
+      (window as any).IntersectionObserver = class {
+        constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+          mockObserver = new MockIntersectionObserver(callback, options);
+          return mockObserver;
+        }
+      };
+      
       TestBed.configureTestingModule({
         imports: [TestComponent]
       });
@@ -135,6 +128,12 @@ describe('IoVisibleDirective', () => {
       fixture = TestBed.createComponent(TestComponent);
       component = fixture.componentInstance;
       directiveElement = fixture.debugElement.query(By.directive(IoVisibleDirective));
+    });
+    
+    afterEach(() => {
+      // Restaura o IntersectionObserver original
+      (window as any).IntersectionObserver = originalIntersectionObserver;
+      mockObserver = undefined;
     });
     
     it('should create directive', () => {
@@ -146,8 +145,8 @@ describe('IoVisibleDirective', () => {
       tick();
       
       expect(mockObserver).toBeDefined();
-      expect(mockObserver.observedElements.length).toBe(1);
-      expect(mockObserver.observedElements[0]).toBe(directiveElement.nativeElement);
+      expect(mockObserver!.observedElements.length).toBe(1);
+      expect(mockObserver!.observedElements[0]).toBe(directiveElement.nativeElement);
     }));
     
     it('should emit entered event when element enters viewport', fakeAsync(() => {
@@ -157,7 +156,7 @@ describe('IoVisibleDirective', () => {
       expect(component.enteredCount).toBe(0);
       
       // Simula entrada no viewport
-      mockObserver.triggerIntersection(true);
+      mockObserver!.triggerIntersection(true);
       tick();
       
       expect(component.enteredCount).toBe(1);
@@ -170,14 +169,14 @@ describe('IoVisibleDirective', () => {
       tick();
       
       // Primeiro entra
-      mockObserver.triggerIntersection(true);
+      mockObserver!.triggerIntersection(true);
       tick();
       
       expect(component.enteredCount).toBe(1);
       expect(component.leftCount).toBe(0);
       
       // Depois sai
-      mockObserver.triggerIntersection(false);
+      mockObserver!.triggerIntersection(false);
       tick();
       
       expect(component.leftCount).toBe(1);
@@ -190,7 +189,7 @@ describe('IoVisibleDirective', () => {
       tick();
       
       // Tenta sair sem ter entrado
-      mockObserver.triggerIntersection(false);
+      mockObserver!.triggerIntersection(false);
       tick();
       
       expect(component.enteredCount).toBe(0);
@@ -202,15 +201,15 @@ describe('IoVisibleDirective', () => {
       tick();
       
       // Ciclo 1: entra e sai
-      mockObserver.triggerIntersection(true);
+      mockObserver!.triggerIntersection(true);
       tick();
-      mockObserver.triggerIntersection(false);
+      mockObserver!.triggerIntersection(false);
       tick();
       
       // Ciclo 2: entra e sai
-      mockObserver.triggerIntersection(true);
+      mockObserver!.triggerIntersection(true);
       tick();
-      mockObserver.triggerIntersection(false);
+      mockObserver!.triggerIntersection(false);
       tick();
       
       expect(component.enteredCount).toBe(2);
@@ -222,20 +221,20 @@ describe('IoVisibleDirective', () => {
       fixture.detectChanges();
       tick();
       
-      expect(mockObserver.observedElements.length).toBe(1);
+      expect(mockObserver!.observedElements.length).toBe(1);
       
       // Primeira entrada
-      mockObserver.triggerIntersection(true);
+      mockObserver!.triggerIntersection(true);
       tick();
       
       expect(component.enteredCount).toBe(1);
       // Observer deve ter sido desconectado
-      expect(mockObserver.observedElements.length).toBe(0);
+      expect(mockObserver!.observedElements.length).toBe(0);
       
       // Segunda entrada não deve emitir evento
-      mockObserver.triggerIntersection(false);
+      mockObserver!.triggerIntersection(false);
       tick();
-      mockObserver.triggerIntersection(true);
+      mockObserver!.triggerIntersection(true);
       tick();
       
       expect(component.enteredCount).toBe(1);
@@ -246,7 +245,7 @@ describe('IoVisibleDirective', () => {
       fixture.detectChanges();
       tick();
       
-      expect(mockObserver.options.rootMargin).toBe('10px 20px');
+      expect(mockObserver!.options.rootMargin).toBe('10px 20px');
     }));
     
     it('should pass threshold to IntersectionObserver', fakeAsync(() => {
@@ -254,7 +253,7 @@ describe('IoVisibleDirective', () => {
       fixture.detectChanges();
       tick();
       
-      expect(mockObserver.options.threshold).toBe(0.5);
+      expect(mockObserver!.options.threshold).toBe(0.5);
     }));
     
     it('should pass array of thresholds to IntersectionObserver', fakeAsync(() => {
@@ -262,19 +261,19 @@ describe('IoVisibleDirective', () => {
       fixture.detectChanges();
       tick();
       
-      expect(mockObserver.options.threshold).toEqual([0, 0.25, 0.5, 0.75, 1]);
+      expect(mockObserver!.options.threshold).toEqual([0, 0.25, 0.5, 0.75, 1]);
     }));
     
     it('should disconnect observer on destroy', fakeAsync(() => {
       fixture.detectChanges();
       tick();
       
-      expect(mockObserver.observedElements.length).toBe(1);
+      expect(mockObserver!.observedElements.length).toBe(1);
       
       fixture.destroy();
       flush();
       
-      expect(mockObserver.observedElements.length).toBe(0);
+      expect(mockObserver!.observedElements.length).toBe(0);
     }));
   });
   
