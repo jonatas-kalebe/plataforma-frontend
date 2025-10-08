@@ -1,0 +1,231 @@
+/**
+ * Ring Tokens - CSS Custom Properties for 3D Card Ring Component
+ * 
+ * This file defines responsive design tokens for the work card ring component
+ * using fluid typography and responsive sizing with clamp().
+ * 
+ * Features:
+ * - Mobile-first responsive design
+ * - Breakpoint-based optimizations (600/640/768/1024)
+ * - Accessibility support (prefers-reduced-motion)
+ * - Viewport-relative sizing with min/max constraints
+ * 
+ * Note: This file is NOT imported globally yet. It will be imported where needed.
+ * 
+ * References:
+ * - WCAG 2.1 Level AA: https://www.w3.org/WAI/WCAG21/quickref/
+ * - Tailwind Responsive Design: https://tailwindcss.com/docs/responsive-design
+ */
+
+/* ============================================
+   BASE TOKENS (Mobile-First)
+   Default values for viewports < 600px
+   ============================================ */
+
+:root {
+  /**
+   * --ring-viewport: Diameter of the 3D ring container
+   * Mobile: 260px minimum, scales with viewport (80vmin), max 320px
+   * Controls the overall size of the ring where cards are positioned
+   */
+  --ring-viewport: clamp(260px, 80vmin, 320px);
+
+  /**
+   * --card-w: Width of individual work cards in the ring
+   * Mobile: 160px minimum, scales with viewport (40vmin), max 240px
+   * Ensures cards are touch-friendly (min 160px) but don't overwhelm mobile screens
+   */
+  --card-w: clamp(160px, 40vmin, 240px);
+
+  /**
+   * --card-h: Height of individual work cards
+   * Calculated as 60% of card width to maintain 5:3 aspect ratio
+   * Provides consistent card proportions across all breakpoints
+   */
+  --card-h: calc(var(--card-w) * 0.6);
+
+  /**
+   * --ring-perspective: 3D perspective depth for ring transformations
+   * Controls the intensity of the 3D effect (higher = less pronounced)
+   */
+  --ring-perspective: 1200px;
+
+  /**
+   * --ring-font-size: Font size for text within cards
+   * Mobile: 0.875rem (14px) minimum, scales with viewport, max 1.1rem (17.6px)
+   * Ensures readability on small screens while scaling up responsively
+   */
+  --ring-font-size: clamp(0.875rem, 2.8vmin, 1.1rem);
+}
+
+/* ============================================
+   BREAKPOINT: 600px (Small Tablets)
+   Optimize for slightly larger mobile devices
+   ============================================ */
+
+@media (min-width: 600px) {
+  :root {
+    /**
+     * At 600px+: Increase ring and card sizes for better use of available space
+     * Ring grows to accommodate larger viewport while maintaining usability
+     */
+    --ring-viewport: clamp(280px, 82vmin, 340px);
+    --card-w: clamp(170px, 42vmin, 250px);
+    --ring-font-size: clamp(0.9rem, 2.9vmin, 1.15rem);
+  }
+}
+
+/* ============================================
+   BREAKPOINT: 640px (Landscape Mobile / Small Tablets)
+   Enhanced sizing for landscape orientation
+   ============================================ */
+
+@media (min-width: 640px) {
+  :root {
+    /**
+     * At 640px+: Further optimization for landscape phones and small tablets
+     * Provides more comfortable viewing experience with increased sizes
+     */
+    --ring-viewport: clamp(300px, 85vmin, 360px);
+    --card-w: clamp(180px, 45vmin, 260px);
+    --ring-font-size: clamp(0.925rem, 3vmin, 1.2rem);
+  }
+}
+
+/* ============================================
+   BREAKPOINT: 768px (Tablets - MD)
+   Standard tablet viewport optimization
+   ============================================ */
+
+@media (min-width: 768px) {
+  :root {
+    /**
+     * At 768px+: Tablet-optimized sizing (aligned with Tailwind 'md' breakpoint)
+     * Larger cards and ring for improved visual hierarchy on tablet screens
+     */
+    --ring-viewport: clamp(320px, 88vmin, 400px);
+    --card-w: clamp(200px, 48vmin, 280px);
+    --ring-font-size: clamp(1rem, 3.2vmin, 1.25rem);
+    --ring-perspective: 1400px;
+  }
+}
+
+/* ============================================
+   BREAKPOINT: 1024px (Desktop - LG)
+   Desktop and large tablet optimization
+   ============================================ */
+
+@media (min-width: 1024px) {
+  :root {
+    /**
+     * At 1024px+: Desktop-optimized sizing (aligned with Tailwind 'lg' breakpoint)
+     * Maximum visual impact with larger cards and enhanced perspective
+     * Provides best experience for mouse/trackpad interaction
+     */
+    --ring-viewport: clamp(340px, 90vmin, 450px);
+    --card-w: clamp(220px, 50vmin, 300px);
+    --ring-font-size: clamp(1.05rem, 3.4vmin, 1.35rem);
+    --ring-perspective: 1600px;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY: Reduced Motion Support
+   WCAG 2.1 Level AA Compliance
+   ============================================ */
+
+/**
+ * Respects user preference for reduced motion (WCAG 2.1 Success Criterion 2.3.3)
+ * When users enable "prefers-reduced-motion" in their system settings:
+ * - Animations are simplified or removed
+ * - Transitions are instant or minimal
+ * - 3D effects are reduced
+ * 
+ * This ensures the interface remains accessible to users with:
+ * - Vestibular disorders
+ * - Motion sensitivity
+ * - Epilepsy or seizure disorders
+ * - Cognitive disabilities affected by motion
+ */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    /**
+     * Reduced motion mode: Disable or minimize animations
+     * - Perspective is reduced for less pronounced 3D effect
+     * - Sizes remain unchanged for layout consistency
+     * - Component-level animations should check this preference
+     */
+    --ring-perspective: 2000px; /* Flatter perspective = less 3D intensity */
+    
+    /**
+     * Note: Components using these tokens should also implement:
+     * - transition: none or minimal duration
+     * - transform: none or minimal transformations
+     * - animation: none or reduced keyframes
+     */
+  }
+}
+
+/* ============================================
+   LANDSCAPE MOBILE OPTIMIZATION
+   Special handling for landscape orientation on mobile
+   ============================================ */
+
+/**
+ * Landscape mobile devices (common breakpoint: max 896px)
+ * Addresses the challenge of limited vertical space in landscape mode
+ * Prevents scrollbars and ensures content fits in viewport
+ */
+
+@media (max-width: 896px) and (orientation: landscape) {
+  :root {
+    /**
+     * Landscape mobile: Reduce vertical sizing to prevent scrollbars
+     * - Smaller ring to fit in reduced vertical space
+     * - Proportionally smaller cards
+     * - Adjusted font sizes for readability in compact layout
+     */
+    --ring-viewport: clamp(220px, 70vmin, 280px);
+    --card-w: clamp(140px, 35vmin, 200px);
+    --ring-font-size: clamp(0.75rem, 2.5vmin, 0.95rem);
+  }
+}
+
+/* ============================================
+   USAGE NOTES
+   ============================================ */
+
+/**
+ * How to use these tokens:
+ * 
+ * 1. Import this file in your component:
+ *    @import 'src/styles/ring-tokens.css';
+ * 
+ * 2. Reference tokens in your styles:
+ *    .ring-container {
+ *      width: var(--ring-viewport);
+ *      height: var(--ring-viewport);
+ *      perspective: var(--ring-perspective);
+ *    }
+ * 
+ * 3. For card sizing:
+ *    .card {
+ *      width: var(--card-w);
+ *      height: var(--card-h);
+ *      font-size: var(--ring-font-size);
+ *    }
+ * 
+ * 4. Accessibility implementation:
+ *    Always check prefers-reduced-motion in component code:
+ *    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+ *    if (prefersReduced) {
+ *      // Disable or simplify animations
+ *    }
+ * 
+ * 5. Testing:
+ *    - Test at all breakpoints: 320px, 600px, 768px, 1024px, 1920px
+ *    - Test landscape mode on mobile (rotate device/browser)
+ *    - Enable "Reduce Motion" in system preferences and verify behavior
+ *    - Ensure touch targets meet minimum 44x44px (WCAG 2.5.5 Level AAA)
+ */
