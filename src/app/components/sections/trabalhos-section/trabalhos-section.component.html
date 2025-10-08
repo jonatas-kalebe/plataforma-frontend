@@ -2,7 +2,12 @@
   #sectionElement
   [attr.data-testid]="testId"
   class="section-base"
-  id="trabalhos">
+  id="trabalhos"
+  ioVisible
+  [threshold]="0.2"
+  [once]="true"
+  (entered)="onSectionEnter()"
+  (left)="onSectionLeave()">
   <div class="section-content pin-container px-4 sm:px-6 lg:px-8">
     <h3 class="trabalhos-title text-fluid-4xl sm:text-fluid-5xl font-extrabold text-center text-athenity-text-title font-heading mb-6 sm:mb-8">
       {{ sectionTitle }}
