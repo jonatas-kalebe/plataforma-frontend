@@ -1,5 +1,7 @@
 import { Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 @Injectable({
   providedIn: 'root'
@@ -8,63 +10,95 @@ export class ServicosAnimationService {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly isBrowser = isPlatformBrowser(this.platformId);
   private readonly prefersReducedMotion: boolean;
-  private observers: IntersectionObserver[] = [];
+  private scrollTriggers: ScrollTrigger[] = [];
   private cleanupFns: Array<() => void> = [];
 
   constructor() {
     this.prefersReducedMotion = this.isBrowser
       ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
       : false;
+
+    if (this.isBrowser) {
+      gsap.registerPlugin(ScrollTrigger);
+    }
   }
 
   /**
-   * Create staggered entrance animations for service cards
-   * Uses IntersectionObserver to toggle CSS-driven transitions
+   * Create scroll-driven animations for service cards
+   * Cards animate based on scroll position, not time
    */
   createStaggeredEntrance(cards: NodeListOf<Element> | Element[]): void {
-    if (!this.isBrowser) {
+    if (!this.isBrowser || this.prefersReducedMotion) {
+      // For reduced motion or SSR, show cards immediately
+      const cardElements = Array.from(cards) as HTMLElement[];
+      cardElements.forEach((card) => {
+        gsap.set(card, { opacity: 1, y: 0, scale: 1 });
+      });
       return;
     }
 
     const cardElements = Array.from(cards) as HTMLElement[];
 
-    const observer = new IntersectionObserver(
-      (entries, obs) => {
-        entries.forEach((entry) => {
-          const target = entry.target as HTMLElement;
+    // Set initial state - cards are visible but transformed
+    cardElements.forEach((card, index) => {
+      gsap.set(card, {
+        opacity: 1,
+        y: 60,
+        scale: 0.95
+      });
 
-          if (entry.isIntersecting) {
-            target.classList.add('is-visible');
+      // Create scroll-triggered animation for each card
+      const trigger = ScrollTrigger.create({
+        trigger: card,
+        start: 'top bottom-=100',
+        end: 'top center',
+        scrub: 1, // Smooth scrubbing effect
+        onUpdate: (self) => {
+          // Animate based on scroll progress
+          const progress = self.progress;
+          gsap.to(card, {
+            y: 60 * (1 - progress),
+            scale: 0.95 + (0.05 * progress),
+            duration: 0.1,
+            ease: 'none'
+          });
+        }
+      });
 
-            if (this.prefersReducedMotion) {
-              target.style.setProperty('--card-stagger-delay', '0s');
-            }
-
-            obs.unobserve(target);
-          }
-        });
-      },
-      {
-        threshold: this.prefersReducedMotion ? 0.1 : 0.25,
-        rootMargin: '0px 0px -15% 0px'
-      }
-    );
-
-    cardElements.forEach((card) => {
-      card.classList.remove('is-visible');
-      observer.observe(card);
+      this.scrollTriggers.push(trigger);
     });
-
-    this.observers.push(observer);
   }
 
   /**
    * Create subtle parallax effect for service cards
-   * DISABLED: Can cause visual stuttering/flickering
+   * Parallax is now scroll-driven, not mousemove-driven
    */
   createParallaxEffect(cards: NodeListOf<Element> | Element[]): void {
-    // Parallax effect disabled to prevent flickering
-    return;
+    if (!this.isBrowser || this.prefersReducedMotion) {
+      return;
+    }
+
+    const cardElements = Array.from(cards) as HTMLElement[];
+
+    cardElements.forEach((card, index) => {
+      const trigger = ScrollTrigger.create({
+        trigger: card,
+        start: 'top bottom',
+        end: 'bottom top',
+        scrub: 2,
+        onUpdate: (self) => {
+          // Subtle parallax based on scroll position
+          const yOffset = (self.progress - 0.5) * 30; // Max 15px up or down
+          gsap.to(card, {
+            y: yOffset,
+            duration: 0.1,
+            ease: 'none'
+          });
+        }
+      });
+
+      this.scrollTriggers.push(trigger);
+    });
   }
 
   /**
@@ -81,17 +115,14 @@ export class ServicosAnimationService {
     cardElements.forEach((card) => {
       const handleMouseEnter = () => {
         if (this.prefersReducedMotion) {
-          card.classList.add('hover-reduced');
+          gsap.to(card, { scale: 1.02, duration: 0.3 });
         } else {
-          card.classList.add('magnetic-hover-active');
+          gsap.to(card, { scale: 1.05, y: -8, duration: 0.4, ease: 'power2.out' });
         }
       };
 
       const handleMouseLeave = () => {
-        card.classList.remove('magnetic-hover-active', 'hover-reduced');
-        card.style.setProperty('--card-rotate-x', '0deg');
-        card.style.setProperty('--card-rotate-y', '0deg');
-        card.style.setProperty('--card-translate-x', '0px');
+        gsap.to(card, { scale: 1, y: 0, duration: 0.4, ease: 'power2.out' });
       };
 
       const handleMouseMove = (event: MouseEvent) => {
@@ -105,13 +136,17 @@ export class ServicosAnimationService {
         const deltaX = (event.clientX - centerX) / (rect.width / 2);
         const deltaY = (event.clientY - centerY) / (rect.height / 2);
 
-        card.style.setProperty('--card-rotate-x', `${deltaY * -3}deg`);
-        card.style.setProperty('--card-rotate-y', `${deltaX * 3}deg`);
-        card.style.setProperty('--card-translate-x', `${deltaX * 4}px`);
+        gsap.to(card, {
+          rotationX: deltaY * -3,
+          rotationY: deltaX * 3,
+          x: deltaX * 4,
+          duration: 0.3,
+          ease: 'power2.out'
+        });
       };
 
       const handleTouchStart = () => {
-        card.classList.add('touch-active');
+        gsap.to(card, { scale: 1.02, duration: 0.2 });
 
         if (navigator.vibrate) {
           navigator.vibrate(50);
@@ -119,7 +154,7 @@ export class ServicosAnimationService {
       };
 
       const handleTouchEnd = () => {
-        card.classList.remove('touch-active');
+        gsap.to(card, { scale: 1, duration: 0.3 });
       };
 
       card.addEventListener('mouseenter', handleMouseEnter);
@@ -142,11 +177,10 @@ export class ServicosAnimationService {
 
   /**
    * Create scroll-based section snapping with vanilla CSS adjustments
-   * DISABLED: Causing flickering issues
+   * DISABLED per user request - no automatic snapping
    */
   createSectionSnapping(): void {
-    // Snap behavior disabled to prevent flickering
-    // The section will scroll normally without snap effects
+    // Snap behavior disabled per user request
     return;
   }
 
@@ -154,8 +188,8 @@ export class ServicosAnimationService {
    * Destroy all animations and clean up
    */
   destroy(): void {
-    this.observers.forEach((observer) => observer.disconnect());
-    this.observers = [];
+    this.scrollTriggers.forEach((trigger) => trigger.kill());
+    this.scrollTriggers = [];
 
     this.cleanupFns.forEach((cleanup) => cleanup());
     this.cleanupFns = [];

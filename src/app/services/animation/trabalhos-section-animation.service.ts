@@ -1,5 +1,7 @@
 import { Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 @Injectable({ providedIn: 'root' })
 export class TrabalhosSectionAnimationService {
@@ -8,14 +10,13 @@ export class TrabalhosSectionAnimationService {
   private prefersReducedMotion = false;
   private isPinned = false;
   private disposers: Array<() => void> = [];
+  private scrollTriggers: ScrollTrigger[] = [];
   public scrollProgress = 0;
   private currentRingComponent: any = null;
   private sectionEl: HTMLElement | null = null;
   private ringEl: HTMLElement | null = null;
   private titleEl: HTMLElement | null = null;
   private hintEl: HTMLElement | null = null;
-  private entranceObserver: IntersectionObserver | null = null;
-  private exitObserver: IntersectionObserver | null = null;
   private rafId: number | null = null;
   private momentumId: number | null = null;
   private isDragging = false;
@@ -30,6 +31,7 @@ export class TrabalhosSectionAnimationService {
     this.isBrowser = isPlatformBrowser(this.platformId);
     if (this.isBrowser) {
       this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      gsap.registerPlugin(ScrollTrigger);
     }
   }
 
@@ -124,26 +126,62 @@ export class TrabalhosSectionAnimationService {
   }
 
   createRingEntrance(): void {
-    if (!this.isBrowser || this.prefersReducedMotion) return;
+    if (!this.isBrowser) return;
+    
     const ringContainer = document.querySelector('#trabalhos .ring-container') as HTMLElement | null;
     const title = document.querySelector('#trabalhos h3') as HTMLElement | null;
     const hint = document.querySelector('#trabalhos .drag-hint') as HTMLElement | null;
-    if (!ringContainer || !title) return;
-    ringContainer.classList.add('enter-init');
-    title.classList.add('enter-init-title');
-    if (hint) hint.classList.add('enter-init-hint');
-    this.entranceObserver = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          title.classList.add('enter-play-title');
-          ringContainer.classList.add('enter-play');
-          if (hint) hint.classList.add('enter-play-hint');
-          this.entranceObserver?.disconnect();
+    const section = document.querySelector('#trabalhos') as HTMLElement | null;
+    
+    if (!ringContainer || !title || !section) return;
+
+    if (this.prefersReducedMotion) {
+      // For reduced motion, show immediately
+      gsap.set([ringContainer, title, hint].filter(Boolean), { opacity: 1, y: 0, scale: 1 });
+      return;
+    }
+
+    // Set initial state - elements are visible but transformed
+    gsap.set(ringContainer, { opacity: 1, scale: 0.8, y: 50 });
+    gsap.set(title, { opacity: 1, y: 30 });
+    if (hint) gsap.set(hint, { opacity: 1, y: 20 });
+
+    // Create scroll-triggered entrance animation
+    const trigger = ScrollTrigger.create({
+      trigger: section,
+      start: 'top bottom-=100',
+      end: 'top center',
+      scrub: 1,
+      onUpdate: (self) => {
+        const progress = self.progress;
+        
+        // Animate ring container
+        gsap.to(ringContainer, {
+          scale: 0.8 + (0.2 * progress),
+          y: 50 * (1 - progress),
+          duration: 0.1,
+          ease: 'none'
+        });
+        
+        // Animate title
+        gsap.to(title, {
+          y: 30 * (1 - progress),
+          duration: 0.1,
+          ease: 'none'
+        });
+        
+        // Animate hint
+        if (hint) {
+          gsap.to(hint, {
+            y: 20 * (1 - progress),
+            duration: 0.1,
+            ease: 'none'
+          });
         }
-      });
-    }, { root: null, threshold: 0.2 });
-    this.entranceObserver.observe(document.querySelector('#trabalhos') as Element);
-    this.disposers.push(() => this.entranceObserver?.disconnect());
+      }
+    });
+
+    this.scrollTriggers.push(trigger);
   }
 
   enhanceRingInteractions(workCardRingComponent: any): void {
@@ -332,18 +370,8 @@ export class TrabalhosSectionAnimationService {
   private prepareForTransition(): void {}
 
   createExitTransition(): void {
-    if (!this.isBrowser || this.prefersReducedMotion) return;
-    const target = document.querySelector('#trabalhos') as HTMLElement | null;
-    if (!target) return;
-    this.exitObserver = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (!entry.isIntersecting && entry.boundingClientRect.top < 0) {
-        } else if (entry.isIntersecting) {
-        }
-      });
-    }, { root: null, threshold: [0, 1] });
-    this.exitObserver.observe(target);
-    this.disposers.push(() => this.exitObserver?.disconnect());
+    // Exit transition disabled - scroll-driven animations handle this naturally
+    return;
   }
 
   getIsPinned(): boolean {
@@ -353,8 +381,8 @@ export class TrabalhosSectionAnimationService {
   destroy(): void {
     this.disposers.forEach(fn => fn());
     this.disposers = [];
-    if (this.entranceObserver) this.entranceObserver.disconnect();
-    if (this.exitObserver) this.exitObserver.disconnect();
+    this.scrollTriggers.forEach(trigger => trigger.kill());
+    this.scrollTriggers = [];
     if (this.rafId) cancelAnimationFrame(this.rafId);
     if (this.momentumId) cancelAnimationFrame(this.momentumId);
     this.isPinned = false;
