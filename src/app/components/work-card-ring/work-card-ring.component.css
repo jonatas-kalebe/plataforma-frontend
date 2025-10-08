@@ -1,14 +1,22 @@
+/**
+ * Import responsive design tokens for 3D card ring
+ * Tokens include: --ring-viewport, --card-w, --card-h, --ring-perspective, --ring-font-size
+ * Breakpoints: 600px, 640px, 768px, 1024px (mobile-first)
+ */
+@import '../../../styles/ring-tokens.css';
+
 :host {
-  --card-w: clamp(160px, 40vmin, 240px);
-  --card-h: calc(var(--card-w) * 0.6);
-  --ring-viewport: clamp(260px, 80vmin, 320px);
-  --font-size: clamp(0.875rem, 2.8vmin, 1.1rem);
   display: block;
   overflow: hidden; /* Prevent any scrollbars on the host element */
 }
 
+/**
+ * Ring wrapper - provides 3D perspective for the card ring
+ * Uses --ring-perspective token from ring-tokens.css
+ * Fallback: 1200px for browsers that don't support CSS custom properties
+ */
 .ring-wrap {
-  perspective: var(--perspective, 1200px);
+  perspective: var(--ring-perspective, 1200px);
   display: grid;
   place-items: center;
   width: 100%;
@@ -18,6 +26,10 @@
   touch-action: pan-y;
 }
 
+/**
+ * Ring container - 3D transform container for cards
+ * Uses responsive tokens: --ring-viewport (width/height)
+ */
 .ring {
   position: relative;
   transform-style: preserve-3d;
@@ -32,6 +44,11 @@
 
 .ring:active { cursor: grabbing; }
 
+/**
+ * Individual work card positioning
+ * Uses tokens: --card-w, --card-h for responsive sizing
+ * Cards are centered using negative margins based on token values
+ */
 .work-card {
   position: absolute;
   top: 50%;
@@ -43,6 +60,11 @@
   will-change: transform;
 }
 
+/**
+ * Work card inner content styling
+ * Uses responsive tokens: --card-w, --card-h, --ring-font-size
+ * Maintains 5:3 aspect ratio via --card-h calculation
+ */
 .work-card-inner {
   width: var(--card-w);
   height: var(--card-h);
@@ -52,7 +74,7 @@
   border: 2px solid #64ffda;
   color: #ccd6f6;
   border-radius: 1rem;
-  font-size: var(--font-size);
+  font-size: var(--ring-font-size);
   font-weight: 700;
   overflow: hidden;
   box-shadow:
@@ -89,45 +111,42 @@
   transform: rotateY(var(--inner-flip, 0deg)) scale(1.02);
 }
 
+/**
+ * WCAG 2.1 Level AA: Respect user motion preferences
+ * Disables animations for users with vestibular disorders or motion sensitivity
+ */
 @media (prefers-reduced-motion: reduce) {
   .work-card-inner { transition: none; }
 }
 
+/**
+ * RESPONSIVE ADJUSTMENTS
+ * Note: Base tokens (--ring-viewport, --card-w, --card-h, --ring-font-size) 
+ * are defined in ring-tokens.css with mobile-first breakpoints:
+ * - Base: < 600px
+ * - 600px: Small tablets
+ * - 640px: Landscape mobile
+ * - 768px: Tablets (md)
+ * - 1024px: Desktop (lg)
+ * 
+ * These component-specific rules only adjust layout height
+ */
+
+/**
+ * Tablet breakpoint (768px) - Adjust ring wrapper height
+ * Tokens --card-w, --ring-viewport already scaled by ring-tokens.css
+ */
 @media (min-width: 768px) {
-  :host {
-    --card-w: clamp(200px, 35vmin, 240px);
-    --font-size: clamp(1rem, 2.5vmin, 1.1rem);
-  }
-  .ring-wrap { height: clamp(320px, 70vmin, 420px); }
-}
-
-/* Landscape mobile optimizations to prevent scrollbars */
-@media (max-width: 896px) and (orientation: landscape) {
-  :host {
-    --card-w: clamp(140px, 35vmin, 200px);
-    --card-h: calc(var(--card-w) * 0.6);
-    --ring-viewport: clamp(220px, 70vmin, 280px);
-    --font-size: clamp(0.75rem, 2.5vmin, 0.95rem);
-  }
-  
-  .ring-wrap {
-    height: clamp(200px, 60vmin, 300px);
-    overflow: hidden;
-  }
-  
-  .work-card-inner {
-    padding: 0.5rem;
-    font-size: var(--font-size);
+  .ring-wrap { 
+    height: clamp(320px, 70vmin, 420px); 
   }
 }
 
-/* Extra small screens - ensure no scrollbars */
+/**
+ * Extra small screens (≤480px) - Adjust ring wrapper height
+ * Prevents scrollbars on very small mobile devices
+ */
 @media (max-width: 480px) {
-  :host {
-    --card-w: clamp(140px, 38vmin, 200px);
-    --font-size: clamp(0.8rem, 2.6vmin, 1rem);
-  }
-  
   .ring-wrap {
     height: clamp(240px, 75vmin, 360px);
     overflow: hidden;
