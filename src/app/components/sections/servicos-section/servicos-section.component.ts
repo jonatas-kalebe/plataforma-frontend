@@ -86,16 +86,16 @@ export class ServicosSectionComponent implements AfterViewInit, OnDestroy {
         this.servicosAnimation.createStaggeredEntrance(cards);
       }
 
-      // Create subtle parallax effect
-      this.servicosAnimation.createParallaxEffect(cards);
+      // Parallax effect disabled - conflicts with entrance animation
+      // this.servicosAnimation.createParallaxEffect(cards);
 
       // Create magnetic hover effects
       if (this.enableCardHover) {
         this.servicosAnimation.createMagneticHover(cards);
       }
 
-      // Create section snapping behavior
-      this.servicosAnimation.createSectionSnapping();
+      // Section snapping disabled per user request
+      // this.servicosAnimation.createSectionSnapping();
     }
   }
 
