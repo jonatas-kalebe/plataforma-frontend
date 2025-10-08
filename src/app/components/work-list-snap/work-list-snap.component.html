@@ -1,0 +1,59 @@
+<div 
+  class="work-list-snap-container"
+  [attr.aria-label]="getContainerAriaLabel()"
+  role="region"
+  aria-roledescription="lista de projetos com rolagem horizontal"
+  tabindex="0">
+  
+  <div 
+    #scrollContainer
+    class="scroll-container"
+    role="list">
+    
+    <article
+      *ngFor="let item of items; let i = index; trackBy: trackByItem"
+      class="snap-item"
+      [attr.data-index]="i"
+      [attr.aria-label]="getItemAriaLabel(i)"
+      [attr.aria-posinset]="i + 1"
+      [attr.aria-setsize]="items.length"
+      role="listitem"
+      tabindex="0"
+      (click)="onItemClick(item, $event)"
+      (keydown.enter)="onItemClick(item, $event)"
+      (keydown.space)="onItemClick(item, $event)">
+      
+      <div class="item-image-wrapper">
+        <img
+          *ngIf="item.imageUrl"
+          lazyImg
+          [src]="item.imageUrl"
+          [alt]="item.title"
+          class="item-image"
+          width="400"
+          height="300">
+        
+        <div 
+          *ngIf="!item.imageUrl"
+          class="item-placeholder"
+          [attr.aria-label]="'Placeholder para ' + item.title">
+          <span class="placeholder-icon" aria-hidden="true">🎨</span>
+        </div>
+      </div>
+      
+      <div class="item-content">
+        <h3 class="item-title">{{ item.title }}</h3>
+        <p 
+          *ngIf="item.description"
+          class="item-description">
+          {{ item.description }}
+        </p>
+      </div>
+    </article>
+  </div>
+  
+  <!-- Screen reader instructions -->
+  <div class="sr-only" aria-live="polite" aria-atomic="true">
+    Use as setas do teclado para navegar entre os itens
+  </div>
+</div>
