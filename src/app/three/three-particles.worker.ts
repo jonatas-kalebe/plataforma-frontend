@@ -197,8 +197,8 @@ function handleStep(message: StepMessage): void {
     velocities,
   };
 
-  // Transfer ownership of arrays for zero-copy communication
-  self.postMessage(response, [positions.buffer, velocities.buffer]);
+  // Don't transfer - worker needs to keep the arrays for next frame
+  self.postMessage(response);
 }
 
 /**
