@@ -62,7 +62,8 @@ const DEFAULT_CONFIG: GestureConfig = {
  * 
  * Usage:
  * ```typescript
- * const service = new RingGestureService(config);
+ * const service = inject(RingGestureService);
+ * service.configure({ gestureThreshold: 10 });
  * 
  * service.gestureData$.subscribe(data => {
  *   console.log(data.state, data.velocity);
@@ -102,8 +103,8 @@ export class RingGestureService {
    */
   public readonly gestureData$: Observable<GestureData> = this.gestureDataSubject.asObservable();
   
-  constructor(config?: Partial<GestureConfig>) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+  constructor() {
+    this.config = { ...DEFAULT_CONFIG };
   }
   
   /**

@@ -25,10 +25,10 @@ import { RingGestureService } from './services/ring-gesture.service';
 
 ## Basic Usage
 
-### 1. Inject or Create Service
+### 1. Inject the Service
 
 ```typescript
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { RingGestureService, SyntheticPointerEvent } from './services/ring-gesture.service';
 
 @Component({
@@ -43,7 +43,7 @@ import { RingGestureService, SyntheticPointerEvent } from './services/ring-gestu
   `
 })
 export class MyComponent implements OnInit {
-  private gestureService = new RingGestureService();
+  private gestureService = inject(RingGestureService);
   
   ngOnInit() {
     // Subscribe to gesture events
@@ -83,11 +83,17 @@ export class MyComponent implements OnInit {
 ### 2. Custom Configuration
 
 ```typescript
-const gestureService = new RingGestureService({
-  gestureThreshold: 10,      // Pixels to move before gesture detection
-  horizontalBias: 1.5,       // Favor horizontal gestures
-  velocityWindowSize: 8,     // Larger smoothing window
-});
+// Inject the service
+private gestureService = inject(RingGestureService);
+
+ngOnInit() {
+  // Configure after injection
+  this.gestureService.configure({
+    gestureThreshold: 10,      // Pixels to move before gesture detection
+    horizontalBias: 1.5,       // Favor horizontal gestures
+    velocityWindowSize: 8,     // Larger smoothing window
+  });
+}
 ```
 
 ### 3. Runtime Configuration Updates
@@ -189,11 +195,11 @@ interface GestureConfig {
 
 ### Methods
 
-#### `constructor(config?: Partial<GestureConfig>)`
-Create a new gesture service instance with optional configuration.
+#### `constructor()`
+Create a new gesture service instance. When used as an Angular Injectable, the service is automatically instantiated by the DI system.
 
 #### `configure(config: Partial<GestureConfig>): void`
-Update configuration at runtime.
+Update configuration at runtime. Use this to customize the service after injection.
 
 #### `getConfig(): Readonly<GestureConfig>`
 Get current configuration (immutable copy).
