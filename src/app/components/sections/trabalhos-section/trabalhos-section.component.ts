@@ -6,13 +6,14 @@
 import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { WorkCardRingComponent } from '../../work-card-ring/work-card-ring.component';
+import { IoVisibleDirective } from '../../../directives/io-visible.directive';
 import { SECTION_IDS } from '../../../shared/constants/section.constants';
 import { TrabalhosSectionAnimationService } from '../../../services/animation/trabalhos-section-animation.service';
 
 @Component({
   selector: 'app-trabalhos-section',
   standalone: true,
-  imports: [CommonModule, WorkCardRingComponent],
+  imports: [CommonModule, WorkCardRingComponent, IoVisibleDirective],
   templateUrl: './trabalhos-section.component.html',
   styleUrls: ['./trabalhos-section.component.css']
 })
@@ -61,26 +62,36 @@ export class TrabalhosSectionComponent implements AfterViewInit, OnDestroy {
    * Initialize all animations for the trabalhos section
    */
   private initializeAnimations(): void {
-    // Create entrance animation for the ring
-    this.trabalhosSectionAnimation.createRingEntrance();
-    
     // Register ring component for scroll updates
     if (this.workCardRing) {
       this.trabalhosSectionAnimation.setRingComponent(this.workCardRing);
     }
     
-    // Create pinned section behavior if enabled
-    if (this.enablePinning) {
-      this.trabalhosSectionAnimation.createPinnedSection();
+    // Register section element for scroll-based pinned behavior
+    if (this.sectionElement && this.enablePinning) {
+      this.trabalhosSectionAnimation.registerSectionElement(this.sectionElement.nativeElement);
     }
     
     // Enhance ring interactions
     if (this.workCardRing) {
       this.trabalhosSectionAnimation.enhanceRingInteractions(this.workCardRing);
     }
-    
-    // Create exit transition
-    this.trabalhosSectionAnimation.createExitTransition();
+  }
+
+  /**
+   * Handle intersection observer entrance
+   * Called by IoVisibleDirective when section enters viewport
+   */
+  onSectionEnter(): void {
+    this.trabalhosSectionAnimation.onIntersectionEnter();
+  }
+
+  /**
+   * Handle intersection observer exit
+   * Called by IoVisibleDirective when section exits viewport
+   */
+  onSectionLeave(): void {
+    this.trabalhosSectionAnimation.onIntersectionLeave();
   }
 
   // Constants

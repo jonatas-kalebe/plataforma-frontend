@@ -1,104 +1,151 @@
 import { Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
+import { Subject, fromEvent, takeUntil } from 'rxjs';
+import { ReducedMotionService } from '../reduced-motion.service';
+import { HapticsService } from '../haptics.service';
+import { FeatureFlagsService } from '../feature-flags.service';
 
+/**
+ * Refactored TrabalhosSectionAnimationService
+ * SSR-safe, decoupled from DOM, event-driven architecture
+ * 
+ * Key improvements:
+ * - Zero direct DOM access (querySelector, document access)
+ * - Uses IoVisibleDirective events via component callbacks
+ * - Integrated with ReducedMotionService for accessibility
+ * - Integrated with HapticsService for tactile feedback
+ * - Integrated with FeatureFlagsService for feature gating
+ * - RxJS-based cleanup with takeUntil pattern
+ * - SSR-safe with proper platform checks
+ * 
+ * @see https://angular.dev/guide/universal
+ * @see https://angular.dev/best-practices/a11y
+ */
 @Injectable({ providedIn: 'root' })
 export class TrabalhosSectionAnimationService {
   private readonly platformId = inject(PLATFORM_ID);
-  private isBrowser: boolean;
+  private readonly reducedMotionService = inject(ReducedMotionService);
+  private readonly hapticsService = inject(HapticsService);
+  private readonly featureFlagsService = inject(FeatureFlagsService);
+  
+  private readonly isBrowser: boolean;
   private prefersReducedMotion = false;
+  private hapticsEnabled = false;
+  private destroy$ = new Subject<void>();
+  
+  // Animation state
   private isPinned = false;
-  private disposers: Array<() => void> = [];
   public scrollProgress = 0;
   private currentRingComponent: any = null;
-  private sectionEl: HTMLElement | null = null;
-  private ringEl: HTMLElement | null = null;
-  private titleEl: HTMLElement | null = null;
-  private hintEl: HTMLElement | null = null;
-  private entranceObserver: IntersectionObserver | null = null;
-  private exitObserver: IntersectionObserver | null = null;
+  
+  // Drag state
+  private isDragging = false;
+  private dragVelocity = 0;
+  
+  // RAF handles
   private rafId: number | null = null;
   private momentumId: number | null = null;
-  private isDragging = false;
-  private dragLastX = 0;
-  private dragVelocity = 0;
-  private dragLastTs = 0;
-  private sectionStartY = 0;
-  private viewportH = 0;
-  private lastPinnedState = false;
 
   constructor() {
     this.isBrowser = isPlatformBrowser(this.platformId);
+    
+    // Subscribe to reduced motion preference changes
     if (this.isBrowser) {
-      this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      this.reducedMotionService.getPrefersReducedMotion()
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(prefersReduced => {
+          this.prefersReducedMotion = prefersReduced;
+        });
+      
+      // Check haptics feature flag
+      this.hapticsEnabled = this.featureFlagsService.isHapticsEnabled();
+    } else {
+      // SSR: default to reduced motion
+      this.prefersReducedMotion = true;
+      this.hapticsEnabled = false;
     }
   }
 
-  createPinnedSection(): void {
+  /**
+   * Register section element for scroll-based animations
+   * Called by component with element reference
+   */
+  registerSectionElement(element: HTMLElement): void {
     if (!this.isBrowser || this.prefersReducedMotion) return;
-    this.sectionEl = document.querySelector('#trabalhos');
-    this.ringEl = document.querySelector('#trabalhos .ring');
-    this.titleEl = document.querySelector('#trabalhos h3');
-    this.hintEl = document.querySelector('#trabalhos .drag-hint');
-    if (!this.sectionEl) return;
-    const recalc = () => {
-      const rect = this.sectionEl!.getBoundingClientRect();
-      this.viewportH = window.innerHeight;
-      this.sectionStartY = window.scrollY + rect.top;
-    };
-    recalc();
-    const onResize = () => recalc();
-    const onScroll = () => {
-      if (this.rafId) cancelAnimationFrame(this.rafId);
-      this.rafId = requestAnimationFrame(() => this.handleScroll());
-    };
-    window.addEventListener('resize', onResize, { passive: true });
-    window.addEventListener('scroll', onScroll, { passive: true });
-    this.disposers.push(() => window.removeEventListener('resize', onResize));
-    this.disposers.push(() => window.removeEventListener('scroll', onScroll));
-    this.handleScroll();
+    
+    // Listen for scroll events via RxJS
+    fromEvent(window, 'scroll', { passive: true })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        if (this.rafId) cancelAnimationFrame(this.rafId);
+        this.rafId = requestAnimationFrame(() => this.handleScroll(element));
+      });
+    
+    // Listen for resize events
+    fromEvent(window, 'resize', { passive: true })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        // Recalculate positions on resize
+        if (this.rafId) cancelAnimationFrame(this.rafId);
+        this.rafId = requestAnimationFrame(() => this.handleScroll(element));
+      });
+    
+    // Initial scroll calculation
+    this.handleScroll(element);
   }
 
+  /**
+   * Register ring component
+   * Called by component to provide reference
+   */
   setRingComponent(ringComponent: any): void {
     this.currentRingComponent = ringComponent;
-    const el = ringComponent?.ringRef?.nativeElement as HTMLElement | undefined;
-    if (el) this.ringEl = el;
   }
 
-  private handleScroll(): void {
-    if (!this.sectionEl) return;
+  /**
+   * Handle scroll for section element
+   * Element is passed from component, no DOM queries
+   */
+  private handleScroll(sectionEl: HTMLElement): void {
+    if (!sectionEl) return;
+    
+    const rect = sectionEl.getBoundingClientRect();
+    const viewportH = window.innerHeight;
     const y = window.scrollY;
-    const start = this.sectionStartY;
-    const end = start + this.viewportH;
+    const sectionStartY = y + rect.top;
+    const start = sectionStartY;
+    const end = start + viewportH;
     const progress = Math.max(0, Math.min(1, (y - start) / (end - start)));
     const pinnedNow = y >= start && y < end;
-    if (pinnedNow !== this.lastPinnedState) {
-      this.lastPinnedState = pinnedNow;
-      if (pinnedNow) {
-        this.isPinned = true;
-        this.showInteractionHints();
-      } else {
-        this.isPinned = false;
-        this.hideInteractionHints();
-      }
+    
+    // Track pinned state changes
+    if (pinnedNow !== this.isPinned) {
+      this.isPinned = pinnedNow;
+      // State changed - components can handle UI updates
     }
+    
     if (this.isDragging) return;
+    
     this.scrollProgress = progress;
     this.updateRingScrollProgress(progress);
+    
     const totalRotation = progress * 720;
     const snapAngle = 45;
     const mod = ((totalRotation % snapAngle) + snapAngle) % snapAngle;
     const isNearSnap = mod < 15 || mod > 30;
+    
     if (progress > 0.45 && progress < 0.55 && isNearSnap) {
       const snappedRotation = Math.round(totalRotation / snapAngle) * snapAngle;
       this.applyRingRotation(snappedRotation, true);
     } else {
       this.applyRingRotation(totalRotation, false);
     }
-    if (progress > 0.9) {
-      this.prepareForTransition();
-    }
   }
 
+  /**
+   * Update ring component rotation via component reference
+   * No direct DOM manipulation
+   */
   private updateRingScrollProgress(progress: number): void {
     if (this.currentRingComponent && typeof this.currentRingComponent === 'object') {
       if ('scrollProgress' in this.currentRingComponent) {
@@ -111,252 +158,208 @@ export class TrabalhosSectionAnimationService {
     }
   }
 
+  /**
+   * Apply rotation to ring element (passed from component)
+   */
   private applyRingRotation(rotation: number, isSnapped: boolean): void {
-    if (!this.ringEl) this.ringEl = document.querySelector('#trabalhos .ring');
-    const ring = this.ringEl;
-    if (!ring) return;
-    if (isSnapped) {
-      ring.classList.add('snap-transition');
-    } else {
-      ring.classList.remove('snap-transition');
+    if (this.currentRingComponent && 'applyRotation' in this.currentRingComponent) {
+      this.currentRingComponent.applyRotation(rotation, isSnapped);
     }
-    ring.style.setProperty('--rotation', `${-rotation}deg`);
   }
 
-  createRingEntrance(): void {
+  /**
+   * Handle intersection observer entrance event
+   * Called by component when section enters viewport
+   */
+  onIntersectionEnter(): void {
     if (!this.isBrowser || this.prefersReducedMotion) return;
-    const ringContainer = document.querySelector('#trabalhos .ring-container') as HTMLElement | null;
-    const title = document.querySelector('#trabalhos h3') as HTMLElement | null;
-    const hint = document.querySelector('#trabalhos .drag-hint') as HTMLElement | null;
-    if (!ringContainer || !title) return;
-    ringContainer.classList.add('enter-init');
-    title.classList.add('enter-init-title');
-    if (hint) hint.classList.add('enter-init-hint');
-    this.entranceObserver = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          title.classList.add('enter-play-title');
-          ringContainer.classList.add('enter-play');
-          if (hint) hint.classList.add('enter-play-hint');
-          this.entranceObserver?.disconnect();
-        }
-      });
-    }, { root: null, threshold: 0.2 });
-    this.entranceObserver.observe(document.querySelector('#trabalhos') as Element);
-    this.disposers.push(() => this.entranceObserver?.disconnect());
+    // Animation logic handled by CSS classes in component
+    // Service just tracks state
   }
 
+  /**
+   * Handle intersection observer exit event
+   * Called by component when section exits viewport
+   */
+  onIntersectionLeave(): void {
+    if (!this.isBrowser || this.prefersReducedMotion) return;
+    // Animation logic handled by CSS classes in component
+    // Service just tracks state
+  }
+
+  /**
+   * Enhance ring interactions with drag handlers
+   * Uses component's interaction bridge pattern
+   */
   enhanceRingInteractions(workCardRingComponent: any): void {
     if (!this.isBrowser || !workCardRingComponent) return;
-    const ringElement: HTMLElement | null = workCardRingComponent.ringRef?.nativeElement ?? document.querySelector('#trabalhos .ring');
-    if (!ringElement) return;
-    this.ringEl = ringElement;
-    ringElement.style.cursor = 'grab';
-
+    
+    // Use interaction bridge if available (preferred pattern)
     if (typeof workCardRingComponent.registerInteractionBridge === 'function') {
       workCardRingComponent.registerInteractionBridge({
         onDragStart: () => {
-          this.isDragging = true;
-          workCardRingComponent.isDragging = true;
-          ringElement.style.cursor = 'grabbing';
-          ringElement.classList.add('ring-dragging');
-          if (navigator.vibrate) navigator.vibrate(30);
+          this.handleDragStart(workCardRingComponent);
         },
         onDragMove: (rotation: number, velocity: number) => {
-          this.dragVelocity = velocity;
-          if (this.currentRingComponent && 'rotationDeg' in this.currentRingComponent) {
-            this.currentRingComponent.rotationDeg = rotation;
-          }
-          ringElement.classList.remove('snap-transition');
-          ringElement.style.setProperty('--rotation', `${-rotation}deg`);
+          this.handleDragMove(rotation, velocity);
         },
         onDragEnd: (velocity: number) => {
-          this.isDragging = false;
-          workCardRingComponent.isDragging = false;
-          this.dragVelocity = velocity;
-          ringElement.style.cursor = 'grab';
-          ringElement.classList.remove('ring-dragging');
-          if (navigator.vibrate) navigator.vibrate(20);
+          this.handleDragEnd(workCardRingComponent, velocity);
         },
         onActiveIndexChange: (index: number) => {
-          this.highlightActiveCard(index);
-          if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+          this.handleActiveIndexChange(index);
         }
       });
-
-      this.disposers.push(() => {
-        workCardRingComponent.registerInteractionBridge(null);
-      });
-
-      return;
     }
-
-    const onPointerDown = (ev: PointerEvent) => {
-      this.isDragging = true;
-      workCardRingComponent.isDragging = true;
-      ringElement.setPointerCapture(ev.pointerId);
-      ringElement.style.cursor = 'grabbing';
-      this.dragLastX = ev.clientX;
-      this.dragLastTs = performance.now();
-      this.dragVelocity = 0;
-      ringElement.classList.add('ring-dragging');
-      if (navigator.vibrate) navigator.vibrate(30);
-    };
-    const onPointerMove = (ev: PointerEvent) => {
-      if (!this.isDragging) return;
-      const now = performance.now();
-      const dx = ev.clientX - this.dragLastX;
-      const dt = Math.max(16, now - this.dragLastTs);
-      const sensitivity = 0.5;
-      const deltaDeg = dx * sensitivity;
-      const curr = this.currentRingComponent?.rotationDeg ?? 0;
-      const next = curr + deltaDeg;
-      if (this.currentRingComponent && 'rotationDeg' in this.currentRingComponent) {
-        this.currentRingComponent.rotationDeg = next;
-      }
-      ringElement.classList.remove('snap-transition');
-      ringElement.style.setProperty('--rotation', `${-next}deg`);
-      this.dragVelocity = (dx / dt) * sensitivity * 16;
-      this.dragLastX = ev.clientX;
-      this.dragLastTs = now;
-    };
-    const endDrag = () => {
-      if (!this.isDragging) return;
-      this.isDragging = false;
-      workCardRingComponent.isDragging = false;
-      ringElement.style.cursor = 'grab';
-      ringElement.classList.remove('ring-dragging');
-      if (navigator.vibrate) navigator.vibrate(20);
-      this.startMomentum();
-    };
-    ringElement.addEventListener('pointerdown', onPointerDown);
-    ringElement.addEventListener('pointermove', onPointerMove);
-    ringElement.addEventListener('pointerup', endDrag);
-    ringElement.addEventListener('pointercancel', endDrag);
-    ringElement.addEventListener('mouseleave', endDrag);
-    const originalActiveIndexChange = workCardRingComponent.activeIndexChange;
-    workCardRingComponent.activeIndexChange = {
-      emit: (index: number) => {
-        this.highlightActiveCard(index);
-        if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-        if (originalActiveIndexChange) originalActiveIndexChange.emit(index);
-      }
-    };
-    this.disposers.push(() => {
-      ringElement.removeEventListener('pointerdown', onPointerDown);
-      ringElement.removeEventListener('pointermove', onPointerMove);
-      ringElement.removeEventListener('pointerup', endDrag);
-      ringElement.removeEventListener('pointercancel', endDrag);
-      ringElement.removeEventListener('mouseleave', endDrag);
-    });
   }
 
+  /**
+   * Handle drag start
+   */
+  private handleDragStart(component: any): void {
+    this.isDragging = true;
+    if (component) {
+      component.isDragging = true;
+    }
+    
+    // Haptic feedback for drag start
+    if (this.hapticsEnabled && this.hapticsService.isHapticsSupported()) {
+      this.hapticsService.vibrate(this.hapticsService.patterns.light);
+    }
+  }
+
+  /**
+   * Handle drag move
+   */
+  private handleDragMove(rotation: number, velocity: number): void {
+    this.dragVelocity = velocity;
+    if (this.currentRingComponent && 'rotationDeg' in this.currentRingComponent) {
+      this.currentRingComponent.rotationDeg = rotation;
+    }
+  }
+
+  /**
+   * Handle drag end
+   */
+  private handleDragEnd(component: any, velocity: number): void {
+    this.isDragging = false;
+    if (component) {
+      component.isDragging = false;
+    }
+    this.dragVelocity = velocity;
+    
+    // Haptic feedback for drag end
+    if (this.hapticsEnabled && this.hapticsService.isHapticsSupported()) {
+      this.hapticsService.vibrate(this.hapticsService.patterns.selection);
+    }
+    
+    // Start momentum scroll
+    this.startMomentum();
+  }
+
+  /**
+   * Handle active index change
+   */
+  private handleActiveIndexChange(index: number): void {
+    // Haptic feedback for snap
+    if (this.hapticsEnabled && this.hapticsService.isHapticsSupported()) {
+      this.hapticsService.vibrate(this.hapticsService.patterns.snap);
+    }
+  }
+
+  /**
+   * Start momentum animation after drag
+   */
   private startMomentum(): void {
     if (this.momentumId) cancelAnimationFrame(this.momentumId);
+    
     const friction = 0.92;
     const step = () => {
       if (Math.abs(this.dragVelocity) < 0.05) {
         this.snapToNearestCard();
         return;
       }
+      
       const curr = this.currentRingComponent?.rotationDeg ?? 0;
       const next = curr + this.dragVelocity;
+      
       if (this.currentRingComponent && 'rotationDeg' in this.currentRingComponent) {
         this.currentRingComponent.rotationDeg = next;
       }
-      if (this.ringEl) {
-        this.ringEl.style.setProperty('--rotation', `${-next}deg`);
-      }
+      
       this.dragVelocity *= friction;
       this.momentumId = requestAnimationFrame(step);
     };
+    
     this.momentumId = requestAnimationFrame(step);
   }
 
-  private highlightActiveCard(index: number): void {
-    const cards = document.querySelectorAll('#trabalhos .work-card');
-    cards.forEach((card, i) => {
-      const el = card as HTMLElement;
-      if (i === index) {
-        el.classList.add('card-active');
-        el.classList.remove('card-inactive');
-      } else {
-        el.classList.remove('card-active');
-        el.classList.add('card-inactive');
-      }
-    });
-  }
-
-  private showInteractionHints(): void {
-    const hint = document.querySelector('#trabalhos .drag-hint') as HTMLElement | null;
-    if (!hint) return;
-    hint.classList.add('hint-on');
-  }
-
-  private hideInteractionHints(): void {
-    const hint = document.querySelector('#trabalhos .drag-hint') as HTMLElement | null;
-    if (!hint) return;
-    hint.classList.remove('hint-on');
-  }
-
+  /**
+   * Snap to nearest card position
+   */
   private snapToNearestCard(): void {
     if (!this.currentRingComponent || this.prefersReducedMotion) return;
+    
     const currentRotation = this.currentRingComponent.rotationDeg || 0;
     const cardAngle = 45;
     const nearestCardIndex = Math.round(-currentRotation / cardAngle);
     const targetRotation = -nearestCardIndex * cardAngle;
+    
     const start = currentRotation;
     const duration = 800;
     const startTs = performance.now();
     const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+    
     const animate = () => {
       const now = performance.now();
       const t = Math.min(1, (now - startTs) / duration);
       const eased = easeOut(t);
       const val = start + (targetRotation - start) * eased;
-      this.currentRingComponent.rotationDeg = val;
-      if (this.ringEl) {
-        this.ringEl.classList.add('snap-transition');
-        this.ringEl.style.setProperty('--rotation', `${-val}deg`);
+      
+      if (this.currentRingComponent && 'rotationDeg' in this.currentRingComponent) {
+        this.currentRingComponent.rotationDeg = val;
       }
+      
       if (t < 1) {
         requestAnimationFrame(animate);
       } else {
-        this.highlightActiveCard(Math.abs(nearestCardIndex) % 8);
-        if (this.ringEl) this.ringEl.classList.remove('snap-transition');
+        // Snap complete - haptic feedback
+        if (this.hapticsEnabled && this.hapticsService.isHapticsSupported()) {
+          this.hapticsService.vibrate(this.hapticsService.patterns.selection);
+        }
       }
     };
+    
     animate();
   }
 
-  private prepareForTransition(): void {}
-
-  createExitTransition(): void {
-    if (!this.isBrowser || this.prefersReducedMotion) return;
-    const target = document.querySelector('#trabalhos') as HTMLElement | null;
-    if (!target) return;
-    this.exitObserver = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (!entry.isIntersecting && entry.boundingClientRect.top < 0) {
-        } else if (entry.isIntersecting) {
-        }
-      });
-    }, { root: null, threshold: [0, 1] });
-    this.exitObserver.observe(target);
-    this.disposers.push(() => this.exitObserver?.disconnect());
-  }
-
+  /**
+   * Get current pinned state
+   */
   getIsPinned(): boolean {
     return this.isPinned;
   }
 
+  /**
+   * Cleanup resources
+   */
   destroy(): void {
-    this.disposers.forEach(fn => fn());
-    this.disposers = [];
-    if (this.entranceObserver) this.entranceObserver.disconnect();
-    if (this.exitObserver) this.exitObserver.disconnect();
-    if (this.rafId) cancelAnimationFrame(this.rafId);
-    if (this.momentumId) cancelAnimationFrame(this.momentumId);
+    // Cancel RAF animations
+    if (this.rafId) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+    if (this.momentumId) {
+      cancelAnimationFrame(this.momentumId);
+      this.momentumId = null;
+    }
+    
+    // Complete destroy subject (triggers takeUntil cleanup)
+    this.destroy$.next();
+    this.destroy$.complete();
+    
+    // Reset state
     this.isPinned = false;
+    this.currentRingComponent = null;
   }
 }

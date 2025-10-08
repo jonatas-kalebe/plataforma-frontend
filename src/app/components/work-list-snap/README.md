@@ -230,18 +230,42 @@ app-work-list-snap {
 
 ### Otimizações
 
-- **Lazy Loading**: Imagens carregadas sob demanda
+- **Lazy Loading**: Imagens carregadas sob demanda via `LazyImgDirective`
+  - Suporte nativo `loading="lazy"` quando disponível
+  - Fallback com IntersectionObserver para navegadores antigos
+  - Pre-loading com `rootMargin="100px"` para UX fluida
 - **CSS-Only Snapping**: Sem JavaScript de inércia
 - **TrackBy Function**: Renderização otimizada com `ngFor`
 - **OnPush Strategy**: Change detection otimizada
 - **Will-Change**: Otimização de transformações CSS
+
+### Prevenção de CLS (Cumulative Layout Shift)
+
+Para garantir CLS < 0.1 (requerimento Core Web Vitals), o componente implementa:
+
+1. **Dimensões Fixas**: Todas as imagens têm `width="400"` e `height="300"`
+2. **Aspect Ratio CSS**: Container usa `aspect-ratio: 4/3`
+3. **Placeholder Reservado**: Espaço reservado antes do carregamento da imagem
+
+```html
+<!-- Implementação no template -->
+<img
+  lazyImg
+  [src]="item.imageUrl"
+  [alt]="item.title"
+  [rootMargin]="'100px'"
+  class="item-image"
+  width="400"
+  height="300"
+  loading="lazy">
+```
 
 ### Métricas
 
 - **Lighthouse Performance**: 90+
 - **FCP**: < 1.5s
 - **LCP**: < 2.5s
-- **CLS**: < 0.1 (com width/height definidos)
+- **CLS**: < 0.1 ✅ (garantido com dimensões fixas + aspect-ratio)
 
 ## 🧪 Testes
 
