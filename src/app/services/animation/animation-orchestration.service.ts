@@ -1,32 +1,12 @@
-/**
- * AnimationOrchestrationService
- * 
- * Centralized service for managing all GSAP animations, plugins, and configurations.
- * This service ensures that all GSAP plugins (ScrollTrigger, Draggable, InertiaPlugin)
- * are registered only once and only in browser environments (SSR-safe).
- * 
- * @example
- * ```typescript
- * // In your component
- * constructor(private animOrchestration: AnimationOrchestrationService) {
- *   this.animOrchestration.setupHeroParallax('.hero-section');
- * }
- * ```
- * 
- * @example
- * ```typescript
- * // Global scroll snap setup
- * ngOnInit() {
- *   this.animOrchestration.setupGlobalScrollSnap();
- * }
- * ```
- */
 
 import { Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { Draggable } from 'gsap/Draggable';
+
+// Importa apenas os tipos para não carregar a biblioteca no servidor
+import type { gsap } from 'gsap';
+import type { ScrollTrigger } from 'gsap/ScrollTrigger';
+import type { Draggable } from 'gsap/Draggable';
+import type { InertiaPlugin } from 'gsap/InertiaPlugin';
 
 @Injectable({
   providedIn: 'root'
@@ -35,233 +15,125 @@ export class AnimationOrchestrationService {
   private readonly platformId = inject(PLATFORM_ID);
   private isInitialized = false;
 
-  constructor() {
-    this.initialize();
-  }
+  // Propriedades para armazenar as instâncias do GSAP após o carregamento
+  private _gsap?: typeof gsap;
+  private _ScrollTrigger?: typeof ScrollTrigger;
+  private _Draggable?: typeof Draggable;
+  private _InertiaPlugin?: typeof InertiaPlugin;
 
   /**
-   * Initialize GSAP and register all plugins
-   * 
-   * This method is called automatically when the service is instantiated.
-   * It ensures that all GSAP plugins are registered only once and only in browser environments.
-   * This prevents SSR errors and ensures optimal performance.
-   * 
-   * @private
+   * Inicializa o GSAP e registra todos os plugins necessários.
+   * Este método deve ser chamado uma vez, de preferência no componente principal
+   * da aplicação (ex: AppComponent), antes de qualquer outra chamada de animação.
+   * O método é idempotente e seguro para SSR.
    */
-  private initialize(): void {
-    // Only initialize in browser environment
-    if (!isPlatformBrowser(this.platformId)) {
-      return;
-    }
-
-    // Prevent double initialization
-    if (this.isInitialized) {
+  public async initialize(): Promise<void> {
+    // Roda apenas no navegador e previne inicialização dupla
+    if (!isPlatformBrowser(this.platformId) || this.isInitialized) {
       return;
     }
 
     try {
-      // Register GSAP plugins
-      gsap.registerPlugin(ScrollTrigger, Draggable);
-      
-      // Note: InertiaPlugin is a premium GSAP plugin that requires a license
-      // Uncomment the following line if you have a GSAP Club membership:
-      // gsap.registerPlugin(InertiaPlugin);
+      // Carrega as bibliotecas do GSAP de forma assíncrona (lazy-loading)
+      const [gsapModule, stModule, draggableModule, inertiaModule] = await Promise.all([
+        import('gsap'),
+        import('gsap/ScrollTrigger'),
+        import('gsap/Draggable'),
+        import('gsap/InertiaPlugin'), // InertiaPlugin agora é parte do core gratuito do GSAP
+      ]);
 
-      // Expose GSAP globally for compatibility (optional)
-      if (typeof window !== 'undefined') {
-        (window as any).gsap = gsap;
-        (window as any).ScrollTrigger = ScrollTrigger;
-        (window as any).Draggable = Draggable;
-      }
+      this._gsap = gsapModule.gsap;
+      this._ScrollTrigger = stModule.ScrollTrigger;
+      this._Draggable = draggableModule.Draggable;
+      this._InertiaPlugin = inertiaModule.InertiaPlugin;
 
-      // Set global GSAP defaults
-      gsap.defaults({
-        ease: 'power2.out',
-        duration: 0.6
+      // Registra os plugins no GSAP
+      this._gsap.registerPlugin(this._ScrollTrigger, this._Draggable, this._InertiaPlugin);
+
+      // Define padrões globais para consistência nas animações
+      this._gsap.defaults({
+        ease: 'power3.out',
+        duration: 0.8,
       });
 
       this.isInitialized = true;
-
-      console.log('[AnimationOrchestrationService] GSAP plugins initialized successfully');
+      console.log('[AnimationOrchestrationService] GSAP e plugins inicializados com sucesso.');
     } catch (error) {
-      console.error('[AnimationOrchestrationService] Failed to initialize GSAP:', error);
+      console.error('[AnimationOrchestrationService] Falha ao inicializar o GSAP:', error);
+      // Garante que não tentaremos usar o GSAP se a inicialização falhar
+      this.isInitialized = false;
     }
   }
 
   /**
-   * Setup hero parallax effect
-   * 
-   * Creates a parallax scrolling effect for hero sections using ScrollTrigger.
-   * Elements with different data attributes will scroll at different speeds,
-   * creating a depth effect.
-   * 
-   * @param selector - CSS selector for the hero section container
-   * 
-   * @example
-   * ```typescript
-   * // In your component
-   * ngAfterViewInit() {
-   *   this.animOrchestration.setupHeroParallax('.hero-section');
-   * }
-   * ```
-   * 
-   * @example
-   * ```html
-   * <!-- In your template -->
-   * <div class="hero-section">
-   *   <div data-speed="0.5">Slow layer</div>
-   *   <div data-speed="1.5">Fast layer</div>
-   * </div>
-   * ```
+   * (Placeholder) Configura um efeito de parallax para uma seção "hero".
+   * @param selector O seletor CSS do contêiner da seção hero.
    */
-  setupHeroParallax(selector: string): void {
-    if (!this.isReady) {
-      console.warn('[AnimationOrchestrationService] Not initialized or not in browser');
+  public setupHeroParallax(selector: string): void {
+    if (!this.isReady()) {
+      this.logNotReadyWarning('setupHeroParallax');
       return;
     }
-
-    console.log(`[AnimationOrchestrationService] Setting up hero parallax for: ${selector}`);
-    
-    // Placeholder implementation
-    // TODO: Implement hero parallax logic
-    // Example:
-    // const elements = document.querySelectorAll(`${selector} [data-speed]`);
-    // elements.forEach(el => {
-    //   const speed = parseFloat(el.getAttribute('data-speed') || '1');
-    //   gsap.to(el, {
-    //     y: (i, target) => -ScrollTrigger.maxScroll(window) * target.dataset.speed,
-    //     ease: 'none',
-    //     scrollTrigger: {
-    //       start: 0,
-    //       end: 'max',
-    //       invalidateOnRefresh: true,
-    //       scrub: 0
-    //     }
-    //   });
-    // });
+    // TODO: Implementar a lógica de parallax aqui.
+    // Exemplo: Animar elementos com `data-speed` dentro do seletor.
+    console.log(`[AnimationOrchestrationService] Placeholder: Configurando parallax para ${selector}`);
   }
 
   /**
-   * Setup global scroll snap
-   * 
-   * Enables smooth scroll snapping between sections using ScrollTrigger.
-   * This creates a full-page scroll experience where each section snaps into place.
-   * 
-   * @example
-   * ```typescript
-   * // In your app component or layout
-   * ngOnInit() {
-   *   this.animOrchestration.setupGlobalScrollSnap();
-   * }
-   * ```
-   * 
-   * @example
-   * ```html
-   * <!-- In your template -->
-   * <section class="snap-section">Section 1</section>
-   * <section class="snap-section">Section 2</section>
-   * <section class="snap-section">Section 3</section>
-   * ```
+   * (Placeholder) Configura o scroll snap global para seções de página inteira.
+   * @param sectionSelector O seletor CSS para as seções que devem ter o snap.
    */
-  setupGlobalScrollSnap(): void {
-    if (!this.isReady) {
-      console.warn('[AnimationOrchestrationService] Not initialized or not in browser');
+  public setupGlobalScrollSnap(sectionSelector: string): void {
+    if (!this.isReady()) {
+      this.logNotReadyWarning('setupGlobalScrollSnap');
       return;
     }
-
-    console.log('[AnimationOrchestrationService] Setting up global scroll snap');
-    
-    // Placeholder implementation
-    // TODO: Implement scroll snap logic
-    // Example:
-    // const sections = gsap.utils.toArray('.snap-section');
-    // gsap.to(sections, {
-    //   xPercent: -100 * (sections.length - 1),
-    //   ease: 'none',
-    //   scrollTrigger: {
-    //     trigger: '.container',
-    //     pin: true,
-    //     scrub: 1,
-    //     snap: 1 / (sections.length - 1),
-    //     end: () => '+=' + document.querySelector('.container').offsetWidth
-    //   }
-    // });
+    // TODO: Implementar a lógica de scroll snap aqui.
+    // Exemplo: Usar ScrollTrigger.create() com a opção `snap`.
+    console.log(`[AnimationOrchestrationService] Placeholder: Configurando scroll snap para ${sectionSelector}`);
   }
 
   /**
-   * Check if service is ready to use
-   * 
-   * @returns true if initialized and running in browser
+   * Recalcula as posições de todas as instâncias do ScrollTrigger.
+   * Essencial para chamar após mudanças no DOM que afetam o layout (ex: carregar imagens, adicionar conteúdo).
    */
-  get isReady(): boolean {
+  public refreshScrollTriggers(): void {
+    if (this.isReady()) {
+      this._ScrollTrigger?.refresh();
+    }
+  }
+
+  /**
+   * Interrompe e remove animações e instâncias do ScrollTrigger.
+   * Crucial para a limpeza no `ngOnDestroy` de componentes para evitar memory leaks.
+   * @param target Opcional. O alvo (seletor, elemento) para matar as animações. Se não for fornecido, remove triggers globais.
+   */
+  public killAll(target?: gsap.DOMTarget): void {
+    if (!this.isReady()) return;
+
+    if (target) {
+      this._gsap?.killTweensOf(target);
+    }
+    // Limpa todos os triggers para evitar comportamento inesperado ao navegar entre rotas
+    this._ScrollTrigger?.getAll().forEach(trigger => trigger.kill());
+  }
+
+  /**
+   * Verifica se o serviço está inicializado e rodando no browser.
+   */
+  public isReady(): boolean {
     return this.isInitialized && isPlatformBrowser(this.platformId);
   }
 
-  /**
-   * Get the GSAP instance
-   * 
-   * @returns GSAP library instance
-   */
-  get gsap(): typeof gsap {
-    return gsap;
-  }
+  // GETTERS para acesso seguro às instâncias do GSAP
+  get gsap(): typeof gsap | undefined { return this._gsap; }
+  get ScrollTrigger(): typeof ScrollTrigger | undefined { return this._ScrollTrigger; }
+  get Draggable(): typeof Draggable | undefined { return this._Draggable; }
 
-  /**
-   * Get the ScrollTrigger instance
-   * 
-   * @returns ScrollTrigger plugin instance
-   */
-  get scrollTrigger(): typeof ScrollTrigger {
-    return ScrollTrigger;
-  }
-
-  /**
-   * Get the Draggable instance
-   * 
-   * @returns Draggable plugin instance
-   */
-  get draggable(): typeof Draggable {
-    return Draggable;
-  }
-
-  /**
-   * Refresh all ScrollTrigger instances
-   * 
-   * Call this after DOM changes or layout shifts to recalculate positions.
-   * 
-   * @example
-   * ```typescript
-   * // After adding/removing elements
-   * this.animOrchestration.refreshScrollTriggers();
-   * ```
-   */
-  refreshScrollTriggers(): void {
-    if (!this.isReady) {
-      return;
-    }
-
-    ScrollTrigger.refresh();
-  }
-
-  /**
-   * Kill all active animations
-   * 
-   * Stops and removes all GSAP animations and ScrollTrigger instances.
-   * Useful for cleanup on component destroy.
-   * 
-   * @example
-   * ```typescript
-   * ngOnDestroy() {
-   *   this.animOrchestration.killAllAnimations();
-   * }
-   * ```
-   */
-  killAllAnimations(): void {
-    if (!this.isReady) {
-      return;
-    }
-
-    gsap.killTweensOf('*');
-    ScrollTrigger.getAll().forEach(trigger => trigger.kill());
+  private logNotReadyWarning(methodName: string): void {
+    console.warn(
+      `[AnimationOrchestrationService] Tentativa de chamar '${methodName}' antes da inicialização. ` +
+      `Certifique-se de que 'await animationService.initialize()' foi chamado e concluído.`
+    );
   }
 }
