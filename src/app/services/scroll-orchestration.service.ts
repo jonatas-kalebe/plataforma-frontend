@@ -311,6 +311,7 @@ export class ScrollOrchestrationService {
     }
   }
 
+
   /**
    * Detecta dispositivos móveis
    */
