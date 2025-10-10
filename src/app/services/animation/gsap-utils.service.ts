@@ -60,36 +60,31 @@ export class GsapUtilsService {
   private registeredScrollTriggers: ScrollTrigger[] = [];
 
   constructor(private motionService: MotionPreferenceService) {
-    this.initialize();
+    // GSAP initialization removed - now handled by AnimationOrchestrationService
+    // This service now relies on GSAP being initialized globally
+    this.checkInitialization();
   }
 
   /**
-   * Initialize GSAP with plugins
+   * Check if GSAP has been initialized (by AnimationOrchestrationService)
    */
-  private initialize(): void {
-    if (!isPlatformBrowser(this.platformId) || this.isInitialized) {
+  private checkInitialization(): void {
+    if (!isPlatformBrowser(this.platformId)) {
       return;
     }
 
-    try {
-      // Register GSAP plugins
-      gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
+    // Check if GSAP is available globally (set by AnimationOrchestrationService)
+    if (typeof window !== 'undefined' && (window as any).gsap && (window as any).ScrollTrigger) {
+      this.isInitialized = true;
       
-      // Expose GSAP globally for compatibility
-      if (typeof window !== 'undefined') {
-        (window as any).gsap = gsap;
-        (window as any).ScrollTrigger = ScrollTrigger;
-      }
-
-      // Set default ease
+      // Set default ease for consistency
       gsap.defaults({ 
         ease: ANIMATION_EASING.EASE_OUT,
         duration: ANIMATION_DURATIONS.SECTION_ENTER
       });
-
-      this.isInitialized = true;
-    } catch (error) {
-      console.warn('GsapUtilsService: Failed to initialize GSAP:', error);
+    } else {
+      // GSAP not yet initialized - will be checked again when used
+      console.warn('GsapUtilsService: GSAP not yet initialized. Ensure AnimationOrchestrationService.initialize() is called first.');
     }
   }
 

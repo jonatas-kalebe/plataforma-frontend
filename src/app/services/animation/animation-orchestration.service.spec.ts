@@ -6,13 +6,14 @@ describe('AnimationOrchestrationService', () => {
   let service: AnimationOrchestrationService;
 
   describe('Browser Environment', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       TestBed.configureTestingModule({
         providers: [
           { provide: PLATFORM_ID, useValue: 'browser' }
         ]
       });
       service = TestBed.inject(AnimationOrchestrationService);
+      await service.initialize();
     });
 
     it('should be created', () => {
@@ -21,6 +22,7 @@ describe('AnimationOrchestrationService', () => {
 
     it('should be initialized in browser', async () => {
       await service.initialize();
+    it('should be initialized in browser', () => {
       expect(service.isReady()).toBe(true);
     });
 
@@ -36,6 +38,11 @@ describe('AnimationOrchestrationService', () => {
 
     it('should expose draggable instance', async () => {
       await service.initialize();
+    it('should expose ScrollTrigger instance', () => {
+      expect(service.ScrollTrigger).toBeDefined();
+    });
+
+    it('should expose Draggable instance', () => {
       expect(service.Draggable).toBeDefined();
     });
 
@@ -47,6 +54,8 @@ describe('AnimationOrchestrationService', () => {
     it('should setup global scroll snap without errors', async () => {
       await service.initialize();
       expect(() => service.setupGlobalScrollSnap('.test-section')).not.toThrow();
+    it('should setup global scroll snap without errors', () => {
+      expect(() => service.setupGlobalScrollSnap('section')).not.toThrow();
     });
 
     it('should refresh scroll triggers without errors', async () => {
@@ -56,6 +65,7 @@ describe('AnimationOrchestrationService', () => {
 
     it('should kill all animations without errors', async () => {
       await service.initialize();
+    it('should kill all animations without errors', () => {
       expect(() => service.killAll()).not.toThrow();
     });
   });
@@ -81,6 +91,7 @@ describe('AnimationOrchestrationService', () => {
     it('should not throw when calling methods in server environment', () => {
       expect(() => service.setupHeroParallax('.test')).not.toThrow();
       expect(() => service.setupGlobalScrollSnap('.test-section')).not.toThrow();
+      expect(() => service.setupGlobalScrollSnap('section')).not.toThrow();
       expect(() => service.refreshScrollTriggers()).not.toThrow();
       expect(() => service.killAll()).not.toThrow();
     });

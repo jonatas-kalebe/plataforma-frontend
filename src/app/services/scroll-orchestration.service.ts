@@ -131,7 +131,7 @@ export class ScrollOrchestrationService {
     }
 
     try {
-      this.initializeGsap();
+      // GSAP initialization removed - now handled by AnimationOrchestrationService
       this.setupSections();
       this.setupScrollEventListener();
 
@@ -156,28 +156,15 @@ export class ScrollOrchestrationService {
   }
 
   /**
-   * Inicializa GSAP e plugins
-   */
-  private initializeGsap(): void {
-    const gsapInstance = (window as any).gsap || gsap;
-    const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
-
-    gsapInstance.registerPlugin(ScrollTriggerInstance, ScrollToPlugin);
-
-    // Expõe globalmente para compatibilidade
-    if (typeof window !== 'undefined') {
-      (window as any).ScrollTrigger = ScrollTriggerInstance;
-    }
-
-    this.lastScrollY = window.scrollY || 0;
-  }
-
-  /**
    * Configura seções de scroll (simplificado)
+   * Note: GSAP must be initialized via AnimationOrchestrationService before calling this
    */
   private setupSections(): void {
+    // Use globally available GSAP instances (set by AnimationOrchestrationService)
     const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
     const gsapInstance = (window as any).gsap || gsap;
+
+    this.lastScrollY = window.scrollY || 0;
 
     const sections: ScrollSection[] = [];
 

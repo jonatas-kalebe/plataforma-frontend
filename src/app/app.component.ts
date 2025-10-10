@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { LoadingScreenComponent } from './components/loading-screen/loading-screen.component';
 import { ViewportService } from './services/viewport.service';
+import { AnimationOrchestrationService } from './services/animation/animation-orchestration.service';
 
 @Component({
   selector: 'app-root',
@@ -14,10 +15,14 @@ import { ViewportService } from './services/viewport.service';
 export class AppComponent implements OnInit {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly viewportService = inject(ViewportService);
+  private readonly animationService = inject(AnimationOrchestrationService);
   showOverlay = signal(true);
 
   ngOnInit(): void {
     if (isPlatformBrowser(this.platformId)) {
+      // Initialize animation service early
+      this.animationService.initialize();
+      
       // ViewportService now handles viewport height automatically
       this.setupMobileOptimizations();
     }
