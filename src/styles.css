@@ -137,13 +137,44 @@
     align-items: center;
   }
 
-  /* Focus styles for accessibility */
+  /* Focus styles for accessibility - WCAG 2.1 AA compliant */
   button:focus-visible,
   a:focus-visible,
-  [tabindex]:focus-visible {
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible,
+  [role="button"]:focus-visible,
+  [role="tab"]:focus-visible,
+  [role="checkbox"]:focus-visible,
+  [role="radio"]:focus-visible,
+  [role="switch"]:focus-visible,
+  [role="slider"]:focus-visible,
+  [contenteditable]:focus-visible {
     outline: 2px solid var(--athenity-green-circuit);
     outline-offset: 2px;
     border-radius: var(--radius-sm);
+  }
+
+  /* Skip link for keyboard navigation */
+  .skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--athenity-green-circuit);
+    color: var(--athenity-blue-deep);
+    padding: var(--spacing-sm) var(--spacing-md);
+    text-decoration: none;
+    font-weight: bold;
+    border-radius: 0 0 var(--radius-sm) 0;
+    z-index: 9999;
+    transition: top var(--duration-fast) ease;
+  }
+
+  .skip-link:focus {
+    top: 0;
+    outline: 2px solid var(--athenity-blue-deep);
+    outline-offset: 2px;
   }
 
   /* Improve tap targets on mobile */

@@ -1,4 +1,7 @@
-<header class="fixed top-0 left-0 right-0 z-40">
+<!-- Skip link for keyboard navigation -->
+<a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+
+<header class="fixed top-0 left-0 right-0 z-40" role="banner">
   <div class="max-w-7xl h-[88px] mx-auto px-6 flex items-center justify-between relative">
     <div id="nav-logo-slot" class="absolute top-1/2 -translate-y-1/2 left-6"></div>
     <nav>
@@ -8,6 +11,10 @@
 
 <app-loading-screen *ngIf="showOverlay()" (loadingFinished)="onOverlayDone()"></app-loading-screen>
 
-<main class="relative">
+<main id="main-content" class="relative" role="main">
   <router-outlet></router-outlet>
 </main>
+
+<footer role="contentinfo" class="bg-athenity-blue-card text-athenity-text-body py-6 text-center border-t border-athenity-text-body/20">
+  <p class="text-sm">&copy; 2024 Athenity. Todos os direitos reservados.</p>
+</footer>
