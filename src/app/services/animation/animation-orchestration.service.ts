@@ -237,17 +237,64 @@ export class AnimationOrchestrationService {
   }
 
   /**
-   * (Placeholder) Configura o scroll snap global para seções de página inteira.
+   * Configura o scroll snap global para seções de página inteira usando ScrollTrigger.snap.
    * @param sectionSelector O seletor CSS para as seções que devem ter o snap.
+   * @param options Opções de configuração do snap (opcional).
    */
-  public setupGlobalScrollSnap(sectionSelector: string): void {
+  public setupGlobalScrollSnap(
+    sectionSelector: string,
+    options?: {
+      duration?: number;
+      ease?: string;
+      delay?: number;
+      directional?: boolean;
+    }
+  ): void {
     if (!this.isReady()) {
       this.logNotReadyWarning('setupGlobalScrollSnap');
       return;
     }
-    // TODO: Implementar a lógica de scroll snap aqui.
-    // Exemplo: Usar ScrollTrigger.create() com a opção `snap`.
-    console.log(`[AnimationOrchestrationService] Placeholder: Configurando scroll snap para ${sectionSelector}`);
+
+    if (!this._ScrollTrigger || !this._gsap) {
+      console.error('[AnimationOrchestrationService] GSAP ou ScrollTrigger não disponíveis.');
+      return;
+    }
+
+    const sections = document.querySelectorAll(sectionSelector);
+    if (!sections.length) {
+      console.warn(`[AnimationOrchestrationService] Nenhuma seção encontrada para o seletor: ${sectionSelector}`);
+      return;
+    }
+
+    // Configurações padrão para snapping suave
+    const snapConfig = {
+      duration: options?.duration ?? 0.9,
+      ease: options?.ease ?? 'power3.out',
+      delay: options?.delay ?? 0.1,
+      directional: options?.directional ?? true
+    };
+
+    // Cria array de posições de snap (início de cada seção)
+    const snapPositions = Array.from(sections).map((section) => {
+      const element = section as HTMLElement;
+      return element.offsetTop;
+    });
+
+    // Configura ScrollTrigger com snap global
+    this._ScrollTrigger.create({
+      trigger: 'body',
+      start: 'top top',
+      end: 'bottom bottom',
+      snap: {
+        snapTo: snapPositions,
+        duration: snapConfig.duration,
+        delay: snapConfig.delay,
+        ease: snapConfig.ease,
+        directional: snapConfig.directional,
+      },
+    });
+
+    console.log(`[AnimationOrchestrationService] Scroll snap configurado para ${sections.length} seções.`);
   }
 
   /**

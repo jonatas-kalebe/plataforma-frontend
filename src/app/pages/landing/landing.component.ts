@@ -185,17 +185,15 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
   /**
    * Inicializa sistema de scroll de forma consolidada
    */
-  private initializeScrollSystem(): void {
-    requestAnimationFrame(() => {
-      this.scrollService.initialize();
-      this.scrollService.scrollState$
-        .pipe(takeUntil(this.destroy$))
-        .subscribe(state => {
-          setTimeout(() => {
-            this.scrollState = state;
-          });
+  private async initializeScrollSystem(): Promise<void> {
+    await this.scrollService.initialize();
+    this.scrollService.scrollState$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(state => {
+        setTimeout(() => {
+          this.scrollState = state;
         });
-    });
+      });
   }
 
   /**
