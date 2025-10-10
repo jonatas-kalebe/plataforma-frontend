@@ -8,11 +8,11 @@
   [once]="true"
   (entered)="onSectionEnter()"
   (left)="onSectionLeave()">
-  <div class="section-content pin-container px-4 sm:px-6 lg:px-8">
+  <div #pinContainer class="section-content pin-container px-4 sm:px-6 lg:px-8">
     <h3 class="trabalhos-title text-fluid-4xl sm:text-fluid-5xl font-extrabold text-center text-athenity-text-title font-heading mb-6 sm:mb-8">
       {{ sectionTitle }}
     </h3>
-    <div [attr.data-testid]="'work-showcase'" class="trabalhos-showcase ring-container">
+    <div #trabalhosShowcase [attr.data-testid]="'work-showcase'" class="trabalhos-showcase ring-container">
       <app-work-card-ring #workCardRing></app-work-card-ring>
     </div>
     <div class="mt-4 sm:mt-6 text-center">

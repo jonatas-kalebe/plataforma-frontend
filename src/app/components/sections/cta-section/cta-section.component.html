@@ -26,6 +26,7 @@
       
       <!-- Primary CTA Button -->
       <a 
+        #primaryButton
         [href]="primaryCta.href"
         class="btn-primary touch-target-comfortable text-fluid-base sm:text-fluid-lg font-bold py-3 px-6 sm:py-4 sm:px-8 rounded-xl shadow-glow inline-flex items-center justify-center flex-1 sm:flex-initial min-w-[240px]"
         (click)="onPrimaryCtaClick($event)">
@@ -34,6 +35,7 @@
 
       <!-- Secondary CTA Button (optional) -->
       <a *ngIf="secondaryCta"
+        #secondaryButton
         [href]="secondaryCta.href"
         class="btn-secondary touch-target-comfortable text-fluid-base sm:text-fluid-lg font-bold py-3 px-6 sm:py-4 sm:px-8 rounded-xl inline-flex items-center justify-center flex-1 sm:flex-initial min-w-[240px]"
         (click)="onSecondaryCtaClick($event)">

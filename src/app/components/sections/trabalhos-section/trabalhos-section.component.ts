@@ -41,6 +41,8 @@ export class TrabalhosSectionComponent implements AfterViewInit, OnDestroy {
   // ViewChild references
   @ViewChild('workCardRing') workCardRing!: WorkCardRingComponent;
   @ViewChild('sectionElement') sectionElement!: ElementRef;
+  @ViewChild('pinContainer', { read: ElementRef }) pinContainer!: ElementRef;
+  @ViewChild('trabalhosShowcase', { read: ElementRef }) trabalhosShowcase!: ElementRef;
 
   constructor(private trabalhosSectionAnimation: TrabalhosSectionAnimationService) {}
 
@@ -130,15 +132,16 @@ export class TrabalhosSectionComponent implements AfterViewInit, OnDestroy {
    */
   showContent(): void {
     if (typeof document === 'undefined') return;
+    if (!this.pinContainer?.nativeElement || !this.trabalhosShowcase?.nativeElement) return;
 
-    const container = document.querySelector('.pin-container');
-    const showcase = document.querySelector('.trabalhos-showcase');
+    const container = this.pinContainer.nativeElement;
+    const showcase = this.trabalhosShowcase.nativeElement;
 
     // Show container first
-    setTimeout(() => container?.classList.add('visible'), 100);
+    setTimeout(() => container.classList.add('visible'), 100);
     
     // Show showcase with delay
-    setTimeout(() => showcase?.classList.add('visible'), 300);
+    setTimeout(() => showcase.classList.add('visible'), 300);
   }
 
   /**
@@ -146,12 +149,13 @@ export class TrabalhosSectionComponent implements AfterViewInit, OnDestroy {
    */
   hideContent(): void {
     if (typeof document === 'undefined') return;
+    if (!this.pinContainer?.nativeElement || !this.trabalhosShowcase?.nativeElement) return;
 
-    const container = document.querySelector('.pin-container');
-    const showcase = document.querySelector('.trabalhos-showcase');
+    const container = this.pinContainer.nativeElement;
+    const showcase = this.trabalhosShowcase.nativeElement;
 
-    container?.classList.remove('visible');
-    showcase?.classList.remove('visible');
+    container.classList.remove('visible');
+    showcase.classList.remove('visible');
   }
 
   /**

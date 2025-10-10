@@ -34,10 +34,11 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
   @Output() sectionReady = new EventEmitter<ElementRef>();
   // Component references
   @ViewChild('heroBg') heroBg!: ElementRef;
-  @ViewChild('heroTitle', {static: false}) heroTitle!: ElementRef;
-  @ViewChild('heroSubtitle', {static: false}) heroSubtitle!: ElementRef;
-  @ViewChild('heroCta', {static: false}) heroCta!: ElementRef;
-  @ViewChild('scrollHint', {static: false}) scrollHint!: ElementRef;
+  @ViewChild('heroSection', {static: false}) heroSection!: ElementRef<HTMLElement>;
+  @ViewChild('heroTitle', {static: false}) heroTitle!: ElementRef<HTMLElement>;
+  @ViewChild('heroSubtitle', {static: false}) heroSubtitle!: ElementRef<HTMLElement>;
+  @ViewChild('heroCta', {static: false}) heroCta!: ElementRef<HTMLElement>;
+  @ViewChild('scrollHint', {static: false}) scrollHint!: ElementRef<HTMLElement>;
   @ViewChild(ThreeParticleBackgroundComponent) particleBackground!: ThreeParticleBackgroundComponent;
   // Constants
   readonly SECTION_ID = SECTION_IDS.HERO;
@@ -75,13 +76,12 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
    * Setup hero animations via AnimationOrchestrationService
    */
   private setupHeroAnimations(): void {
-    const heroContainer = document.getElementById('hero');
-    if (!heroContainer || !this.heroTitle || !this.heroSubtitle || !this.heroCta) {
+    if (!this.heroSection?.nativeElement || !this.heroTitle || !this.heroSubtitle || !this.heroCta) {
       return;
     }
 
     this.animationService.setupHeroParallax(
-      heroContainer,
+      this.heroSection.nativeElement,
       this.heroTitle.nativeElement,
       this.heroSubtitle.nativeElement,
       this.heroCta.nativeElement,
@@ -120,13 +120,13 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
   private setupShockwaveEffects(): void {
     if (!isPlatformBrowser(this.platformId)) return;
 
-    const heroSection = document.querySelector('#hero') as HTMLElement;
-    if (!heroSection) return;
+    if (!this.heroSection?.nativeElement) return;
+    const heroSectionEl = this.heroSection.nativeElement;
 
     const handleClick = (event: MouseEvent | TouchEvent) => {
       // Trigger shockwave through particle background
       if (this.particleBackground) {
-        const rect = heroSection.getBoundingClientRect();
+        const rect = heroSectionEl.getBoundingClientRect();
         let clientX, clientY;
 
         if (event instanceof MouseEvent) {
@@ -155,7 +155,7 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
       }
     };
 
-    heroSection.addEventListener('click', handleClick);
-    heroSection.addEventListener('touchend', handleClick);
+    heroSectionEl.addEventListener('click', handleClick);
+    heroSectionEl.addEventListener('touchend', handleClick);
   }
 }
