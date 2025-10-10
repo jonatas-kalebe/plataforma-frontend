@@ -255,16 +255,16 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
 
   @HostListener('window:resize')
   onWindowResize = () => {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     const host = this.el.nativeElement;
     this.camera.aspect = host.clientWidth / host.clientHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(host.clientWidth, host.clientHeight);
     
     // Update particle config based on new viewport size
-    if (isPlatformBrowser(this.platformId)) {
-      const newConfig = getParticleConfig(window.innerWidth, this.prefersReducedMotion);
-      this.updateParticleConfig(newConfig);
-    }
+    const newConfig = getParticleConfig(window.innerWidth, this.prefersReducedMotion);
+    this.updateParticleConfig(newConfig);
     
     if (this.prefersReducedMotion) this.renderer.render(this.scene, this.camera);
   };
@@ -376,6 +376,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   }
 
   private initThree(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     // Use window.THREE if available (for tests), otherwise use imported THREE
     const ThreeInstance = (window as any).THREE || THREE;
 
@@ -397,6 +399,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   }
 
   private createParticles(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     // Use window.THREE if available (for tests), otherwise use imported THREE
     const ThreeInstance = (window as any).THREE || THREE;
 
@@ -465,6 +469,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   }
 
   private createParticleTexture(): any {
+    if (!isPlatformBrowser(this.platformId)) return null;
+    
     const ThreeInstance = (window as any).THREE || THREE;
 
     const canvas = document.createElement('canvas');
@@ -482,7 +488,9 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   }
 
   private tryEnableGyro = async () => {
+    if (!isPlatformBrowser(this.platformId)) return;
     if (!this.isMobile || this.gyroEnabled) return;
+    
     const DOE = (window as any).DeviceOrientationEvent;
     if (DOE && typeof DOE.requestPermission === 'function') {
       try {
@@ -495,6 +503,8 @@ export class ThreeParticleBackgroundComponent implements AfterViewInit, OnDestro
   };
 
   private onScreenOrientationChange = () => {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     const anyScr: any = window.screen as any;
     this.screenOrientation = (anyScr?.orientation?.angle ?? (window as any).orientation ?? 0) as number;
     this.lastOrientation = { alpha: null, beta: null, gamma: null };

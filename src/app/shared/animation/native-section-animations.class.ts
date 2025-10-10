@@ -3,6 +3,8 @@
  * Replaces GSAP-based section animations with native Web APIs
  */
 
+import { inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { NativeAnimation, NativeAnimationConfig } from './native-animation.class';
 import { NativeScrollAnimationService } from '../../services/animation/native-scroll-animation.service';
 
@@ -25,8 +27,10 @@ export class NativeSectionAnimations {
   private scrollAnimationService: NativeScrollAnimationService;
   private prefersReducedMotion: boolean;
   private animatedElements = new Set<Element>();
+  private isBrowser: boolean;
 
-  constructor() {
+  constructor(private platformId?: Object) {
+    this.isBrowser = platformId ? isPlatformBrowser(platformId) : typeof window !== 'undefined';
     this.nativeAnimation = new NativeAnimation();
     this.scrollAnimationService = new NativeScrollAnimationService();
     this.prefersReducedMotion = this.checkReducedMotion();
@@ -46,6 +50,8 @@ export class NativeSectionAnimations {
    * Animate section entry with title, content and CTA
    */
   public animateSectionEntry(sectionId: string, elements: SectionElements): void {
+    if (!this.isBrowser) return;
+    
     const sectionElement = document.getElementById(sectionId);
     if (!sectionElement) return;
 
@@ -70,6 +76,8 @@ export class NativeSectionAnimations {
    * Create intersection observer for section animations
    */
   private createSectionObserver(sectionElement: Element, elements: SectionElements): void {
+    if (!this.isBrowser || typeof IntersectionObserver === 'undefined') return;
+    
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach(entry => {
@@ -140,6 +148,8 @@ export class NativeSectionAnimations {
     animationConfig?: NativeAnimationConfig;
     scrollConfig?: ScrollAnimationTrigger;
   }): void {
+    if (!this.isBrowser) return;
+    
     const elements = document.querySelectorAll(config.selector);
     if (elements.length === 0) return;
 
@@ -147,6 +157,7 @@ export class NativeSectionAnimations {
       document.querySelector(config.trigger) : config.trigger;
     
     if (!triggerElement) return;
+    if (typeof IntersectionObserver === 'undefined') return;
 
     // Set initial state
     this.nativeAnimation.set(config.selector, {
@@ -188,6 +199,7 @@ export class NativeSectionAnimations {
    * Setup hover animations using CSS transitions
    */
   public setupHoverAnimations(selector: string): void {
+    if (!this.isBrowser) return;
     if (this.prefersReducedMotion) return;
 
     const elements = document.querySelectorAll(selector);
@@ -207,6 +219,9 @@ export class NativeSectionAnimations {
    * Setup service card animations specifically
    */
   public setupServiceCardAnimations(): void {
+    if (!this.isBrowser) return;
+    if (typeof IntersectionObserver === 'undefined') return;
+    
     const serviceCards = document.querySelectorAll('.service-card');
     
     serviceCards.forEach((card, index) => {
