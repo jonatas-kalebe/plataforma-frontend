@@ -1,17 +1,17 @@
-<section id="hero" class="section-base select-none">
+<section #heroSection id="hero" class="section-base select-none">
   <app-three-particle-background [scrollState]="scrollState"></app-three-particle-background>
 
   <div #heroBg class="absolute inset-0 -z-10"></div>
   <div class="section-content text-center px-4 sm:px-6 lg:px-8">
-    <h1 id="hero-title" 
+    <h1 #heroTitle id="hero-title" 
         class="text-fluid-6xl sm:text-fluid-7xl lg:text-fluid-8xl font-black tracking-tighter leading-tight">
       {{ titlePrefix }}<span class="text-athenity-gold">{{ titleHighlight }}</span>{{ titleSuffix }}
     </h1>
-    <p id="hero-subtitle" 
+    <p #heroSubtitle id="hero-subtitle" 
        class="mt-4 sm:mt-6 text-fluid-lg sm:text-fluid-xl max-w-2xl text-athenity-text-body mx-auto px-4 leading-relaxed">
       Não criamos sites. Criamos experiências onde o seu cliente é o protagonista.
     </p>
-    <div id="hero-cta" class="mt-8 sm:mt-10 px-4">
+    <div #heroCta id="hero-cta" class="mt-8 sm:mt-10 px-4">
       <a href="#servicos" 
          data-testid="hero-cta-button"
          (click)="onCtaClick($event)"
@@ -19,7 +19,7 @@
         <span>Explore Nosso Trabalho</span>
       </a>
     </div>
-    <div id="scroll-hint" 
+    <div #scrollHint id="scroll-hint" 
          data-testid="hero-scroll-hint"
          class="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 text-xs uppercase tracking-widest text-athenity-text-body/70 hidden sm:block">
       Scroll

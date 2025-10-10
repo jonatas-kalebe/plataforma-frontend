@@ -39,6 +39,8 @@ export class CtaSectionComponent implements AfterViewInit, OnDestroy {
 
   // ViewChild references
   @ViewChild('sectionElement') sectionElement!: ElementRef;
+  @ViewChild('primaryButton') primaryButton!: ElementRef<HTMLElement>;
+  @ViewChild('secondaryButton') secondaryButton!: ElementRef<HTMLElement>;
 
   // Constants
   readonly SECTION_ID = SECTION_IDS.CTA;
@@ -67,13 +69,15 @@ export class CtaSectionComponent implements AfterViewInit, OnDestroy {
     // Skip animations if user prefers reduced motion
     const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    const primaryButton = document.querySelector('[data-testid="cta-buttons"] a:first-child') as HTMLElement;
-    const secondaryButton = document.querySelector('[data-testid="cta-buttons"] a:last-child') as HTMLElement;
+    if (!this.primaryButton?.nativeElement) return;
+
+    const primaryBtn = this.primaryButton.nativeElement;
+    const secondaryBtn = this.secondaryButton?.nativeElement;
 
     const gsapInstance = (window as any).gsap || gsap;
 
     // Enhanced magnetic effects for all buttons
-    const buttons = [primaryButton, secondaryButton].filter(Boolean);
+    const buttons = [primaryBtn, secondaryBtn].filter(Boolean);
 
     buttons.forEach((button, index) => {
       const isPrimary = index === 0;
