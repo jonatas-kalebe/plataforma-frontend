@@ -5,9 +5,6 @@
 
 import { Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
 import { 
   ANIMATION_DURATIONS, 
   ANIMATION_EASING, 
@@ -15,6 +12,7 @@ import {
   TIMELINE_CONFIG 
 } from '../../shared/constants';
 import { MotionPreferenceService } from '../../shared/utils';
+import { AnimationOrchestrationService } from './animation-orchestration.service';
 
 export interface GsapConfig {
   duration?: number;
@@ -56,8 +54,9 @@ export interface ScrollTriggerOptions {
 })
 export class GsapUtilsService {
   private readonly platformId = inject(PLATFORM_ID);
+  private readonly animationService = inject(AnimationOrchestrationService);
   private isInitialized = false;
-  private registeredScrollTriggers: ScrollTrigger[] = [];
+  private registeredScrollTriggers: any[] = [];
 
   constructor(private motionService: MotionPreferenceService) {
     // GSAP initialization removed - now handled by AnimationOrchestrationService
@@ -78,7 +77,8 @@ export class GsapUtilsService {
       this.isInitialized = true;
       
       // Set default ease for consistency
-      gsap.defaults({ 
+      const gsapInstance = (window as any).gsap;
+      gsapInstance.defaults({ 
         ease: ANIMATION_EASING.EASE_OUT,
         duration: ANIMATION_DURATIONS.SECTION_ENTER
       });
@@ -91,7 +91,12 @@ export class GsapUtilsService {
   /**
    * Create a GSAP timeline with default configuration
    */
-  createTimeline(config?: gsap.TimelineVars): gsap.core.Timeline {
+  createTimeline(config?: any): any {
+    if (!this.animationService.gsap) {
+      console.warn('GsapUtilsService: GSAP not available');
+      return null;
+    }
+
     const defaultConfig = {
       paused: false,
       defaults: {
@@ -100,14 +105,14 @@ export class GsapUtilsService {
       }
     };
 
-    return gsap.timeline({ ...defaultConfig, ...config });
+    return this.animationService.gsap.timeline({ ...defaultConfig, ...config });
   }
 
   /**
    * Create a scroll trigger with default configuration
    */
-  createScrollTrigger(options: ScrollTriggerOptions): ScrollTrigger | null {
-    if (!this.isInitialized) {
+  createScrollTrigger(options: ScrollTriggerOptions): any {
+    if (!this.isInitialized || !this.animationService.ScrollTrigger) {
       console.warn('GsapUtilsService: GSAP not initialized');
       return null;
     }
@@ -119,7 +124,7 @@ export class GsapUtilsService {
         toggleActions: 'play none none reverse'
       };
 
-      const scrollTrigger = ScrollTrigger.create({
+      const scrollTrigger = this.animationService.ScrollTrigger.create({
         ...defaultOptions,
         ...options
       });
@@ -137,13 +142,18 @@ export class GsapUtilsService {
   /**
    * Animate element with motion preferences applied
    */
-  animateTo(target: gsap.TweenTarget, config: GsapConfig): gsap.core.Tween {
+  animateTo(target: any, config: GsapConfig): any {
+    if (!this.animationService.gsap) {
+      console.warn('GsapUtilsService: GSAP not available');
+      return null;
+    }
+
     const motionConfig = this.motionService.getGsapConfig(
       config.duration || ANIMATION_DURATIONS.SECTION_ENTER,
       config.ease || ANIMATION_EASING.EASE_OUT
     );
 
-    return gsap.to(target, {
+    return this.animationService.gsap.to(target, {
       ...config,
       ...motionConfig
     });
@@ -152,13 +162,18 @@ export class GsapUtilsService {
   /**
    * Animate element from specified values
    */
-  animateFrom(target: gsap.TweenTarget, config: GsapConfig): gsap.core.Tween {
+  animateFrom(target: any, config: GsapConfig): any {
+    if (!this.animationService.gsap) {
+      console.warn('GsapUtilsService: GSAP not available');
+      return null;
+    }
+
     const motionConfig = this.motionService.getGsapConfig(
       config.duration || ANIMATION_DURATIONS.SECTION_ENTER,
       config.ease || ANIMATION_EASING.EASE_OUT
     );
 
-    return gsap.from(target, {
+    return this.animationService.gsap.from(target, {
       ...config,
       ...motionConfig
     });
@@ -168,16 +183,21 @@ export class GsapUtilsService {
    * Animate element from/to specified values
    */
   animateFromTo(
-    target: gsap.TweenTarget, 
+    target: any, 
     fromConfig: GsapConfig, 
     toConfig: GsapConfig
-  ): gsap.core.Tween {
+  ): any {
+    if (!this.animationService.gsap) {
+      console.warn('GsapUtilsService: GSAP not available');
+      return null;
+    }
+
     const motionConfig = this.motionService.getGsapConfig(
       toConfig.duration || ANIMATION_DURATIONS.SECTION_ENTER,
       toConfig.ease || ANIMATION_EASING.EASE_OUT
     );
 
-    return gsap.fromTo(target, fromConfig, {
+    return this.animationService.gsap.fromTo(target, fromConfig, {
       ...toConfig,
       ...motionConfig
     });
@@ -187,16 +207,21 @@ export class GsapUtilsService {
    * Create staggered animation
    */
   staggerAnimation(
-    targets: gsap.TweenTarget, 
+    targets: any, 
     config: GsapConfig, 
     stagger: number = TIMELINE_CONFIG.STAGGER_MEDIUM
-  ): gsap.core.Tween {
+  ): any {
+    if (!this.animationService.gsap) {
+      console.warn('GsapUtilsService: GSAP not available');
+      return null;
+    }
+
     const motionConfig = this.motionService.getGsapConfig(
       config.duration || ANIMATION_DURATIONS.SECTION_ENTER,
       config.ease || ANIMATION_EASING.EASE_OUT
     );
 
-    return gsap.to(targets, {
+    return this.animationService.gsap.to(targets, {
       ...config,
       ...motionConfig,
       stagger: stagger
@@ -207,9 +232,9 @@ export class GsapUtilsService {
    * Smooth scroll to element
    */
   scrollTo(target: string | HTMLElement, duration: number = 1): void {
-    if (!this.isInitialized) return;
+    if (!this.isInitialized || !this.animationService.gsap) return;
 
-    gsap.to(window, {
+    this.animationService.gsap.to(window, {
       duration: this.motionService.getAnimationDuration(duration),
       scrollTo: target,
       ease: ANIMATION_EASING.EASE_OUT
@@ -219,34 +244,40 @@ export class GsapUtilsService {
   /**
    * Kill all animations for a target
    */
-  killAnimations(target?: gsap.TweenTarget): void {
+  killAnimations(target?: any): void {
+    if (!this.animationService.gsap) return;
+    
     if (target) {
-      gsap.killTweensOf(target);
+      this.animationService.gsap.killTweensOf(target);
     } else {
-      gsap.killTweensOf("*");
+      this.animationService.gsap.killTweensOf("*");
     }
   }
 
   /**
    * Set immediate values without animation
    */
-  set(target: gsap.TweenTarget, config: gsap.TweenVars): gsap.core.Tween {
-    return gsap.set(target, config);
+  set(target: any, config: any): any {
+    if (!this.animationService.gsap) {
+      console.warn('GsapUtilsService: GSAP not available');
+      return null;
+    }
+    return this.animationService.gsap.set(target, config);
   }
 
   /**
    * Refresh all ScrollTriggers
    */
   refreshScrollTriggers(): void {
-    if (this.isInitialized) {
-      ScrollTrigger.refresh();
+    if (this.isInitialized && this.animationService.ScrollTrigger) {
+      this.animationService.ScrollTrigger.refresh();
     }
   }
 
   /**
    * Kill specific ScrollTrigger
    */
-  killScrollTrigger(trigger: ScrollTrigger): void {
+  killScrollTrigger(trigger: any): void {
     const index = this.registeredScrollTriggers.indexOf(trigger);
     if (index > -1) {
       this.registeredScrollTriggers.splice(index, 1);

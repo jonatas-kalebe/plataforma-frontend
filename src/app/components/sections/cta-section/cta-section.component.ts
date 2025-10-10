@@ -6,7 +6,7 @@
 import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit, OnDestroy, PLATFORM_ID, inject } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { SECTION_IDS } from '../../../shared/constants/section.constants';
-import gsap from 'gsap';
+import { AnimationOrchestrationService } from '../../../services/animation/animation-orchestration.service';
 
 @Component({
   selector: 'app-cta-section',
@@ -17,6 +17,7 @@ import gsap from 'gsap';
 })
 export class CtaSectionComponent implements AfterViewInit, OnDestroy {
   private readonly platformId = inject(PLATFORM_ID);
+  private readonly animationService = inject(AnimationOrchestrationService);
 
   // Configuration variables (customizable)
   @Input() title: string = 'Vamos Construir o Futuro';
@@ -46,7 +47,7 @@ export class CtaSectionComponent implements AfterViewInit, OnDestroy {
   readonly SECTION_ID = SECTION_IDS.CTA;
 
   // Animation references
-  private pulseAnimation: gsap.core.Tween | null = null;
+  private pulseAnimation: any = null;
 
   ngAfterViewInit(): void {
     this.sectionReady.emit(this.sectionElement);
@@ -74,7 +75,11 @@ export class CtaSectionComponent implements AfterViewInit, OnDestroy {
     const primaryBtn = this.primaryButton.nativeElement;
     const secondaryBtn = this.secondaryButton?.nativeElement;
 
-    const gsapInstance = (window as any).gsap || gsap;
+    const gsapInstance = this.animationService.gsap;
+    if (!gsapInstance) {
+      console.warn('CtaSectionComponent: GSAP not available');
+      return;
+    }
 
     // Enhanced magnetic effects for all buttons
     const buttons = [primaryBtn, secondaryBtn].filter(Boolean);

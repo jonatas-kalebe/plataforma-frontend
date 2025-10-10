@@ -10,11 +10,6 @@ import { isPlatformBrowser } from '@angular/common';
 // RxJS Imports
 import { Observable } from 'rxjs';
 
-// GSAP Animation Library Imports
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
-
 // Application Configuration and Services
 import { ScrollTelemetryService } from './scroll-telemetry.service';
 import { AnimationOrchestrationService } from './animation/animation-orchestration.service';
@@ -56,7 +51,7 @@ export class ScrollOrchestrationService {
 
   // Estado do serviço
   private isInitialized = false;
-  private scrollTriggers: ScrollTrigger[] = [];
+  private scrollTriggers: any[] = [];
   private prefersReducedMotion = false;
   private lastScrollY = 0;
   private scrollDirection: 'up' | 'down' | 'none' = 'none';
@@ -161,8 +156,8 @@ export class ScrollOrchestrationService {
    */
   private setupSections(): void {
     // Use globally available GSAP instances (set by AnimationOrchestrationService)
-    const ScrollTriggerInstance = (window as any).ScrollTrigger || ScrollTrigger;
-    const gsapInstance = (window as any).gsap || gsap;
+    const ScrollTriggerInstance = (window as any).ScrollTrigger;
+    const gsapInstance = (window as any).gsap;
 
     this.lastScrollY = window.scrollY || 0;
 
