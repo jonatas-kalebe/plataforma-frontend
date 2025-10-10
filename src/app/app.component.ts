@@ -20,8 +20,8 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     if (isPlatformBrowser(this.platformId)) {
-      // Initialize animation service early
-      this.animationService.initialize();
+      // Animation service initialization moved to LandingComponent
+      // to ensure DOM elements are ready before GSAP setup
       
       // ViewportService now handles viewport height automatically
       this.setupMobileOptimizations();

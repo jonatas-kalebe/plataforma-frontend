@@ -21,7 +21,6 @@ import {
   ScrollMetrics,
   ScrollState
 } from '../shared/scroll/scroll-metrics.manager';
-import { HeroAnimationManager } from '../shared/scroll/hero-animation.manager';
 
 // Re-export para compatibilidade
 export type { ScrollSection, ScrollMetrics, ScrollState };
@@ -59,7 +58,6 @@ export class ScrollOrchestrationService {
 
   // Managers especializados (novo sistema)
   private metricsManager: ScrollMetricsManager;
-  private heroAnimationManager: HeroAnimationManager;
 
   // Expõe observables
   public readonly metrics$: Observable<ScrollMetrics>;
@@ -68,7 +66,6 @@ export class ScrollOrchestrationService {
   constructor() {
     // Inicializa managers
     this.metricsManager = new ScrollMetricsManager(this.telemetryService);
-    this.heroAnimationManager = new HeroAnimationManager(this.prefersReducedMotion);
 
     // Expõe observables dos managers
     this.metrics$ = this.metricsManager.metrics$;
@@ -84,14 +81,15 @@ export class ScrollOrchestrationService {
 
   /**
    * Inicializa o serviço de scroll
+   * Note: AnimationOrchestrationService must be initialized by the caller before this method
    */
   async initialize(): Promise<void> {
     if (!isPlatformBrowser(this.platformId) || this.isInitialized) {
       return;
     }
 
-    // Inicializa o AnimationOrchestrationService primeiro
-    await this.animationOrchestrationService.initialize();
+    // AnimationOrchestrationService initialization is now handled by LandingComponent
+    // This service only depends on GSAP being available globally
 
     this.ngZone.runOutsideAngular(() => {
       if (this.tryInitialize()) {
@@ -130,16 +128,8 @@ export class ScrollOrchestrationService {
       this.setupSections();
       this.setupScrollEventListener();
 
-      // Configura scroll snap global usando AnimationOrchestrationService
-      if (!this.prefersReducedMotion) {
-        const sectionSelector = SCROLL_SECTION_SELECTORS.join(',');
-        this.animationOrchestrationService.setupGlobalScrollSnap(sectionSelector, {
-          duration: 0.92,
-          ease: 'power3.out',
-          delay: 0.11,
-          directional: true
-        });
-      }
+      // Global scroll snap is now configured in LandingComponent
+      // after AnimationOrchestrationService.initialize()
 
       this.isInitialized = true;
       console.log('ScrollOrchestrationService: Successfully initialized');
@@ -199,14 +189,8 @@ export class ScrollOrchestrationService {
     // Atualiza métricas iniciais
     this.updateScrollMetrics(sections);
 
-    // Configura animação do hero
-    if (!this.prefersReducedMotion) {
-      this.heroAnimationManager.createHeroAnimation(gsapInstance);
-      const heroTrigger = this.heroAnimationManager.setupHeroScrollTrigger();
-      if (heroTrigger) {
-        this.scrollTriggers.push(heroTrigger);
-      }
-    }
+    // Hero animations are now handled by AnimationOrchestrationService in HeroSectionComponent
+    // No need to setup hero animation here
   }
 
   /**
@@ -268,7 +252,12 @@ export class ScrollOrchestrationService {
       return;
     }
 
-    const gsapInstance = (window as any).gsap || gsap;
+    const gsapInstance = (window as any).gsap;
+    if (!gsapInstance) {
+      console.warn('ScrollOrchestrationService: GSAP not available for scrollToSection');
+      return;
+    }
+    
     gsapInstance.to(window, {
       duration: this.prefersReducedMotion ? 0 : duration,
       scrollTo: { y: element, offsetY: 0 },
@@ -283,9 +272,6 @@ export class ScrollOrchestrationService {
     if (typeof window !== 'undefined' && window.matchMedia) {
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
       this.prefersReducedMotion = mediaQuery.matches;
-
-      // Atualiza hero animation manager
-      this.heroAnimationManager = new HeroAnimationManager(this.prefersReducedMotion);
     }
   }
 
@@ -311,7 +297,6 @@ export class ScrollOrchestrationService {
 
     // Limpa managers
     this.metricsManager.destroy();
-    this.heroAnimationManager.destroy();
 
     this.isInitialized = false;
   }

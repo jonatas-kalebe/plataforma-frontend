@@ -69,8 +69,8 @@ export class TrabalhosSectionComponent implements AfterViewInit, OnDestroy {
       this.scrollTrigger = null;
     }
     // Kill any remaining animations on the ring element
-    if (this.workCardRing) {
-      this.animationService.killAll(this.workCardRing);
+    if (this.workCardRing?.ringRef?.nativeElement) {
+      this.animationService.killAll(this.workCardRing.ringRef.nativeElement);
     }
   }
 

@@ -316,17 +316,17 @@ export class GsapUtilsService {
   }
 
   /**
-   * Get GSAP instance
+   * Get GSAP instance from AnimationOrchestrationService
    */
-  get gsap(): typeof gsap {
-    return gsap;
+  get gsap(): any {
+    return this.animationService.gsap;
   }
 
   /**
-   * Get ScrollTrigger instance
+   * Get ScrollTrigger instance from AnimationOrchestrationService
    */
-  get scrollTrigger(): typeof ScrollTrigger {
-    return ScrollTrigger;
+  get scrollTrigger(): any {
+    return this.animationService.ScrollTrigger;
   }
 
   /**

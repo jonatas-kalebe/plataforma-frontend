@@ -274,10 +274,15 @@ export class AnimationOrchestrationService {
       directional: options?.directional ?? true
     };
 
-    // Cria array de posições de snap (início de cada seção)
+    // Calculate total scrollable height
+    const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+    
+    // Cria array de posições de snap como frações de progresso (0-1)
     const snapPositions = Array.from(sections).map((section) => {
       const element = section as HTMLElement;
-      return element.offsetTop;
+      const scrollPosition = element.offsetTop;
+      // Convert pixel position to progress fraction (0-1)
+      return scrollPosition / scrollHeight;
     });
 
     // Configura ScrollTrigger com snap global
