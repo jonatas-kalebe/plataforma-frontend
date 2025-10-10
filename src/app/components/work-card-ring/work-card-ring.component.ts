@@ -843,4 +843,12 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     const exponent = intensity > 1.4 ? 0.82 : 0.9;
     return Math.sign(clamped) * Math.pow(Math.abs(clamped), exponent);
   }
+
+  /**
+   * Track by function for ngFor performance optimization
+   * Returns unique identifier for each item to minimize DOM re-renders
+   */
+  trackByItemId(index: number, item: any): any {
+    return item?.id ?? index;
+  }
 }

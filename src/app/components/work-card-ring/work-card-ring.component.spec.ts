@@ -542,4 +542,34 @@ describe('WorkCardRingComponent', () => {
       }, 10);
     });
   });
+
+  describe('Track By Function', () => {
+    it('should track by item id when available', () => {
+      const itemWithId = { id: 'item-123', title: 'Test Project' };
+      const result = component.trackByItemId(0, itemWithId);
+      expect(result).toBe('item-123');
+    });
+
+    it('should track by item id when id is numeric', () => {
+      const itemWithId = { id: 42, title: 'Test Project' };
+      const result = component.trackByItemId(0, itemWithId);
+      expect(result).toBe(42);
+    });
+
+    it('should track by index when id is not available', () => {
+      const itemWithoutId = { title: 'Test Project' };
+      const result = component.trackByItemId(5, itemWithoutId);
+      expect(result).toBe(5);
+    });
+
+    it('should track by index when item is null', () => {
+      const result = component.trackByItemId(3, null);
+      expect(result).toBe(3);
+    });
+
+    it('should track by index when item is undefined', () => {
+      const result = component.trackByItemId(7, undefined);
+      expect(result).toBe(7);
+    });
+  });
 });
