@@ -3,8 +3,6 @@
  * Classe base para padronizar e simplificar animações GSAP no projeto
  */
 
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { ANIMATION_DURATIONS, ANIMATION_EASING } from '../constants/animation.constants';
 
 export interface AnimationConfig {
@@ -23,7 +21,7 @@ export interface ScrollTriggerConfig {
   end?: string;
   scrub?: number | boolean;
   toggleActions?: string;
-  onUpdate?: (self: ScrollTrigger) => void;
+  onUpdate?: (self: any) => void;
 }
 
 /**
@@ -31,8 +29,8 @@ export interface ScrollTriggerConfig {
  * Centraliza configurações comuns e reduz duplicação de código
  */
 export abstract class BaseAnimation {
-  protected timelines: gsap.core.Timeline[] = [];
-  protected scrollTriggers: ScrollTrigger[] = [];
+  protected timelines: any[] = [];
+  protected scrollTriggers: any[] = [];
   protected prefersReducedMotion = false;
 
   constructor() {
@@ -52,7 +50,13 @@ export abstract class BaseAnimation {
   /**
    * Cria uma timeline GSAP com configurações padrão otimizadas
    */
-  protected createTimeline(config?: gsap.TimelineVars): gsap.core.Timeline {
+  protected createTimeline(config?: any): any {
+    const gsap = (window as any).gsap;
+    if (!gsap) {
+      console.warn('BaseAnimation: GSAP not available');
+      return null;
+    }
+
     const timeline = gsap.timeline({
       defaults: {
         ease: this.prefersReducedMotion ? 'none' : ANIMATION_EASING.EASE_OUT,
@@ -68,8 +72,12 @@ export abstract class BaseAnimation {
   /**
    * Cria um ScrollTrigger com configurações otimizadas baseadas nas preferências do usuário
    */
-  protected createScrollTrigger(config: ScrollTriggerConfig): ScrollTrigger | null {
-    if (!ScrollTrigger) return null;
+  protected createScrollTrigger(config: ScrollTriggerConfig): any {
+    const ScrollTrigger = (window as any).ScrollTrigger;
+    if (!ScrollTrigger) {
+      console.warn('BaseAnimation: ScrollTrigger not available');
+      return null;
+    }
 
     // Adapta configurações para movimento reduzido
     const finalConfig = this.prefersReducedMotion ? {
@@ -86,25 +94,29 @@ export abstract class BaseAnimation {
   /**
    * Animação de entrada padrão para elementos
    */
-  protected animateEnter(selector: string, config: AnimationConfig = {}): gsap.core.Timeline {
+  protected animateEnter(selector: string, config: AnimationConfig = {}): any {
     const finalConfig = this.getAdaptedConfig(config);
     const timeline = this.createTimeline();
     
-    timeline.from(selector, finalConfig);
+    if (timeline) {
+      timeline.from(selector, finalConfig);
+    }
     return timeline;
   }
 
   /**
    * Animação de entrada escalonada para múltiplos elementos
    */
-  protected animateStaggeredEnter(selector: string, config: AnimationConfig = {}, stagger: number = 0.1): gsap.core.Timeline {
+  protected animateStaggeredEnter(selector: string, config: AnimationConfig = {}, stagger: number = 0.1): any {
     const finalConfig = this.getAdaptedConfig(config);
     const timeline = this.createTimeline();
     
-    timeline.from(selector, {
-      ...finalConfig,
-      stagger: this.prefersReducedMotion ? 0 : stagger
-    });
+    if (timeline) {
+      timeline.from(selector, {
+        ...finalConfig,
+        stagger: this.prefersReducedMotion ? 0 : stagger
+      });
+    }
     
     return timeline;
   }

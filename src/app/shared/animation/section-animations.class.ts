@@ -3,7 +3,6 @@
  * Classe especializada para animações de seção reutilizáveis
  */
 
-import gsap from 'gsap';
 import { BaseAnimation, AnimationConfig, ScrollTriggerConfig } from './base-animation.class';
 
 /**
