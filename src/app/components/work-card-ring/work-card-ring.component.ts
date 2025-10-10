@@ -1,6 +1,5 @@
 import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, EventEmitter, HostListener, Inject, Input, NgZone, OnChanges, OnDestroy, Output, PLATFORM_ID, QueryList, SimpleChanges, ViewChild, ViewChildren } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
-import { getGroupAttrs, getItemAttrs, getLiveMessage } from '../../a11y/aria-ring';
 import { Subscription } from 'rxjs';
 
 // Service imports
@@ -130,7 +129,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     private featureFlagsService: FeatureFlagsService
   ) {
     this.isBrowser = isPlatformBrowser(platformId);
-    
+
     // Configure gesture service with component settings
     if (this.isBrowser) {
       this.ringGestureService.configure({
@@ -201,7 +200,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         this.lastRadiusApplied = -1;
         this.layoutCards(true);
         this.emitActiveIndex();
-        
+
         // Update ARIA attributes when items change
         if (changes['items']) {
           this.updateAriaAttributes();
@@ -228,19 +227,19 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
   ngOnDestroy(): void {
     if (!this.isBrowser) return;
-    
+
     // Unsubscribe from all observables
     this.subscriptions.unsubscribe();
-    
+
     // Cleanup event listeners
     this.detachEvents();
-    
+
     // Cancel animation frame
     if (this.rafId != null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
-    
+
     // Reset gesture service state
     this.ringGestureService.reset();
   }
@@ -258,23 +257,23 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       isPrimary: ev.isPrimary !== false,
       button: ev.button
     };
-    
+
     // Reset rotation targets
     this.desiredRotationDeg = null;
     this.snapPending = false;
     this.snapTarget = null;
-    
+
     // Update cursor
     this.ringEl.style.cursor = 'grab';
     this.ringEl.style.touchAction = 'pan-y';
-    
+
     // Reset drag metrics
     this.lastDragVelocity = 0;
     this.peakDragVelocity = 0;
     this.peakDragAcceleration = 0;
     this.dragEnergy = 0;
     this.slowDragFrames = 0;
-    
+
     this.ringGestureService.onPointerDown(syntheticEvent);
   };
 
@@ -288,9 +287,9 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       isPrimary: ev.isPrimary !== false,
       button: ev.button
     };
-    
+
     this.ringGestureService.onPointerMove(syntheticEvent);
-    
+
     // Prevent default if rotating
     if (this.ringGestureService.getState() === 'rotate') {
       ev.preventDefault?.();
@@ -307,9 +306,9 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       isPrimary: ev.isPrimary !== false,
       button: ev.button
     };
-    
+
     this.ringGestureService.onPointerUp(syntheticEvent);
-    
+
     // Reset cursor
     this.ringEl.style.cursor = 'grab';
     this.ringEl.style.touchAction = 'pan-y';
@@ -349,7 +348,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.desiredRotationDeg = null;
     this.snapPending = true;
     this.lastDragEndTS = now;
-    
+
     // Trigger haptic feedback on wheel
     if (this.featureFlagsService.isHapticsEnabled()) {
       this.hapticsService.vibrate(this.hapticsService.patterns.light);
@@ -361,7 +360,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
    */
   private handleGestureData(data: GestureData): void {
     const state = data.state;
-    
+
     if (state === 'pending') {
       // Gesture started, waiting for disambiguation
       this.dragging = false;
@@ -372,7 +371,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         this.dragging = true;
         this.ringEl.style.cursor = 'grabbing';
         this.ringEl.style.touchAction = 'none';
-        
+
         // Capture pointer if available
         if (data.pointerId !== null && this.ringEl.setPointerCapture) {
           try {
@@ -382,7 +381,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
           }
         }
       }
-      
+
       // Apply drag curve and sensitivity
       const pointerSpeed = Math.abs(data.velocity);
       const intensity = this.computePointerIntensity(pointerSpeed);
@@ -402,7 +401,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       // Update rotation
       this.rotationDeg += deltaDeg;
       this.snapTarget = null;
-      
+
       // Update velocity with smoothing
       const smoothedVelocity = data.smoothedVelocity * this.dragSensitivity;
       const isSlowDrag = this.peakDragVelocity < this.stepDeg * 3.5 && Math.abs(smoothedVelocity) < this.stepDeg * 2.75;
@@ -413,13 +412,13 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         this.slowDragFrames = Math.max(0, this.slowDragFrames - 3);
         this.angularVelocity = this.angularVelocity * 0.55 + smoothedVelocity * 0.45;
       }
-      
+
       this.interactionBridge?.onDragMove?.(this.rotationDeg, this.angularVelocity);
     } else if (state === 'idle' && this.dragging) {
       // Gesture ended
       const wasRotating = this.dragging;
       this.dragging = false;
-      
+
       // Release pointer capture
       if (data.pointerId !== null && this.ringEl.releasePointerCapture) {
         try {
@@ -428,7 +427,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
           // Silently fail
         }
       }
-      
+
       // Calculate release velocity using physics service
       if (wasRotating) {
         const params: ReleaseVelocityParams = {
@@ -441,29 +440,29 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
           peakDragAcceleration: this.peakDragAcceleration,
           dragEnergy: this.dragEnergy
         };
-        
+
         this.angularVelocity = this.ringPhysicsService.releaseVelocity(params);
-        
+
         // Trigger haptic feedback on release
         if (this.featureFlagsService.isHapticsEnabled() && Math.abs(this.angularVelocity) > this.stepDeg * 2) {
           this.hapticsService.vibrate(this.hapticsService.patterns.selection);
         }
       }
-      
+
       // Record when drag ended and handle snap
       this.lastDragEndTS = performance.now();
       this.snapPending = wasRotating;
       this.snapTarget = null;
-      
+
       if (wasRotating && this.slowDragFrames > 12 && Math.abs(this.angularVelocity) < this.stepDeg * 1.25) {
         this.angularVelocity = 0;
         this.desiredRotationDeg = this.ringPhysicsService.nearestSnapAngle(this.rotationDeg, this.stepDeg);
       }
-      
+
       if (wasRotating) {
         this.interactionBridge?.onDragEnd?.(this.angularVelocity);
       }
-      
+
       // Reset drag metrics
       this.slowDragFrames = 0;
       this.lastDragVelocity = 0;
@@ -501,13 +500,13 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       springStiffness: this.springStiffness,
       springDamping: this.springDamping
     };
-    
+
     this.baseRadiusEffective = this.ringLayoutService.calculateRadius(config);
   }
 
   private layoutCards(forceAll = false) {
     const radius = this.radiusState.current;
-    
+
     if (!forceAll && Math.abs(radius - this.lastRadiusApplied) < 0.1) return;
 
     const config: RingLayoutConfig = {
@@ -527,11 +526,11 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     for (let i = 0; i < this.cardEls.length; i++) {
       const el = this.cardEls[i];
       const position = this.ringLayoutService.calculateCardPosition(i, config, radius);
-      
+
       el.style.transform = position.transform;
       el.style.width = `${this.cardWidth}px`;
       el.style.height = `${this.cardHeight}px`;
-      
+
       // Add ARIA attributes to each card
       const itemAttrs = getItemAttrs(i, this.count);
       el.setAttribute('role', itemAttrs.role);
@@ -634,7 +633,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
             this.angularVelocity = 0;
             this.snapPending = false;
             this.snapTarget = null;
-            
+
             // Trigger haptic feedback on snap
             if (this.featureFlagsService.isHapticsEnabled()) {
               this.hapticsService.vibrate(this.hapticsService.patterns.snap);
@@ -665,7 +664,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       springStiffness: this.springStiffness,
       springDamping: this.springDamping
     };
-    
+
     this.radiusState = this.ringLayoutService.computeDynamicRadius(
       this.radiusState,
       config,
@@ -699,12 +698,12 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       this.activeIndexChange.emit(idx);
       this.interactionBridge?.onActiveIndexChange?.(idx);
       this.updateLiveMessage();
-      
+
       // Update ARIA live message
       this.updateAriaLiveMessage(idx);
     }
   }
-  
+
   private emitActiveIndex() {
     this.lastEmittedIndex = -1;
     this.maybeEmitIndex();
@@ -712,20 +711,20 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
   // Accessibility helpers
   liveMessage = '';
-  
+
   getGroupAttrs() {
     return getGroupAttrs(this.count);
   }
-  
+
   getItemAttrs(index: number) {
     return getItemAttrs(index, this.count);
   }
-  
+
   private updateLiveMessage() {
     const activeIndex = this.computeActiveIndex();
     const item = this.items[activeIndex];
     const itemLabel = item?.title ?? undefined;
-    
+
     this.liveMessage = getLiveMessage({
       activeIndex,
       total: this.count,
@@ -733,16 +732,16 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
       isRotating: this.dragging
     });
   }
-  
+
   onKeyDown(event: KeyboardEvent) {
     // Prevent default for navigation keys
     const navKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
     if (navKeys.includes(event.key)) {
       event.preventDefault();
     }
-    
+
     const step = this.stepDeg;
-    
+
     switch (event.key) {
       case 'ArrowLeft':
       case 'ArrowUp':
@@ -752,7 +751,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         this.snapPending = true;
         this.lastDragEndTS = performance.now();
         break;
-      
+
       case 'ArrowRight':
       case 'ArrowDown':
         // Rotate to next item
@@ -761,21 +760,21 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         this.snapPending = true;
         this.lastDragEndTS = performance.now();
         break;
-      
+
       case 'Home':
         // Jump to first item
         this.desiredRotationDeg = 0;
         this.angularVelocity = 0;
         this.snapPending = false;
         break;
-      
+
       case 'End':
         // Jump to last item
         this.desiredRotationDeg = -(this.count - 1) * step;
         this.angularVelocity = 0;
         this.snapPending = false;
         break;
-      
+
       case 'Enter':
       case ' ':
         // Allow space and enter to trigger selection (emit event)
@@ -790,7 +789,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
    */
   private updateAriaAttributes(): void {
     this.ariaGroupAttrs = getGroupAttrs(this.count);
-    
+
     // Apply group attributes to ring element
     this.ringEl.setAttribute('role', this.ariaGroupAttrs.role);
     this.ringEl.setAttribute('aria-label', this.ariaGroupAttrs['aria-label']);
