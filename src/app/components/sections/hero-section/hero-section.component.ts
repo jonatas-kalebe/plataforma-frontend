@@ -75,6 +75,7 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
    * Setup scroll-based resistance and acceleration animations using native JavaScript
    */
   private setupScrollAnimations(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
     if (!this.heroTitle || !this.heroSubtitle) return;
 
     // Skip scroll animations if user prefers reduced motion
@@ -107,6 +108,8 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
    * Update parallax elements based on scroll position
    */
   private updateParallaxElements(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     const heroSection = document.getElementById('hero');
     if (!heroSection) return;
 
@@ -155,6 +158,7 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
    * Setup animated scroll hint using CSS animation
    */
   private setupScrollHintAnimation(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
     if (!this.scrollHint) return;
 
     // Add CSS animation class instead of using GSAP
@@ -248,6 +252,7 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
    * Setup device orientation tilt support for mobile
    */
   private setupTiltSupport(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
     if (!('DeviceOrientationEvent' in window)) return;
 
     let tiltX = 0;
@@ -284,6 +289,9 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
           if (response == 'granted') {
             window.addEventListener('deviceorientation', handleDeviceOrientation);
           }
+        })
+        .catch(() => {
+          // Permission denied or error - silently fail
         });
     } else {
       // Non iOS 13+ devices

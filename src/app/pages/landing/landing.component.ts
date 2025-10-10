@@ -32,7 +32,7 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
   private zone = new NgZone({enableLongStackTrace: false});
 
   // Sistema de animações consolidado
-  private sectionAnimations = new NativeSectionAnimations();
+  private sectionAnimations = new NativeSectionAnimations(this.platformId);
 
   // Canvas e animação do knot
   private knotCtx!: CanvasRenderingContext2D | null;

@@ -7,7 +7,7 @@ import { RingLayoutService, RingLayoutConfig, RadiusState } from '../../services
 import { RingPhysicsService, ReleaseVelocityParams } from '../../services/ring-physics.service';
 import { RingGestureService, GestureData, SyntheticPointerEvent } from '../../services/ring-gesture.service';
 import { ReducedMotionService } from '../../services/reduced-motion.service';
-import { HapticsService } from '../../services/haptics.service';
+import { HapticsService, VibrationPattern } from '../../services/haptics.service';
 import { FeatureFlagsService } from '../../services/feature-flags.service';
 
 // A11y imports
@@ -112,6 +112,10 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private cardEls: HTMLDivElement[] = [];
   private interactionBridge: InteractionBridge = null;
   private lastWheelTS = 0;
+  
+  // Haptic feedback debouncing
+  private lastHapticTS = 0;
+  private readonly HAPTIC_DEBOUNCE_MS = 250;
 
   // ARIA attributes
   public ariaGroupAttrs: AriaGroupAttributes = getGroupAttrs(this.items.length);
@@ -349,10 +353,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
     this.snapPending = true;
     this.lastDragEndTS = now;
 
-    // Trigger haptic feedback on wheel
-    if (this.featureFlagsService.isHapticsEnabled()) {
-      this.hapticsService.vibrate(this.hapticsService.patterns.light);
-    }
+    // Trigger haptic feedback on wheel (debounced)
+    this.triggerHapticFeedback(this.hapticsService.patterns.light, true);
   };
 
   /**
@@ -371,6 +373,9 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
         this.dragging = true;
         this.ringEl.style.cursor = 'grabbing';
         this.ringEl.style.touchAction = 'none';
+
+        // Trigger light haptic feedback on drag start
+        this.triggerHapticFeedback(this.hapticsService.patterns.light, true);
 
         // Capture pointer if available
         if (data.pointerId !== null && this.ringEl.setPointerCapture) {
@@ -443,9 +448,9 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
 
         this.angularVelocity = this.ringPhysicsService.releaseVelocity(params);
 
-        // Trigger haptic feedback on release
-        if (this.featureFlagsService.isHapticsEnabled() && Math.abs(this.angularVelocity) > this.stepDeg * 2) {
-          this.hapticsService.vibrate(this.hapticsService.patterns.selection);
+        // Trigger haptic feedback on release (debounced, only for significant velocity)
+        if (Math.abs(this.angularVelocity) > this.stepDeg * 2) {
+          this.triggerHapticFeedback(this.hapticsService.patterns.selection, true);
         }
       }
 
@@ -634,10 +639,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
             this.snapPending = false;
             this.snapTarget = null;
 
-            // Trigger haptic feedback on snap
-            if (this.featureFlagsService.isHapticsEnabled()) {
-              this.hapticsService.vibrate(this.hapticsService.patterns.snap);
-            }
+            // Trigger haptic feedback on snap (debounced)
+            this.triggerHapticFeedback(this.hapticsService.patterns.snap, true);
           }
         } else if (this.snapPending && timeSinceDragEnd >= snapDelay) {
           // keep inertia alive but gently bleed energy so we eventually cross the threshold
@@ -850,5 +853,31 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
    */
   trackByItemId(index: number, item: any): any {
     return item?.id ?? index;
+   * Trigger haptic feedback with debouncing and reduced motion check
+   * @param pattern - Vibration pattern to use
+   * @param forceDebounce - If true, enforces debounce; if false, allows immediate trigger
+   */
+  private triggerHapticFeedback(pattern: VibrationPattern, forceDebounce = true): void {
+    // Check if haptics are enabled via feature flag
+    if (!this.featureFlagsService.isHapticsEnabled()) {
+      return;
+    }
+
+    // Respect prefers-reduced-motion preference
+    if (this.reducedMotion) {
+      return;
+    }
+
+    // Apply debouncing
+    if (forceDebounce) {
+      const now = performance.now();
+      if (now - this.lastHapticTS < this.HAPTIC_DEBOUNCE_MS) {
+        return; // Too soon, skip this haptic
+      }
+      this.lastHapticTS = now;
+    }
+
+    // Trigger the haptic feedback
+    this.hapticsService.vibrate(pattern);
   }
 }
