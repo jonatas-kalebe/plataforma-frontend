@@ -149,6 +149,12 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
       this.animationOrchestration.initialize().then(() => {
         console.log('LandingComponent: GSAP initialized via AnimationOrchestrationService');
         
+        // Setup global scroll snap after GSAP is initialized
+        this.setupGlobalScrollSnap();
+        
+        // Setup resize listener for ScrollTrigger refresh
+        this.setupResizeListener();
+        
         // Then initialize scroll system (which depends on GSAP)
         this.initializeScrollSystem();
         this.initializeSectionAnimations();
@@ -210,6 +216,46 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
     this.sectionAnimations.animateSectionEntry('cta', {
       title: '#cta h2',
       cta: '#cta a'
+    });
+  }
+
+  /**
+   * Setup global scroll snap for sections
+   */
+  private setupGlobalScrollSnap(): void {
+    if (this.prefersReducedMotion) {
+      return;
+    }
+
+    const sectionSelector = '#hero, #filosofia, #servicos, #trabalhos, #cta';
+    this.animationOrchestration.setupGlobalScrollSnap(sectionSelector, {
+      duration: 0.92,
+      ease: 'power3.out',
+      delay: 0.11,
+      directional: true
+    });
+  }
+
+  /**
+   * Setup resize listener to refresh ScrollTrigger
+   */
+  private setupResizeListener(): void {
+    let resizeTimeout: any;
+    
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        // Refresh ScrollTrigger after layout changes
+        this.animationOrchestration.refreshScrollTriggers();
+        console.log('LandingComponent: ScrollTrigger refreshed after resize');
+      }, 250);
+    };
+
+    window.addEventListener('resize', handleResize);
+    
+    // Store cleanup in destroy
+    this.destroy$.subscribe(() => {
+      window.removeEventListener('resize', handleResize);
     });
   }
 
