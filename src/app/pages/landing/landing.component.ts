@@ -13,6 +13,7 @@ import {CtaSectionComponent} from '../../components/sections/cta-section/cta-sec
 
 // Import new animation system
 import { NativeSectionAnimations } from '../../shared/animation/native-section-animations.class';
+import { AnimationOrchestrationService } from '../../services/animation/animation-orchestration.service';
 
 @Component({
   selector: 'app-landing',
@@ -47,6 +48,9 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
   // Preload service injection
   private preloadService = inject(PreloadService);
   public preloadStatus: PreloadStatus = {};
+  
+  // Animation orchestration service injection
+  private animationOrchestration = inject(AnimationOrchestrationService);
 
   constructor(private scrollService: ScrollOrchestrationService) {
     this.checkReducedMotion();
@@ -141,10 +145,16 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!isPlatformBrowser(this.platformId)) return;
 
     this.zone.runOutsideAngular(() => {
-      // Inicialização consolidada dos sistemas
-      this.initializeScrollSystem();
-      this.initializeSectionAnimations();
-
+      // Initialize GSAP first via AnimationOrchestrationService
+      this.animationOrchestration.initialize().then(() => {
+        console.log('LandingComponent: GSAP initialized via AnimationOrchestrationService');
+        
+        // Then initialize scroll system (which depends on GSAP)
+        this.initializeScrollSystem();
+        this.initializeSectionAnimations();
+      }).catch(error => {
+        console.error('LandingComponent: Failed to initialize GSAP:', error);
+      });
     });
   }
 

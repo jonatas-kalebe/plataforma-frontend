@@ -7,6 +7,7 @@ import type { gsap } from 'gsap';
 import type { ScrollTrigger } from 'gsap/ScrollTrigger';
 import type { Draggable } from 'gsap/Draggable';
 import type { InertiaPlugin } from 'gsap/InertiaPlugin';
+import type { ScrollToPlugin } from 'gsap/ScrollToPlugin';
 
 @Injectable({
   providedIn: 'root'
@@ -20,6 +21,7 @@ export class AnimationOrchestrationService {
   private _ScrollTrigger?: typeof ScrollTrigger;
   private _Draggable?: typeof Draggable;
   private _InertiaPlugin?: typeof InertiaPlugin;
+  private _ScrollToPlugin?: typeof ScrollToPlugin;
 
   /**
    * Inicializa o GSAP e registra todos os plugins necessários.
@@ -35,20 +37,28 @@ export class AnimationOrchestrationService {
 
     try {
       // Carrega as bibliotecas do GSAP de forma assíncrona (lazy-loading)
-      const [gsapModule, stModule, draggableModule, inertiaModule] = await Promise.all([
+      const [gsapModule, stModule, draggableModule, inertiaModule, scrollToModule] = await Promise.all([
         import('gsap'),
         import('gsap/ScrollTrigger'),
         import('gsap/Draggable'),
         import('gsap/InertiaPlugin'), // InertiaPlugin agora é parte do core gratuito do GSAP
+        import('gsap/ScrollToPlugin'),
       ]);
 
       this._gsap = gsapModule.gsap;
       this._ScrollTrigger = stModule.ScrollTrigger;
       this._Draggable = draggableModule.Draggable;
       this._InertiaPlugin = inertiaModule.InertiaPlugin;
+      this._ScrollToPlugin = scrollToModule.ScrollToPlugin;
 
-      // Registra os plugins no GSAP
-      this._gsap.registerPlugin(this._ScrollTrigger, this._Draggable, this._InertiaPlugin);
+      // Registra os plugins no GSAP (incluindo ScrollToPlugin necessário para animações de scroll)
+      this._gsap.registerPlugin(this._ScrollTrigger, this._Draggable, this._InertiaPlugin, this._ScrollToPlugin);
+      
+      // Expõe globalmente para compatibilidade com código legado
+      if (typeof window !== 'undefined') {
+        (window as any).gsap = this._gsap;
+        (window as any).ScrollTrigger = this._ScrollTrigger;
+      }
 
       // Define padrões globais para consistência nas animações
       this._gsap.defaults({
