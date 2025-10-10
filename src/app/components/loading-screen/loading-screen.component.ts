@@ -16,7 +16,6 @@ import {
 import {CommonModule, isPlatformBrowser} from '@angular/common';
 import {HttpClient} from '@angular/common/http';
 import {DomSanitizer, SafeHtml} from '@angular/platform-browser';
-import gsap from 'gsap';
 import {finalize, first} from 'rxjs/operators';
 import { PreloadService } from '../../services/preload.service';
 
@@ -42,7 +41,7 @@ export class LoadingScreenComponent implements OnInit, AfterViewInit, OnDestroy 
   private zone = inject(NgZone);
   private platformId = inject(PLATFORM_ID);
   private preloadService = inject(PreloadService);
-  private tl: gsap.core.Timeline | null = null;
+  private tl: any = null;
   private isDone = false;
   private onSkip = () => this.skipAnimation();
   private startTime: number = 0;
@@ -126,8 +125,13 @@ export class LoadingScreenComponent implements OnInit, AfterViewInit, OnDestroy 
       return;
     }
 
-    // Use window.gsap if available (for tests), otherwise use imported gsap
-    const gsapInstance = (window as any).gsap || gsap;
+    // Use window.gsap which is set by AnimationOrchestrationService
+    const gsapInstance = (window as any).gsap;
+    if (!gsapInstance) {
+      console.warn('LoadingScreenComponent: GSAP not available, finishing immediately');
+      this.finish();
+      return;
+    }
 
     gsapInstance.set([svgPaths], {opacity: 0});
     gsapInstance.set(svgPaths, {
@@ -170,8 +174,13 @@ export class LoadingScreenComponent implements OnInit, AfterViewInit, OnDestroy 
     const overlay = this.hostRef.nativeElement.querySelector('.loading-overlay') as HTMLElement | null;
     const svgPaths = this.hostRef.nativeElement.querySelectorAll('path, ellipse');
 
-    // Use window.gsap if available (for tests), otherwise use imported gsap
-    const gsapInstance = (window as any).gsap || gsap;
+    // Use window.gsap which is set by AnimationOrchestrationService
+    const gsapInstance = (window as any).gsap;
+    if (!gsapInstance) {
+      // If GSAP not available, just finish immediately
+      this.finish();
+      return;
+    }
 
     this.tl?.kill();
     if (svgPaths.length > 0) {

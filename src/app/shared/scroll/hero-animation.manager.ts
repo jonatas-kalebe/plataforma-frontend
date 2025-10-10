@@ -3,15 +3,12 @@
  * Extrai lógica complexa de animação do hero do scroll service
  */
 
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-
 /**
  * Gerencia animações específicas da seção hero
  * Reduz complexidade do scroll service principal
  */
 export class HeroAnimationManager {
-  private heroTimeline: gsap.core.Timeline | null = null;
+  private heroTimeline: any = null;
 
   constructor(private prefersReducedMotion: boolean = false) {}
 
@@ -111,8 +108,14 @@ export class HeroAnimationManager {
   /**
    * Configura ScrollTrigger para o hero
    */
-  public setupHeroScrollTrigger(): ScrollTrigger | null {
+  public setupHeroScrollTrigger(): any {
     if (this.prefersReducedMotion || !this.heroTimeline) return null;
+
+    const ScrollTrigger = (window as any).ScrollTrigger;
+    if (!ScrollTrigger) {
+      console.warn('HeroAnimationManager: ScrollTrigger not available');
+      return null;
+    }
 
     return ScrollTrigger.create({
       trigger: '#hero',
@@ -120,7 +123,7 @@ export class HeroAnimationManager {
       end: 'bottom top',
       scrub: 1,
       animation: this.heroTimeline,
-      onUpdate: (self) => {
+      onUpdate: (self: any) => {
         const progress = self.progress;
         this.updateHeroEffects(progress);
         

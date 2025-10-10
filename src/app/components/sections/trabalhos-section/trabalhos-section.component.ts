@@ -8,7 +8,8 @@ import { CommonModule } from '@angular/common';
 import { WorkCardRingComponent } from '../../work-card-ring/work-card-ring.component';
 import { IoVisibleDirective } from '../../../directives/io-visible.directive';
 import { SECTION_IDS } from '../../../shared/constants/section.constants';
-import { TrabalhosSectionAnimationService } from '../../../services/animation/trabalhos-section-animation.service';
+import { AnimationOrchestrationService } from '../../../services/animation/animation-orchestration.service';
+import { HapticsService } from '../../../services/haptics.service';
 
 @Component({
   selector: 'app-trabalhos-section',
@@ -44,7 +45,13 @@ export class TrabalhosSectionComponent implements AfterViewInit, OnDestroy {
   @ViewChild('pinContainer', { read: ElementRef }) pinContainer!: ElementRef;
   @ViewChild('trabalhosShowcase', { read: ElementRef }) trabalhosShowcase!: ElementRef;
 
-  constructor(private trabalhosSectionAnimation: TrabalhosSectionAnimationService) {}
+  // Animation state
+  private scrollTrigger: any = null;
+
+  constructor(
+    private animationService: AnimationOrchestrationService,
+    private hapticsService: HapticsService
+  ) {}
 
   ngAfterViewInit(): void {
     this.sectionReady.emit(this.sectionElement);
@@ -57,26 +64,54 @@ export class TrabalhosSectionComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     // Clean up all animations
-    this.trabalhosSectionAnimation.destroy();
+    if (this.scrollTrigger) {
+      this.scrollTrigger.kill();
+      this.scrollTrigger = null;
+    }
+    // Kill any remaining animations on the ring element
+    if (this.workCardRing) {
+      this.animationService.killAll(this.workCardRing);
+    }
   }
 
   /**
    * Initialize all animations for the trabalhos section
    */
   private initializeAnimations(): void {
-    // Register ring component for scroll updates
-    if (this.workCardRing) {
-      this.trabalhosSectionAnimation.setRingComponent(this.workCardRing);
+    if (!this.sectionElement || !this.workCardRing) {
+      return;
+    }
+
+    const sectionEl = this.sectionElement.nativeElement;
+    
+    // Setup scroll-based rotation animation
+    if (this.enableParallax) {
+      this.scrollTrigger = this.animationService.setupTrabalhosScrollAnimation(
+        sectionEl,
+        this.workCardRing
+      );
     }
     
-    // Register section element for scroll-based pinned behavior
-    if (this.sectionElement && this.enablePinning) {
-      this.trabalhosSectionAnimation.registerSectionElement(this.sectionElement.nativeElement);
-    }
-    
-    // Enhance ring interactions
-    if (this.workCardRing) {
-      this.trabalhosSectionAnimation.enhanceRingInteractions(this.workCardRing);
+    // The ring component already handles its own drag interactions
+    // We just need to provide haptic feedback if the ring supports it
+    if (this.workCardRing && typeof this.workCardRing.registerInteractionBridge === 'function') {
+      this.workCardRing.registerInteractionBridge({
+        onDragStart: () => {
+          if (this.hapticsService.isHapticsSupported()) {
+            this.hapticsService.vibrate(this.hapticsService.patterns.light);
+          }
+        },
+        onDragEnd: () => {
+          if (this.hapticsService.isHapticsSupported()) {
+            this.hapticsService.vibrate(this.hapticsService.patterns.selection);
+          }
+        },
+        onActiveIndexChange: () => {
+          if (this.hapticsService.isHapticsSupported()) {
+            this.hapticsService.vibrate(this.hapticsService.patterns.snap);
+          }
+        }
+      });
     }
   }
 
@@ -85,7 +120,8 @@ export class TrabalhosSectionComponent implements AfterViewInit, OnDestroy {
    * Called by IoVisibleDirective when section enters viewport
    */
   onSectionEnter(): void {
-    this.trabalhosSectionAnimation.onIntersectionEnter();
+    // Animation logic handled by GSAP ScrollTrigger
+    // No additional action needed here
   }
 
   /**
@@ -93,7 +129,8 @@ export class TrabalhosSectionComponent implements AfterViewInit, OnDestroy {
    * Called by IoVisibleDirective when section exits viewport
    */
   onSectionLeave(): void {
-    this.trabalhosSectionAnimation.onIntersectionLeave();
+    // Animation logic handled by GSAP ScrollTrigger
+    // No additional action needed here
   }
 
   // Constants
