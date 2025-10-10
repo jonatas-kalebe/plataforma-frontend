@@ -26,7 +26,7 @@
     <div
       #card
       class="work-card"
-      *ngFor="let item of items; let i = index"
+      *ngFor="let item of items; let i = index; trackBy: trackByItemId"
       [style.--i]="i"
       [attr.role]="getItemAttrs(i).role"
       [attr.aria-label]="getItemAttrs(i)['aria-label']"

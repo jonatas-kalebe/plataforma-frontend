@@ -848,6 +848,11 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   }
 
   /**
+   * Track by function for ngFor performance optimization
+   * Returns unique identifier for each item to minimize DOM re-renders
+   */
+  trackByItemId(index: number, item: any): any {
+    return item?.id ?? index;
    * Trigger haptic feedback with debouncing and reduced motion check
    * @param pattern - Vibration pattern to use
    * @param forceDebounce - If true, enforces debounce; if false, allows immediate trigger
