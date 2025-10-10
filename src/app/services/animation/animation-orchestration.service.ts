@@ -308,11 +308,151 @@ export class AnimationOrchestrationService {
   }
 
   /**
+   * Configura animações de scroll para a seção de trabalhos usando GSAP e ScrollTrigger.
+   * @param sectionElement O elemento da seção de trabalhos
+   * @param ringComponent Referência ao componente do anel que será animado
+   * @returns O ScrollTrigger criado, ou null se não puder ser criado
+   */
+  public setupTrabalhosScrollAnimation(
+    sectionElement: HTMLElement,
+    ringComponent: any
+  ): any {
+    if (!this.isReady()) {
+      this.logNotReadyWarning('setupTrabalhosScrollAnimation');
+      return null;
+    }
+
+    if (!this._gsap || !this._ScrollTrigger) {
+      console.warn('[AnimationOrchestrationService] GSAP ou ScrollTrigger não disponível');
+      return null;
+    }
+
+    // Check if user prefers reduced motion
+    const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      console.log('[AnimationOrchestrationService] Reduced motion preference detected, skipping trabalhos scroll animation');
+      return null;
+    }
+
+    const ScrollTrigger = this._ScrollTrigger;
+    const gsap = this._gsap;
+
+    // Create scroll-based rotation animation for the ring
+    const trigger = ScrollTrigger.create({
+      trigger: sectionElement,
+      start: 'top bottom',
+      end: 'bottom top',
+      scrub: 1,
+      onUpdate: (self) => {
+        const progress = self.progress;
+        
+        // Update ring component's scroll progress
+        if (ringComponent && 'scrollProgress' in ringComponent) {
+          ringComponent.scrollProgress = progress;
+        }
+
+        // Calculate rotation based on scroll progress (2 full rotations over the section)
+        const totalRotation = progress * 720;
+        
+        // Apply rotation to ring component
+        if (ringComponent && 'rotationDeg' in ringComponent) {
+          ringComponent.rotationDeg = -totalRotation;
+        }
+      }
+    });
+
+    console.log('[AnimationOrchestrationService] Trabalhos scroll animation configured');
+    return trigger;
+  }
+
+  /**
+   * Configura interação de drag para o anel de trabalhos usando GSAP Draggable.
+   * @param ringElement O elemento HTML do anel que será arrastável
+   * @param ringComponent Referência ao componente do anel
+   * @param callbacks Callbacks para eventos de drag
+   */
+  public setupTrabalhosDrag(
+    ringElement: HTMLElement,
+    ringComponent: any,
+    callbacks?: {
+      onDragStart?: () => void;
+      onDragMove?: (rotation: number, velocity: number) => void;
+      onDragEnd?: (velocity: number) => void;
+      onSnap?: (index: number) => void;
+    }
+  ): any {
+    if (!this.isReady()) {
+      this.logNotReadyWarning('setupTrabalhosDrag');
+      return null;
+    }
+
+    if (!this._gsap || !this._Draggable) {
+      console.warn('[AnimationOrchestrationService] GSAP ou Draggable não disponível');
+      return null;
+    }
+
+    // Check if user prefers reduced motion
+    const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      console.log('[AnimationOrchestrationService] Reduced motion preference detected, skipping drag setup');
+      return null;
+    }
+
+    const Draggable = this._Draggable;
+    const gsap = this._gsap;
+
+    // Create draggable instance with rotation
+    const draggable = Draggable.create(ringElement, {
+      type: 'rotation',
+      inertia: true,
+      onDragStart: () => {
+        if (callbacks?.onDragStart) callbacks.onDragStart();
+        if (ringComponent) ringComponent.isDragging = true;
+      },
+      onDrag: function(this: any) {
+        const rotation = this['rotation'];
+        const velocity = this['getVelocity']('rotation');
+        if (callbacks?.onDragMove) callbacks.onDragMove(rotation, velocity);
+        if (ringComponent && 'rotationDeg' in ringComponent) {
+          ringComponent.rotationDeg = rotation;
+        }
+      },
+      onDragEnd: function(this: any) {
+        const velocity = this['getVelocity']('rotation');
+        if (callbacks?.onDragEnd) callbacks.onDragEnd(velocity);
+        if (ringComponent) ringComponent.isDragging = false;
+        
+        // Snap to nearest card (45 degrees per card)
+        const currentRotation = this['rotation'];
+        const cardAngle = 45;
+        const nearestCardIndex = Math.round(-currentRotation / cardAngle);
+        const targetRotation = -nearestCardIndex * cardAngle;
+        
+        gsap.to(ringElement, {
+          rotation: targetRotation,
+          duration: 0.8,
+          ease: 'power3.out',
+          onComplete: () => {
+            if (callbacks?.onSnap) callbacks.onSnap(nearestCardIndex);
+          }
+        });
+      },
+      snap: (value: number) => {
+        // Snap to 45-degree intervals (8 cards)
+        return Math.round(value / 45) * 45;
+      }
+    });
+
+    console.log('[AnimationOrchestrationService] Trabalhos drag interaction configured');
+    return draggable[0];
+  }
+
+  /**
    * Interrompe e remove animações e instâncias do ScrollTrigger.
    * Crucial para a limpeza no `ngOnDestroy` de componentes para evitar memory leaks.
    * @param target Opcional. O alvo (seletor, elemento) para matar as animações. Se não for fornecido, remove triggers globais.
    */
-  public killAll(target?: gsap.DOMTarget): void {
+  public killAll(target?: any): void {
     if (!this.isReady()) return;
 
     if (target) {
