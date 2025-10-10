@@ -112,7 +112,7 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
   private cardEls: HTMLDivElement[] = [];
   private interactionBridge: InteractionBridge = null;
   private lastWheelTS = 0;
-  
+
   // Haptic feedback debouncing
   private lastHapticTS = 0;
   private readonly HAPTIC_DEBOUNCE_MS = 250;
@@ -853,10 +853,8 @@ export class WorkCardRingComponent implements AfterViewInit, OnDestroy, OnChange
    */
   trackByItemId(index: number, item: any): any {
     return item?.id ?? index;
-   * Trigger haptic feedback with debouncing and reduced motion check
-   * @param pattern - Vibration pattern to use
-   * @param forceDebounce - If true, enforces debounce; if false, allows immediate trigger
-   */
+  }
+
   private triggerHapticFeedback(pattern: VibrationPattern, forceDebounce = true): void {
     // Check if haptics are enabled via feature flag
     if (!this.featureFlagsService.isHapticsEnabled()) {

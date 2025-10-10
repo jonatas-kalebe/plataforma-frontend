@@ -74,22 +74,22 @@
     line-height: 1.6;
     overflow-x: hidden;
     height: 100%;
-    
+
     /* Support for safe area insets on mobile */
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
-    
+
     /* Improve touch scrolling on iOS */
     -webkit-overflow-scrolling: touch;
-    
+
     /* Prevent text selection on touch devices for UI elements */
     -webkit-touch-callout: none;
-    
+
     /* Hide scrollbars while maintaining scroll functionality */
     scrollbar-width: none; /* Firefox */
     -ms-overflow-style: none; /* IE and Edge */
   }
-  
+
   /* Hide scrollbar for Chrome, Safari and Opera */
   body::-webkit-scrollbar {
     display: none;
@@ -178,7 +178,7 @@
   }
 
   /* Improve tap targets on mobile */
-  button, 
+  button,
   [role="button"],
   input[type="button"],
   input[type="submit"] {
@@ -213,7 +213,7 @@
       padding: var(--spacing-md);
       border-radius: var(--radius-lg);
     }
-    
+
     .card-base:hover {
       transform: translateY(-2px);
     }
@@ -229,15 +229,15 @@
     justify-content: center;
     text-decoration: none;
     transition: all var(--duration-normal) ease;
-    
+
     /* Ensure touch targets are large enough */
     min-height: var(--touch-target-comfortable);
     min-width: var(--touch-target-comfortable);
-    
+
     /* Prevent text selection */
     user-select: none;
     -webkit-user-select: none;
-    
+
     /* Better touch response */
     touch-action: manipulation;
   }
@@ -278,7 +278,7 @@
       padding: var(--spacing-sm) var(--spacing-lg);
       font-size: clamp(0.875rem, 0.8rem + 0.375vw, 1rem);
     }
-    
+
     .btn-primary,
     .btn-secondary {
       width: 100%;
@@ -293,12 +293,12 @@
     padding-right: var(--spacing-lg);
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
-    
+
     /* Use CSS custom property for dynamic viewport height */
     min-height: calc(var(--vh, 1vh) * 100);
     min-height: 100vh; /* Fallback */
     min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-    
+
     position: relative;
   }
 
@@ -315,7 +315,7 @@
       padding-right: var(--spacing-md);
       min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     }
-    
+
     .section-content {
       padding-left: 0;
       padding-right: 0;
@@ -603,7 +603,7 @@
 }
 
 /* High contrast mode support */
-@media (prefers-contrast: high) {
+@media (prefers-contrast: more) {
   :root {
     --athenity-text-body: #ffffff;
     --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.5);

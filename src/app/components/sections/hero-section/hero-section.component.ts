@@ -1,9 +1,20 @@
-import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, AfterViewInit, OnDestroy, PLATFORM_ID, inject } from '@angular/core';
-import { CommonModule, isPlatformBrowser } from '@angular/common';
-import { ThreeParticleBackgroundComponent } from '../../three-particle-background/three-particle-background.component';
-import { SECTION_IDS } from '../../../shared/constants/section.constants';
-import { ScrollOrchestrationService } from '../../../services/scroll-orchestration.service';
-import { NativeScrollAnimationService } from '../../../services/animation/native-scroll-animation.service';
+import {
+  Component,
+  Input,
+  Output,
+  EventEmitter,
+  ViewChild,
+  ElementRef,
+  AfterViewInit,
+  OnDestroy,
+  PLATFORM_ID,
+  inject
+} from '@angular/core';
+import {CommonModule, isPlatformBrowser} from '@angular/common';
+import {ThreeParticleBackgroundComponent} from '../../three-particle-background/three-particle-background.component';
+import {SECTION_IDS} from '../../../shared/constants/section.constants';
+import {ScrollOrchestrationService} from '../../../services/scroll-orchestration.service';
+import {NativeScrollAnimationService} from '../../../services/animation/native-scroll-animation.service';
 
 @Component({
   selector: 'app-hero-section',
@@ -13,25 +24,20 @@ import { NativeScrollAnimationService } from '../../../services/animation/native
   styleUrls: ['./hero-section.component.css']
 })
 export class HeroSectionComponent implements AfterViewInit, OnDestroy {
-  private readonly platformId = inject(PLATFORM_ID);
-  
   // Configuration variables (customizable - at top of file)
   @Input() scrollState: any = null;
   @Input() titlePrefix: string = 'Nós Desenvolvemos ';
   @Input() titleHighlight: string = 'Momentos';
   @Input() titleSuffix: string = '.';
-  
   // Event outputs
   @Output() ctaClicked = new EventEmitter<Event>();
   @Output() sectionReady = new EventEmitter<ElementRef>();
-  
   // Component references
   @ViewChild('heroBg') heroBg!: ElementRef;
   @ViewChild(ThreeParticleBackgroundComponent) particleBackground!: ThreeParticleBackgroundComponent;
-  
   // Constants
   readonly SECTION_ID = SECTION_IDS.HERO;
-  
+  private readonly platformId = inject(PLATFORM_ID);
   // Private properties for animations
   private heroTitle!: HTMLElement;
   private heroSubtitle!: HTMLElement;
@@ -40,8 +46,9 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
   private nativeScrollService = new NativeScrollAnimationService();
   private scrollHandler: (() => void) | null = null;
 
-  constructor(private scrollService: ScrollOrchestrationService) {}
-  
+  constructor(private scrollService: ScrollOrchestrationService) {
+  }
+
   ngAfterViewInit(): void {
     if (!isPlatformBrowser(this.platformId)) {
       return;
@@ -49,12 +56,12 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
 
     // Get element references
     this.heroTitle = document.querySelector('#hero-title') as HTMLElement;
-    this.heroSubtitle = document.querySelector('#hero-subtitle') as HTMLElement; 
+    this.heroSubtitle = document.querySelector('#hero-subtitle') as HTMLElement;
     this.heroCta = document.querySelector('#hero-cta') as HTMLElement;
     this.scrollHint = document.querySelector('#scroll-hint') as HTMLElement;
 
     this.sectionReady.emit(this.heroBg);
-    
+
     // Set up all hero animations and interactions
     this.setupScrollAnimations();
     this.setupScrollHintAnimation();
@@ -66,9 +73,16 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
     if (isPlatformBrowser(this.platformId)) {
       this.nativeScrollService.destroy();
       if (this.scrollHandler) {
-        window.removeEventListener('scroll', this.scrollHandler, { passive: true } as any);
+        window.removeEventListener('scroll', this.scrollHandler, {passive: true} as any);
       }
     }
+  }
+
+  /**
+   * Handle CTA click
+   */
+  onCtaClick(event: Event): void {
+    this.ctaClicked.emit(event);
   }
 
   /**
@@ -101,7 +115,7 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
       }
     };
 
-    window.addEventListener('scroll', throttledScrollHandler, { passive: true });
+    window.addEventListener('scroll', throttledScrollHandler, {passive: true});
   }
 
   /**
@@ -109,13 +123,13 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
    */
   private updateParallaxElements(): void {
     if (!isPlatformBrowser(this.platformId)) return;
-    
+
     const heroSection = document.getElementById('hero');
     if (!heroSection) return;
 
     const rect = heroSection.getBoundingClientRect();
     const windowHeight = window.innerHeight;
-    
+
     // Calculate scroll progress (0 = hero starts entering viewport, 1 = hero completely exits)
     const sectionTop = rect.top;
     const sectionHeight = rect.height;
@@ -125,20 +139,20 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
       // 0-20%: Gentle resistance - small movement
       const resistanceProgress = progress / 0.2;
       const resistance = resistanceProgress * 0.2;
-      
+
       this.heroTitle.style.transform = `translateY(${-resistance * 40}px)`;
       this.heroTitle.style.opacity = Math.max(0.7, 1 - resistance * 0.3).toString();
-      
+
       this.heroSubtitle.style.transform = `translateY(${-resistance * 25}px)`;
       this.heroSubtitle.style.opacity = Math.max(0.8, 1 - resistance * 0.2).toString();
     } else {
       // >20%: Acceleration - progressively larger movement
       const accelerationProgress = (progress - 0.2) / 0.8;
       const acceleratedMovement = 0.2 + (accelerationProgress * accelerationProgress * 2);
-      
+
       this.heroTitle.style.transform = `translateY(${-acceleratedMovement * 100}px)`;
       this.heroTitle.style.opacity = Math.max(0, 1 - acceleratedMovement * 1.5).toString();
-      
+
       this.heroSubtitle.style.transform = `translateY(${-acceleratedMovement * 80}px)`;
       this.heroSubtitle.style.opacity = Math.max(0, 1 - acceleratedMovement * 1.2).toString();
 
@@ -163,13 +177,6 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
 
     // Add CSS animation class instead of using GSAP
     this.scrollHint.classList.add('pulse-float');
-  }
-
-  /**
-   * Handle CTA click
-   */
-  onCtaClick(event: Event): void {
-    this.ctaClicked.emit(event);
   }
 
   /**
@@ -208,25 +215,25 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
 
       if (this.heroTitle) {
         this.heroTitle.style.transform = `
-          translateX(${mouseX * 15}px) 
-          translateY(${mouseY * 10}px) 
-          rotateX(${mouseY * 2}deg) 
+          translateX(${mouseX * 15}px)
+          translateY(${mouseY * 10}px)
+          rotateX(${mouseY * 2}deg)
           rotateY(${mouseX * 2}deg)
         `;
       }
 
       if (this.heroSubtitle) {
         this.heroSubtitle.style.transform = `
-          translateX(${mouseX * 8}px) 
-          translateY(${mouseY * 5}px) 
-          rotateX(${mouseY * 1}deg) 
+          translateX(${mouseX * 8}px)
+          translateY(${mouseY * 5}px)
+          rotateX(${mouseY * 1}deg)
           rotateY(${mouseX * 1}deg)
         `;
       }
 
       if (this.heroCta) {
         this.heroCta.style.transform = `
-          translateX(${mouseX * 5}px) 
+          translateX(${mouseX * 5}px)
           translateY(${mouseY * 3}px)
         `;
       }
@@ -265,18 +272,18 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
 
       if (this.heroTitle) {
         this.heroTitle.style.transform = `
-          translateX(${tiltX * 20}px) 
-          translateY(${tiltY * 15}px) 
-          rotateX(${tiltY * 3}deg) 
+          translateX(${tiltX * 20}px)
+          translateY(${tiltY * 15}px)
+          rotateX(${tiltY * 3}deg)
           rotateY(${tiltX * 3}deg)
         `;
       }
 
       if (this.heroSubtitle) {
         this.heroSubtitle.style.transform = `
-          translateX(${tiltX * 12}px) 
-          translateY(${tiltY * 8}px) 
-          rotateX(${tiltY * 2}deg) 
+          translateX(${tiltX * 12}px)
+          translateY(${tiltY * 8}px)
+          rotateX(${tiltY * 2}deg)
           rotateY(${tiltX * 2}deg)
         `;
       }
@@ -331,13 +338,11 @@ export class HeroSectionComponent implements AfterViewInit, OnDestroy {
         // Visual feedback: brief scale animation on clicked element
         const target = event.target as HTMLElement;
         if (target && (target.closest('#hero-title') || target.closest('#hero-subtitle') || target.closest('#hero-cta'))) {
-          gsap.to(target, {
-            scale: 1.05,
-            duration: 0.1,
-            ease: 'power2.out',
-            yoyo: true,
-            repeat: 1
-          });
+          const el = target as HTMLElement
+          el?.animate(
+            [{transform: 'scale(1)'}, {transform: 'scale(1.05)'}, {transform: 'scale(1)'}],
+            {duration: 160, easing: 'ease-out'}
+          )
         }
       }
     };
